@@ -24,3 +24,9 @@
 .outline-link { flex: 1; text-align: left; padding: 2px 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .outline-link:hover { color: var(--accent); }
 .outline-empty { color: var(--fg-muted); font-size: var(--fs-small); padding: 8px; }
+
+.breadcrumbs { display: flex; align-items: center; gap: 6px; font-size: var(--fs-small); color: var(--fg-muted); overflow: hidden; }
+.bc-file { color: var(--fg); font-weight: 500; }
+.bc-sep { color: var(--fg-muted); margin: 0 4px; }
+.bc-item { display: inline-flex; align-items: center; }
+.bc-item:last-child .bc-text { color: var(--accent); font-weight: 500; }
