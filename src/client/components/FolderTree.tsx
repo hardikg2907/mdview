@@ -1,5 +1,6 @@
 import { useState } from 'preact/hooks';
 import type { TreeNode } from '../../shared/types.js';
+import { IconChevronRight, IconFolder, IconFolderOpen, IconFile, IconFileMd } from './Icons.js';
 
 interface Props {
   tree: TreeNode[];
@@ -9,9 +10,15 @@ interface Props {
 
 export function FolderTree({ tree, currentPath, onSelect }: Props) {
   return (
-    <ul class="tree">
+    <ul class="tree" role="tree">
       {tree.map((node) => (
-        <TreeItem key={node.relPath} node={node} currentPath={currentPath} onSelect={onSelect} depth={0} />
+        <TreeItem
+          key={node.relPath}
+          node={node}
+          currentPath={currentPath}
+          onSelect={onSelect}
+          depth={0}
+        />
       ))}
     </ul>
   );
@@ -26,19 +33,35 @@ interface ItemProps {
 
 function TreeItem({ node, currentPath, onSelect, depth }: ItemProps) {
   const [open, setOpen] = useState(true);
-  const pad = { paddingLeft: `${8 + depth * 14}px` };
+  // Indent: leftmost gutter for guide rails + per-level offset.
+  const indent = `${10 + depth * 14}px`;
 
   if (node.type === 'dir') {
     return (
-      <li>
-        <button class="tree-item tree-dir" style={pad} onClick={() => setOpen((o) => !o)}>
-          <span class={`chev ${open ? 'open' : ''}`} aria-hidden>▸</span>
+      <li class="tree-li tree-li-dir" role="treeitem" aria-expanded={open}>
+        <button
+          class={`tree-item tree-dir ${open ? 'is-open' : ''}`}
+          style={{ paddingLeft: indent }}
+          onClick={() => setOpen((o) => !o)}
+        >
+          <span class={`chev ${open ? 'open' : ''}`} aria-hidden>
+            <IconChevronRight size={12} />
+          </span>
+          <span class="tree-icon" aria-hidden>
+            {open ? <IconFolderOpen size={15} /> : <IconFolder size={15} />}
+          </span>
           <span class="name">{node.name}</span>
         </button>
-        {open && node.children && (
-          <ul>
+        {open && node.children && node.children.length > 0 && (
+          <ul class="tree-children" style={{ paddingLeft: `${10 + depth * 14 + 7}px` }}>
             {node.children.map((c) => (
-              <TreeItem key={c.relPath} node={c} currentPath={currentPath} onSelect={onSelect} depth={depth + 1} />
+              <TreeItem
+                key={c.relPath}
+                node={c}
+                currentPath={currentPath}
+                onSelect={onSelect}
+                depth={depth + 1}
+              />
             ))}
           </ul>
         )}
@@ -49,13 +72,17 @@ function TreeItem({ node, currentPath, onSelect, depth }: ItemProps) {
   const isMd = node.isMarkdown ?? false;
   const isCurrent = currentPath === node.relPath;
   return (
-    <li>
+    <li class="tree-li tree-li-file" role="treeitem">
       <button
         class={`tree-item tree-file ${isMd ? '' : 'is-disabled'} ${isCurrent ? 'is-current' : ''}`}
-        style={pad}
+        style={{ paddingLeft: indent }}
         disabled={!isMd}
         onClick={() => isMd && onSelect(node.relPath)}
+        title={node.name}
       >
+        <span class="tree-icon" aria-hidden>
+          {isMd ? <IconFileMd size={14} /> : <IconFile size={14} />}
+        </span>
         <span class="name">{node.name}</span>
       </button>
     </li>

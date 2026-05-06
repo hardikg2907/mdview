@@ -4,10 +4,17 @@ import { useTree, treeSignal } from './hooks/useTree.js';
 import { fileSignal, fileLoading, fileError, loadFile } from './hooks/useFile.js';
 import { useScrollSpy } from './hooks/useScrollSpy.js';
 import { useSSE } from './hooks/useSSE.js';
+import {
+  treeCollapsedSignal,
+  outlineCollapsedSignal,
+  toggleTreeCollapsed,
+  toggleOutlineCollapsed,
+} from './hooks/useUiState.js';
 import { FolderTree } from './components/FolderTree.js';
 import { Content } from './components/Content.js';
 import { Outline } from './components/Outline.js';
-import { Breadcrumbs } from './components/Breadcrumbs.js';
+import { Header } from './components/Header.js';
+import { IconPanelLeftOpen, IconPanelRightOpen } from './components/Icons.js';
 import type { TreeNode } from '../shared/types.js';
 
 function initialPath(): string | null {
@@ -36,6 +43,9 @@ export function App() {
   const tree = useTree();
   const [currentPath, setCurrentPath] = useState<string | null>(initialPath());
   const mainRef = useRef<HTMLElement | null>(null);
+
+  const treeCollapsed = treeCollapsedSignal.value;
+  const outlineCollapsed = outlineCollapsedSignal.value;
 
   // First load: if no path and dir-mode, load the first md file
   useEffect(() => {
@@ -113,16 +123,45 @@ export function App() {
   const file = fileSignal.value;
   const treeData = treeSignal.value;
 
+  const shellClasses = [
+    'app-shell',
+    treeCollapsed ? 'tree-collapsed' : '',
+    outlineCollapsed ? 'outline-collapsed' : '',
+  ].filter(Boolean).join(' ');
+
   return (
-    <div class="app-shell">
-      <aside class="pane-tree">
-        {treeData && (
-          <FolderTree tree={treeData.tree} currentPath={currentPath} onSelect={handleSelect} />
+    <div class={shellClasses}>
+      <aside class="pane-tree" aria-label="File tree">
+        {treeCollapsed ? (
+          <button
+            class="rail-btn"
+            aria-label="Expand file tree"
+            title="Expand file tree"
+            onClick={toggleTreeCollapsed}
+          >
+            <IconPanelLeftOpen size={15} />
+            <span class="rail-label">FILES</span>
+          </button>
+        ) : (
+          treeData && (
+            <FolderTree
+              tree={treeData.tree}
+              currentPath={currentPath}
+              onSelect={handleSelect}
+            />
+          )
         )}
       </aside>
 
       <header class="pane-header">
-        <Breadcrumbs outline={file?.outline ?? []} fileName={file?.title ?? null} />
+        <Header
+          outline={file?.outline ?? []}
+          fileName={file?.title ?? null}
+          treeCollapsed={treeCollapsed}
+          outlineCollapsed={outlineCollapsed}
+          onToggleTree={toggleTreeCollapsed}
+          onToggleOutline={toggleOutlineCollapsed}
+        />
       </header>
 
       <main class="pane-main" ref={mainRef as never}>
@@ -131,8 +170,20 @@ export function App() {
         {file && <Content file={file} onInternalNavigate={handleInternalNav} />}
       </main>
 
-      <aside class="pane-outline">
-        {file && <Outline nodes={file.outline} onJump={handleJump} />}
+      <aside class="pane-outline" aria-label="Outline">
+        {outlineCollapsed ? (
+          <button
+            class="rail-btn"
+            aria-label="Expand outline"
+            title="Expand outline"
+            onClick={toggleOutlineCollapsed}
+          >
+            <IconPanelRightOpen size={15} />
+            <span class="rail-label">OUTLINE</span>
+          </button>
+        ) : (
+          file && <Outline nodes={file.outline} onJump={handleJump} />
+        )}
       </aside>
     </div>
   );
