@@ -17,6 +17,7 @@ interface Props {
   outlineCollapsed: boolean;
   onToggleTree: () => void;
   onToggleOutline: () => void;
+  onJumpHeading: (id: string | null) => void;
 }
 
 export function Header({
@@ -26,6 +27,7 @@ export function Header({
   outlineCollapsed,
   onToggleTree,
   onToggleOutline,
+  onJumpHeading,
 }: Props) {
   const theme = themeSignal.value;
   return (
@@ -43,7 +45,7 @@ export function Header({
       </div>
 
       <div class="header-center">
-        <Breadcrumbs outline={outline} fileName={fileName} />
+        <Breadcrumbs outline={outline} fileName={fileName} onJump={onJumpHeading} />
       </div>
 
       <div class="header-right">

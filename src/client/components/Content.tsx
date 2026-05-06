@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'preact/hooks';
 import type { RenderedFile } from '../../shared/types.js';
 import { renderMermaidIn } from '../lib/mermaid-loader.js';
 import { wireInternalLinks } from '../lib/link-router.js';
+import { wireCopyButtons } from '../lib/copy-buttons.js';
 
 interface Props {
   file: RenderedFile;
@@ -16,6 +17,7 @@ export function Content({ file, onInternalNavigate }: Props) {
     ref.current.innerHTML = file.html;
     void renderMermaidIn(ref.current);
     wireInternalLinks(ref.current, onInternalNavigate);
+    wireCopyButtons(ref.current);
   }, [file]);
 
   return (

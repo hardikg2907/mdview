@@ -119,6 +119,14 @@ export function App() {
     history.replaceState(history.state, '', `#${id}`);
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
   };
+  const handleJumpHeading = (id: string | null) => {
+    if (id === null) {
+      history.replaceState(history.state, '', window.location.pathname + window.location.search);
+      mainRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    handleJump(id);
+  };
 
   const file = fileSignal.value;
   const treeData = treeSignal.value;
@@ -161,6 +169,7 @@ export function App() {
           outlineCollapsed={outlineCollapsed}
           onToggleTree={toggleTreeCollapsed}
           onToggleOutline={toggleOutlineCollapsed}
+          onJumpHeading={handleJumpHeading}
         />
       </header>
 

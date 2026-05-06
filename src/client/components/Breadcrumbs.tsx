@@ -4,6 +4,7 @@ import { activeHeadingId } from '../hooks/useScrollSpy.js';
 interface Props {
   outline: OutlineNode[];
   fileName: string | null;
+  onJump: (id: string | null) => void;
 }
 
 function findPath(
@@ -24,11 +25,10 @@ function normalize(s: string): string {
   return s.trim().toLowerCase();
 }
 
-export function Breadcrumbs({ outline, fileName }: Props) {
+export function Breadcrumbs({ outline, fileName, onJump }: Props) {
   const id = activeHeadingId.value;
   let path = id ? findPath(outline, id) ?? [] : [];
 
-  // Strip a leading H1 entry if its text equals the file title (avoid duplicate).
   if (
     fileName &&
     path.length > 0 &&
@@ -40,13 +40,32 @@ export function Breadcrumbs({ outline, fileName }: Props) {
 
   return (
     <nav class="breadcrumbs" aria-label="Current section">
-      {fileName && <span class="bc-file">{fileName}</span>}
-      {path.map((node) => (
-        <span key={node.id} class="bc-item">
-          <span class="bc-sep" aria-hidden>›</span>
-          <span class="bc-text">{node.text}</span>
-        </span>
-      ))}
+      {fileName && (
+        <button
+          type="button"
+          class="bc-item bc-root"
+          onClick={() => onJump(null)}
+          title="Scroll to top"
+        >
+          {fileName}
+        </button>
+      )}
+      {path.map((node, i) => {
+        const isCurrent = i === path.length - 1;
+        return (
+          <span key={node.id} class="bc-step">
+            <span class="bc-sep" aria-hidden>›</span>
+            <button
+              type="button"
+              class={`bc-item${isCurrent ? ' is-current' : ''}`}
+              onClick={() => onJump(node.id)}
+              aria-current={isCurrent ? 'location' : undefined}
+            >
+              {node.text}
+            </button>
+          </span>
+        );
+      })}
     </nav>
   );
 }

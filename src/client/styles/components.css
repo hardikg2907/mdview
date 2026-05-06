@@ -267,7 +267,7 @@
 .breadcrumbs {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
   font-size: 13px;
   color: var(--fg-muted);
   overflow: hidden;
@@ -275,36 +275,51 @@
   font-family: var(--font-sans);
   min-width: 0;
 }
-.bc-file {
-  color: var(--fg-strong);
-  font-weight: 600;
-  font-family: var(--font-serif);
-  font-size: 14.5px;
-  letter-spacing: .005em;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  flex-shrink: 1;
+.bc-step {
+  display: inline-flex;
+  align-items: center;
   min-width: 0;
+  flex-shrink: 1;
 }
 .bc-sep {
   color: var(--fg-subtle);
-  margin: 0 4px;
-  font-weight: 300;
+  margin: 0 2px;
+  font-weight: 400;
+  user-select: none;
 }
 .bc-item {
-  display: inline-flex;
-  align-items: center;
-  overflow: hidden;
-  flex-shrink: 1;
-  min-width: 0;
-}
-.bc-text {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--fg-muted);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  max-width: 240px;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: background var(--transition), color var(--transition);
 }
-.bc-item:last-child .bc-text {
+.bc-item:hover {
+  background: var(--accent-tint);
+  color: var(--fg-strong);
+}
+.bc-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.bc-root {
+  color: var(--fg-strong);
+  font-weight: 600;
+  max-width: 320px;
+}
+.bc-item.is-current {
   color: var(--accent);
-  font-weight: 500;
+  background: var(--accent-tint);
 }
 
 /* ============================================================
