@@ -323,6 +323,27 @@
 }
 
 /* ============================================================
+   READING PROGRESS
+   ============================================================ */
+.reading-progress {
+  position: sticky;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: transparent;
+  pointer-events: none;
+  z-index: 10;
+  margin: 0 -48px 0;
+}
+.reading-progress__bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent-strong));
+  transition: width 60ms linear;
+  box-shadow: 0 0 8px var(--accent-tint);
+}
+
+/* ============================================================
    STATUS
    ============================================================ */
 .status {

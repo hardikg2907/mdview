@@ -14,6 +14,7 @@ import { FolderTree } from './components/FolderTree.js';
 import { Content } from './components/Content.js';
 import { Outline } from './components/Outline.js';
 import { Header } from './components/Header.js';
+import { ReadingProgress } from './components/ReadingProgress.js';
 import { IconPanelLeftOpen, IconPanelRightOpen } from './components/Icons.js';
 import type { TreeNode } from '../shared/types.js';
 
@@ -174,6 +175,7 @@ export function App() {
       </header>
 
       <main class="pane-main" ref={mainRef as never}>
+        <ReadingProgress scroller={mainRef.current} trigger={file} />
         {fileLoading.value && <div class="status">Loading…</div>}
         {fileError.value && <div class="status status-error">Error: {fileError.value}</div>}
         {file && <Content file={file} onInternalNavigate={handleInternalNav} />}
