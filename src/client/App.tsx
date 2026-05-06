@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'preact/hooks';
 import { useTheme } from './hooks/useTheme.js';
 import { useTree, treeSignal } from './hooks/useTree.js';
 import { fileSignal, fileLoading, fileError, loadFile } from './hooks/useFile.js';
-import { useScrollSpy } from './hooks/useScrollSpy.js';
+import { useScrollSpy, activeHeadingId } from './hooks/useScrollSpy.js';
 import { useSSE } from './hooks/useSSE.js';
 import {
   treeCollapsedSignal,
@@ -131,11 +131,13 @@ export function App() {
   };
   const handleJump = (id: string) => {
     history.replaceState(history.state, '', `#${id}`);
+    activeHeadingId.value = id;
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
   };
   const handleJumpHeading = (id: string | null) => {
     if (id === null) {
       history.replaceState(history.state, '', window.location.pathname + window.location.search);
+      activeHeadingId.value = null;
       mainRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }

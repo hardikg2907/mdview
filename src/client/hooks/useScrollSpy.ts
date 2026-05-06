@@ -8,10 +8,13 @@ export const breadcrumbPath = signal<string[]>([]);
 
 export function pickActiveId(positions: HeadingPos[], scrollTop: number): string | null {
   if (positions.length === 0) return null;
+  // scroll-margin-top on headings is 80px; matched here, plus a small tolerance
+  // for sub-pixel rounding from smooth-scroll easing landings.
   const offset = 80;
+  const tolerance = 6;
   let active = positions[0]!.id;
   for (const p of positions) {
-    if (p.top - offset <= scrollTop) active = p.id;
+    if (p.top - offset <= scrollTop + tolerance) active = p.id;
     else break;
   }
   return active;
