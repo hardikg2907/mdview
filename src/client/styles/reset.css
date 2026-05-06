@@ -6,11 +6,27 @@ body {
   font-size: var(--fs-body);
   line-height: 1.6;
   color: var(--fg);
-  background: var(--bg);
+  background-color: var(--bg);
+  background-image: var(--paper-grain);
+  background-size: var(--paper-grain-size);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 img, picture, video, svg { display: block; max-width: 100%; }
-button { font: inherit; cursor: pointer; background: none; border: none; color: inherit; }
+button {
+  font: inherit;
+  cursor: pointer;
+  background: none;
+  border: none;
+  color: inherit;
+}
+button:disabled { cursor: default; }
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
 a { color: var(--link); text-decoration: none; }
-a:hover { text-decoration: underline; }
+a:hover { color: var(--link-hover); }
+ul, ol { list-style: none; }

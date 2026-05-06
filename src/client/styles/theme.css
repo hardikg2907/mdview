@@ -1,48 +1,140 @@
 :root {
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, "Cascadia Mono", "Liberation Mono", Consolas, monospace;
-  --fs-body: 16px;
+  /* Editorial serif stack for prose */
+  --font-serif:
+    "Iowan Old Style", "Charter", "Sitka Text", "Source Serif Pro",
+    "Source Serif 4", "Georgia", "Times New Roman", ui-serif, serif;
+  /* Sans for chrome (header, sidebars, controls) — kept system, not Inter */
+  --font-sans:
+    "Söhne", "Inter Tight", -apple-system, BlinkMacSystemFont,
+    "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --font-mono:
+    ui-monospace, "JetBrains Mono", "SF Mono", "Cascadia Mono",
+    Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+
+  --fs-body: 17px;
   --fs-small: 13px;
-  --line-width: 72ch;
-  --radius: 6px;
-  --transition: 160ms ease;
+  --line-width: 70ch;
+  --radius: 8px;
+  --radius-sm: 4px;
+  --transition: 200ms ease;
+  --transition-pane: 220ms cubic-bezier(.2, .8, .2, 1);
+
+  /* Layout dimensions */
+  --tree-width: 264px;
+  --outline-width: 280px;
+  --rail-width: 36px;
+  --header-height: 52px;
 }
 
+/* ----- LIGHT (warm cream paper) ----- */
 :root[data-theme="light"], :root:not([data-theme]) {
-  --bg: #fcfbf8;
+  --bg: #fcfbf6;
   --bg-elev: #ffffff;
-  --bg-sidebar: #f5f3ee;
-  --fg: #1f2328;
-  --fg-muted: #6e7681;
-  --border: #e5e3dc;
-  --link: #2563eb;
+  --bg-sidebar: #f4f1e8;
+  --bg-sidebar-2: #ede9dd;
+  --fg: #1f1a14;
+  --fg-strong: #0f0c08;
+  --fg-muted: #7a6e5e;
+  --fg-subtle: #a89c87;
+  --border: #e3dccb;
+  --border-strong: #d6cdb6;
+  --link: #ad3a02;
+  --link-hover: #c2410c;
   --accent: #c2410c;
-  --accent-soft: #fde6d6;
-  --code-bg: #f3efe6;
+  --accent-strong: #9a3409;
+  --accent-soft: #fbe4d0;
+  --accent-tint: #fdf3eb;
+  --code-bg: #f3eede;
   --quote-bar: #c2410c;
   --quote-bg: #fdf3eb;
-  --shadow: 0 1px 2px rgba(0,0,0,0.04);
+  --quote-fg: #5b4a36;
+  --shadow: 0 1px 2px rgba(60, 40, 20, .05), 0 1px 0 rgba(60, 40, 20, .03);
+  --shadow-md: 0 6px 24px -10px rgba(60, 40, 20, .12),
+               0 2px 6px -2px rgba(60, 40, 20, .06);
+  --selection-bg: #fbe4d0;
+  --selection-fg: #2b1707;
+
+  /* Faint paper grain — orange-tinted radial dots, very low opacity */
+  --paper-grain:
+    radial-gradient(circle at 1px 1px, rgba(120, 70, 30, .045) 1px, transparent 0);
+  --paper-grain-size: 22px 22px;
 }
 
+/* ----- DARK (deep coffee, warmer) ----- */
 :root[data-theme="dark"] {
-  --bg: #0f1115;
-  --bg-elev: #161a21;
-  --bg-sidebar: #11141a;
-  --fg: #e6edf3;
-  --fg-muted: #8b949e;
-  --border: #21262d;
-  --link: #58a6ff;
-  --accent: #f0883e;
+  --bg: #16110c;
+  --bg-elev: #1d1812;
+  --bg-sidebar: #120e0a;
+  --bg-sidebar-2: #1a140e;
+  --fg: #ece4d6;
+  --fg-strong: #fbf6ec;
+  --fg-muted: #9a8c75;
+  --fg-subtle: #6e6453;
+  --border: #2a2218;
+  --border-strong: #38301f;
+  --link: #f59e6b;
+  --link-hover: #ffb380;
+  --accent: #f59e6b;
+  --accent-strong: #ffb380;
   --accent-soft: #3a210e;
-  --code-bg: #161a21;
-  --quote-bar: #f0883e;
-  --quote-bg: #1a130a;
-  --shadow: 0 1px 2px rgba(0,0,0,0.5);
+  --accent-tint: #221610;
+  --code-bg: #221b13;
+  --quote-bar: #f59e6b;
+  --quote-bg: #1f160d;
+  --quote-fg: #c2b496;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .4);
+  --shadow-md: 0 8px 28px -10px rgba(0, 0, 0, .55),
+               0 2px 8px -2px rgba(0, 0, 0, .3);
+  --selection-bg: #c2410c;
+  --selection-fg: #fff7ec;
+
+  --paper-grain:
+    radial-gradient(circle at 1px 1px, rgba(245, 200, 140, .035) 1px, transparent 0);
+  --paper-grain-size: 22px 22px;
 }
 
+/* Smooth global transitions on theme swap */
+html, body {
+  transition: background-color var(--transition), color var(--transition);
+}
+.app-shell, .pane-tree, .pane-header, .pane-outline,
+.tree-item, .outline-row, .icon-btn {
+  transition:
+    background-color var(--transition),
+    color var(--transition),
+    border-color var(--transition);
+}
+
+/* Selection highlight in accent */
+::selection {
+  background: var(--selection-bg);
+  color: var(--selection-fg);
+}
+
+/* Shiki theme switching */
 :root[data-theme="dark"] .shiki span { color: var(--shiki-dark) !important; }
 :root[data-theme="dark"] .shiki { background-color: var(--shiki-dark-bg) !important; }
 :root[data-theme="light"] .shiki span,
 :root:not([data-theme]) .shiki span { color: var(--shiki-light) !important; }
 :root[data-theme="light"] .shiki,
 :root:not([data-theme]) .shiki { background-color: var(--shiki-light-bg) !important; }
+
+/* Scrollbar polish */
+.pane-tree, .pane-outline, .pane-main {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+.pane-main::-webkit-scrollbar,
+.pane-tree::-webkit-scrollbar,
+.pane-outline::-webkit-scrollbar { width: 10px; height: 10px; }
+.pane-main::-webkit-scrollbar-thumb,
+.pane-tree::-webkit-scrollbar-thumb,
+.pane-outline::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 999px;
+  border: 2px solid var(--bg);
+}
+.pane-tree::-webkit-scrollbar-thumb,
+.pane-outline::-webkit-scrollbar-thumb {
+  border-color: var(--bg-sidebar);
+}
