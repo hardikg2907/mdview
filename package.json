@@ -6,7 +6,10 @@
   "bin": {
     "mdview": "./bin/mdview.mjs"
   },
-  "files": ["bin", "dist"],
+  "files": [
+    "bin",
+    "dist"
+  ],
   "scripts": {
     "dev:client": "vite",
     "build:client": "vite build",
@@ -18,7 +21,7 @@
     "typecheck": "tsc --noEmit && tsc -p tsconfig.client.json --noEmit"
   },
   "dependencies": {
-    "@fastify/static": "^7.0.4",
+    "@fastify/static": "^8.3.0",
     "chokidar": "^4.0.1",
     "fastify": "^5.0.0",
     "gray-matter": "^4.0.3",
