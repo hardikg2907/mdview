@@ -17,6 +17,7 @@ export function SearchBar({ scroller, fileTrigger: _fileTrigger }: Props) {
   const [query, setQuery] = useState('');
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [activeIdx, setActiveIdx] = useState(0);
+  const [domCount, setDomCount] = useState(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   // Auto-focus on mount
@@ -32,6 +33,7 @@ export function SearchBar({ scroller, fileTrigger: _fileTrigger }: Props) {
     if (!query.trim()) {
       setHits([]);
       setActiveIdx(0);
+      setDomCount(0);
       return;
     }
     const found = findHits(scroller, query);
@@ -39,10 +41,14 @@ export function SearchBar({ scroller, fileTrigger: _fileTrigger }: Props) {
     setActiveIdx(0);
     if (found.length > 0) {
       highlightHits(found, 0);
+      const liveCount = scroller.querySelectorAll('mark.search-hit').length;
+      setDomCount(liveCount);
       requestAnimationFrame(() => {
         const active = scroller.querySelector('mark.search-hit.is-active');
         active?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       });
+    } else {
+      setDomCount(0);
     }
   }, [query, scroller, _fileTrigger]);
 
@@ -100,9 +106,9 @@ export function SearchBar({ scroller, fileTrigger: _fileTrigger }: Props) {
       />
       <span class="search-count" aria-live="polite">
         {query.trim()
-          ? hits.length === 0
+          ? domCount === 0
             ? 'No matches'
-            : `${activeIdx + 1} / ${hits.length}`
+            : `${Math.min(activeIdx + 1, domCount)} / ${domCount}`
           : ''}
       </span>
       <button

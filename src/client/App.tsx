@@ -19,6 +19,7 @@ import { Lightbox } from './components/Lightbox.js';
 import { ContentSkeleton } from './components/ContentSkeleton.js';
 import { SearchBar } from './components/SearchBar.js';
 import { searchOpenSignal, closeSearch } from './hooks/useSearch.js';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts.js';
 import { IconPanelLeftOpen, IconPanelRightOpen } from './components/Icons.js';
 import type { TreeNode } from '../shared/types.js';
 
@@ -86,6 +87,10 @@ export function App() {
   }, [fileSignal.value]);
 
   useScrollSpy(mainRef.current);
+  useKeyboardShortcuts({
+    outline: fileSignal.value?.outline ?? [],
+    onJumpHeading: (id) => handleJump(id),
+  });
 
   // Live reload: re-fetch the current file on change
   const onWatch = useCallback((e: { kind: string; relPath: string }) => {
@@ -179,10 +184,10 @@ export function App() {
           onToggleOutline={toggleOutlineCollapsed}
           onJumpHeading={handleJumpHeading}
         />
+        <ReadingProgress scroller={mainRef.current} trigger={file} />
       </header>
 
       <main class="pane-main" ref={mainRef as never}>
-        <ReadingProgress scroller={mainRef.current} trigger={file} />
         {searchOpenSignal.value && (
           <SearchBar scroller={mainRef.current} fileTrigger={file} />
         )}

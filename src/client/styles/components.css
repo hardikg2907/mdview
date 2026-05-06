@@ -456,15 +456,14 @@ mark.search-hit.is-active {
    READING PROGRESS
    ============================================================ */
 .reading-progress {
-  position: sticky;
-  top: 0;
+  position: absolute;
   left: 0;
   right: 0;
+  bottom: -1px;
   height: 2px;
   background: transparent;
   pointer-events: none;
   z-index: 10;
-  margin: 0 -48px 0;
 }
 .reading-progress__bar {
   height: 100%;
