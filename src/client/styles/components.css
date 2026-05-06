@@ -1,1 +1,14 @@
-/* Filled in Tasks 20–23 */
+.tree { list-style: none; padding: 8px 0; font-size: var(--fs-small); }
+.tree ul { list-style: none; }
+.tree-item {
+  display: flex; align-items: center; gap: 6px;
+  width: 100%; padding: 4px 12px; text-align: left;
+  border-radius: var(--radius);
+  transition: background var(--transition), color var(--transition);
+}
+.tree-item:hover { background: var(--accent-soft); }
+.tree-file.is-current { background: var(--accent-soft); color: var(--accent); font-weight: 500; }
+.tree-file.is-disabled { color: var(--fg-muted); cursor: default; }
+.tree-file.is-disabled:hover { background: transparent; }
+.tree .chev { display: inline-block; transition: transform var(--transition); color: var(--fg-muted); }
+.tree .chev.open { transform: rotate(90deg); }
