@@ -38,15 +38,11 @@ export async function highlightCode(code: string, lang: string): Promise<string>
     }
   }
   try {
-    const html = highlighter.codeToHtml(code, {
+    return highlighter.codeToHtml(code, {
       lang: effectiveLang || 'text',
       themes: { light: 'github-light', dark: 'github-dark' },
-      defaultColor: 'light',
+      defaultColor: false,
     });
-    return html
-      .replace(/&#x3C;/g, '&lt;')
-      .replace(/&#x3E;/g, '&gt;')
-      .replace(/(&lt;)<\/span><span[^>]*>([\w-]+)<\/span><span([^>]*)>>/g, '<span$3>$1$2&gt;');
   } catch {
     return `<pre class="shiki shiki-fallback"><code>${escapeHtml(code)}</code></pre>`;
   }

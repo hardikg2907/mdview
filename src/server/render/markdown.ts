@@ -27,14 +27,6 @@ md.use(anchor, {
 });
 md.use(taskLists, { enabled: false, label: false });
 
-function reorderCheckboxAttrs(html: string): string {
-  return html.replace(
-    /<input class="task-list-item-checkbox"( checked="")?( disabled="")? type="checkbox">/g,
-    (_m, checked, disabled) =>
-      `<input class="task-list-item-checkbox" type="checkbox"${disabled ?? ''}${checked ?? ''}>`,
-  );
-}
-
 export async function renderMarkdown(source: string): Promise<RenderResult> {
   const tokens = md.parse(source, {});
   for (const token of tokens) {
@@ -51,6 +43,6 @@ export async function renderMarkdown(source: string): Promise<RenderResult> {
       }
     }
   }
-  const html = reorderCheckboxAttrs(md.renderer.render(tokens, md.options, {}));
+  const html = md.renderer.render(tokens, md.options, {});
   return { html, tokens };
 }

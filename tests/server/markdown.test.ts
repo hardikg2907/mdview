@@ -17,7 +17,10 @@ describe('renderMarkdown', () => {
 
   it('renders task lists with checkboxes', async () => {
     const { html } = await renderMarkdown('- [x] done\n- [ ] todo');
-    expect(html).toMatch(/<input[^>]+type="checkbox"[^>]+checked/);
+    const inputs = html.match(/<input[^>]*>/g) ?? [];
+    expect(inputs.length).toBeGreaterThanOrEqual(2);
+    expect(inputs.every((tag) => /type="checkbox"/.test(tag))).toBe(true);
+    expect(inputs.some((tag) => /\bchecked\b/.test(tag))).toBe(true);
   });
 
   it('renders strikethrough', async () => {
