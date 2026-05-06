@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
+import { useSignal } from '@preact/signals';
 import {
   clearHighlights,
   findHits,
@@ -15,9 +16,9 @@ interface Props {
 
 export function SearchBar({ scroller, fileTrigger: _fileTrigger }: Props) {
   const [query, setQuery] = useState('');
-  const [hits, setHits] = useState<SearchHit[]>([]);
-  const [activeIdx, setActiveIdx] = useState(0);
-  const [domCount, setDomCount] = useState(0);
+  const hits = useSignal<SearchHit[]>([]);
+  const activeIdx = useSignal(0);
+  const domCount = useSignal(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   // Auto-focus on mount
@@ -31,33 +32,36 @@ export function SearchBar({ scroller, fileTrigger: _fileTrigger }: Props) {
     if (!scroller) return;
     clearHighlights(scroller);
     if (!query.trim()) {
-      setHits([]);
-      setActiveIdx(0);
-      setDomCount(0);
+      hits.value = [];
+      activeIdx.value = 0;
+      domCount.value = 0;
       return;
     }
     const found = findHits(scroller, query);
-    setHits(found);
-    setActiveIdx(0);
+    hits.value = found;
+    activeIdx.value = 0;
     if (found.length > 0) {
       highlightHits(found, 0);
       const liveCount = scroller.querySelectorAll('mark.search-hit').length;
-      setDomCount(liveCount);
+      domCount.value = liveCount;
       requestAnimationFrame(() => {
         const active = scroller.querySelector('mark.search-hit.is-active');
         active?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       });
     } else {
-      setDomCount(0);
+      domCount.value = 0;
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, scroller, _fileTrigger]);
 
   // Update active mark when activeIdx changes
   useEffect(() => {
-    if (!scroller || hits.length === 0) return;
-    const active = setActiveMark(scroller, activeIdx);
+    if (!scroller || hits.value.length === 0) return;
+    const active = setActiveMark(scroller, activeIdx.value);
     active?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }, [activeIdx, scroller, hits.length]);
+    // Subscribe to activeIdx so this effect re-runs on change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeIdx.value, scroller, hits.value.length]);
 
   // Cleanup highlights on unmount
   useEffect(() => {
@@ -67,12 +71,12 @@ export function SearchBar({ scroller, fileTrigger: _fileTrigger }: Props) {
   }, [scroller]);
 
   function gotoNext() {
-    if (hits.length === 0) return;
-    setActiveIdx((i) => (i + 1) % hits.length);
+    if (hits.value.length === 0) return;
+    activeIdx.value = (activeIdx.value + 1) % hits.value.length;
   }
   function gotoPrev() {
-    if (hits.length === 0) return;
-    setActiveIdx((i) => (i - 1 + hits.length) % hits.length);
+    if (hits.value.length === 0) return;
+    activeIdx.value = (activeIdx.value - 1 + hits.value.length) % hits.value.length;
   }
 
   function handleKeyDown(ev: KeyboardEvent) {
@@ -106,16 +110,16 @@ export function SearchBar({ scroller, fileTrigger: _fileTrigger }: Props) {
       />
       <span class="search-count" aria-live="polite">
         {query.trim()
-          ? domCount === 0
+          ? domCount.value === 0
             ? 'No matches'
-            : `${Math.min(activeIdx + 1, domCount)} / ${domCount}`
+            : `${Math.min(activeIdx.value + 1, domCount.value)} / ${domCount.value}`
           : ''}
       </span>
       <button
         type="button"
         class="search-btn"
         onClick={gotoPrev}
-        disabled={hits.length === 0}
+        disabled={hits.value.length === 0}
         aria-label="Previous match"
         title="Previous (↑ / Shift+Enter)"
       >
@@ -125,7 +129,7 @@ export function SearchBar({ scroller, fileTrigger: _fileTrigger }: Props) {
         type="button"
         class="search-btn"
         onClick={gotoNext}
-        disabled={hits.length === 0}
+        disabled={hits.value.length === 0}
         aria-label="Next match"
         title="Next (↓ / Enter)"
       >
