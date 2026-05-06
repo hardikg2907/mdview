@@ -73,6 +73,19 @@
   margin: 1.4em 0 .3em;
 }
 
+/* ===== Doc stats strip ===== */
+.doc-stats {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: .04em;
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  margin-bottom: 1.6em;
+  padding-bottom: .8em;
+  border-bottom: 1px dashed var(--border);
+}
+
 /* ===== Body text & lists ===== */
 .markdown-content p {
   margin: 0.95em 0;
