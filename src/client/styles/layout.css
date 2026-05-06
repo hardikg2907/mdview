@@ -1,1 +1,26 @@
-/* Filled in Task 18 */
+.app-shell {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr) 280px;
+  grid-template-rows: 48px minmax(0, 1fr);
+  grid-template-areas:
+    "tree  header  outline"
+    "tree  main    outline";
+  height: 100%;
+  background: var(--bg);
+}
+
+.app-shell > .pane-tree { grid-area: tree; background: var(--bg-sidebar); border-right: 1px solid var(--border); overflow: auto; }
+.app-shell > .pane-header { grid-area: header; background: var(--bg-elev); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 16px; gap: 12px; }
+.app-shell > .pane-main { grid-area: main; overflow: auto; padding: 32px 48px 96px; }
+.app-shell > .pane-outline { grid-area: outline; background: var(--bg-sidebar); border-left: 1px solid var(--border); overflow: auto; padding: 16px 12px; }
+
+.pane-main .markdown-body { max-width: var(--line-width); margin: 0 auto; }
+
+@media (max-width: 1100px) {
+  .app-shell { grid-template-columns: 240px minmax(0, 1fr) 0; }
+  .app-shell > .pane-outline { display: none; }
+}
+@media (max-width: 800px) {
+  .app-shell { grid-template-columns: 0 minmax(0, 1fr) 0; }
+  .app-shell > .pane-tree { display: none; }
+}
