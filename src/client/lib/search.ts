@@ -34,13 +34,16 @@ export function findHits(root: HTMLElement, query: string): SearchHit[] {
   const needle = query.toLowerCase();
   const hits: SearchHit[] = [];
 
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+  // Restrict search to the rendered markdown only — exclude search bar UI,
+  // doc-stats, frontmatter block, and our injected widgets.
+  const contentRoot = root.querySelector<HTMLElement>('.markdown-content') ?? root;
+  const walker = document.createTreeWalker(contentRoot, NodeFilter.SHOW_TEXT, {
     acceptNode(node) {
       if (!node.nodeValue) return NodeFilter.FILTER_REJECT;
       if (isInsideMark(node)) return NodeFilter.FILTER_REJECT;
       const parent = node.parentElement;
       if (!parent) return NodeFilter.FILTER_REJECT;
-      if (parent.closest('.heading-anchor, .copy-btn, .external-icon')) {
+      if (parent.closest('.heading-anchor, .copy-btn, .external-icon, .search-bar')) {
         return NodeFilter.FILTER_REJECT;
       }
       return NodeFilter.FILTER_ACCEPT;

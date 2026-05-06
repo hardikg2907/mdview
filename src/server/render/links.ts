@@ -2,6 +2,7 @@ import path from 'node:path/posix';
 
 const MD_EXT_RE = /\.(md|markdown|mdx)$/i;
 const HREF_RE = /<a\s+([^>]*?)href="([^"#?]*)(\?[^"#]*)?(#[^"]*)?"([^>]*)>/gi;
+const IMG_SRC_RE = /<img\s+([^>]*?)src="([^"]+)"([^>]*)>/gi;
 
 export function tagInternalLinks(html: string, currentRelPath: string): string {
   const currentDir = path.dirname(currentRelPath);
@@ -14,5 +15,17 @@ export function tagInternalLinks(html: string, currentRelPath: string): string {
     const resolved = path.normalize(path.join(currentDir, target));
     const internal = `${resolved}${query ?? ''}${hash ?? ''}`;
     return `<a ${pre}href="${internal}" data-internal-link="${internal}"${post}>`;
+  });
+}
+
+export function rewriteImageSrc(html: string, currentRelPath: string): string {
+  const currentDir = path.dirname(currentRelPath);
+  return html.replace(IMG_SRC_RE, (full, pre, src, post) => {
+    if (!src) return full;
+    if (/^(https?:\/\/|data:|\/__asset\/)/i.test(src)) return full;
+    const trimmed = src.replace(/^\/+/, '');
+    const resolved = path.normalize(path.join(currentDir, trimmed));
+    if (resolved.startsWith('..')) return full;
+    return `<img ${pre}src="/__asset/${resolved}"${post}>`;
   });
 }

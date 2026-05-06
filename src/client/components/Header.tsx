@@ -6,9 +6,11 @@ import {
   IconPanelLeftOpen,
   IconPanelRightClose,
   IconPanelRightOpen,
+  IconKeyboard,
 } from './Icons.js';
 import type { OutlineNode } from '../../shared/types.js';
 import { themeSignal, toggleTheme } from '../hooks/useTheme.js';
+import { openShortcutsPanel } from '../hooks/useShortcutsPanel.js';
 
 interface Props {
   outline: OutlineNode[];
@@ -49,6 +51,14 @@ export function Header({
       </div>
 
       <div class="header-right">
+        <button
+          class="icon-btn"
+          aria-label="Keyboard shortcuts"
+          title="Keyboard shortcuts (?)"
+          onClick={openShortcutsPanel}
+        >
+          <IconKeyboard />
+        </button>
         <button
           class="icon-btn theme-btn"
           aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}

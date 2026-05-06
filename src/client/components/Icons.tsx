@@ -126,6 +126,21 @@ export function IconPanelRightOpen({ size = 16, class: cls }: IconProps) {
   );
 }
 
+export function IconKeyboard({ size = 16, class: cls }: IconProps) {
+  return (
+    <svg {...base(size)} class={cls} aria-hidden>
+      <rect x="2" y="6" width="20" height="13" rx="2" />
+      <line x1="6" y1="10" x2="6.01" y2="10" />
+      <line x1="10" y1="10" x2="10.01" y2="10" />
+      <line x1="14" y1="10" x2="14.01" y2="10" />
+      <line x1="18" y1="10" x2="18.01" y2="10" />
+      <line x1="6" y1="14" x2="6.01" y2="14" />
+      <line x1="18" y1="14" x2="18.01" y2="14" />
+      <line x1="9" y1="14" x2="15" y2="14" />
+    </svg>
+  );
+}
+
 export function IconList({ size = 16, class: cls }: IconProps) {
   return (
     <svg {...base(size)} class={cls} aria-hidden>

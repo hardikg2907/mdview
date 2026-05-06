@@ -4,7 +4,7 @@ import { resolveSafePath } from '../fs/resolve.js';
 import { renderMarkdown } from '../render/markdown.js';
 import { extractOutline } from '../render/outline.js';
 import { parseFrontmatter } from '../render/frontmatter.js';
-import { tagInternalLinks } from '../render/links.js';
+import { tagInternalLinks, rewriteImageSrc } from '../render/links.js';
 import type { RenderedFile, RootInfo } from '../../shared/types.js';
 
 export function registerApiFile(
@@ -44,7 +44,7 @@ export function registerApiFile(
 
     const { data, body } = parseFrontmatter(raw);
     const { html: rawHtml, tokens } = await renderMarkdown(body);
-    const html = tagInternalLinks(rawHtml, relPath);
+    const html = rewriteImageSrc(tagInternalLinks(rawHtml, relPath), relPath);
     const outline = extractOutline(tokens);
     const title =
       (typeof data?.title === 'string' ? data.title : null) ??

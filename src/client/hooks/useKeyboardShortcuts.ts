@@ -4,6 +4,11 @@ import { toggleTreeCollapsed, toggleOutlineCollapsed } from './useUiState.js';
 import { toggleTheme } from './useTheme.js';
 import { openSearch, closeSearch, searchOpenSignal } from './useSearch.js';
 import { closeLightbox, lightboxSignal } from './useLightbox.js';
+import {
+  openShortcutsPanel,
+  closeShortcutsPanel,
+  shortcutsPanelSignal,
+} from './useShortcutsPanel.js';
 import { activeHeadingId } from './useScrollSpy.js';
 
 function flattenIds(nodes: OutlineNode[]): string[] {
@@ -39,11 +44,23 @@ export function useKeyboardShortcuts({ outline, onJumpHeading }: Args): void {
           ev.preventDefault();
           return;
         }
+        if (shortcutsPanelSignal.value) {
+          closeShortcutsPanel();
+          ev.preventDefault();
+          return;
+        }
         if (searchOpenSignal.value) {
           closeSearch();
           ev.preventDefault();
           return;
         }
+      }
+
+      // ? — open shortcuts panel (allowed even while typing if Shift+/)
+      if (ev.key === '?' && !typing) {
+        ev.preventDefault();
+        openShortcutsPanel();
+        return;
       }
 
       // Open search: ⌘F / Ctrl+F (intercept browser default)
