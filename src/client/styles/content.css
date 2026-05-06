@@ -313,20 +313,33 @@
 }
 .mermaid-block svg { max-width: 100%; height: auto; }
 
-/* Anchor heading link icons (markdown-it-anchor) — keep subtle */
-.markdown-content .header-anchor {
+/* ===== Heading permalinks ===== */
+.markdown-content .heading-anchor {
+  display: inline-block;
+  margin-left: .4em;
+  padding: 0 .25em;
+  font-family: var(--font-mono);
+  font-size: .7em;
+  font-weight: 600;
+  font-style: normal;
   color: var(--fg-subtle);
-  margin-left: .35em;
   text-decoration: none;
+  border-radius: var(--radius-sm);
   opacity: 0;
-  transition: opacity var(--transition), color var(--transition);
+  transform: translateY(-1px);
+  transition: opacity var(--transition), color var(--transition),
+              background var(--transition);
+  vertical-align: middle;
 }
-.markdown-content h1:hover .header-anchor,
-.markdown-content h2:hover .header-anchor,
-.markdown-content h3:hover .header-anchor,
-.markdown-content h4:hover .header-anchor,
-.markdown-content h5:hover .header-anchor,
-.markdown-content h6:hover .header-anchor {
+.markdown-content :is(h1,h2,h3,h4,h5,h6):hover .heading-anchor,
+.markdown-content .heading-anchor:focus-visible {
   opacity: 1;
 }
-.markdown-content .header-anchor:hover { color: var(--accent); }
+.markdown-content .heading-anchor:hover {
+  color: var(--accent);
+  background: var(--accent-tint);
+}
+.markdown-content .heading-anchor.is-copied {
+  opacity: 1;
+  color: var(--accent);
+}
