@@ -1,1 +1,64 @@
-/* Filled in Task 21 */
+.markdown-content h1, .markdown-content h2, .markdown-content h3,
+.markdown-content h4, .markdown-content h5, .markdown-content h6 {
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  margin: 1.6em 0 0.6em;
+  scroll-margin-top: 64px;
+}
+.markdown-content h1 { font-size: 2rem;   color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: .25em; }
+.markdown-content h2 { font-size: 1.5rem; color: var(--fg); }
+.markdown-content h3 { font-size: 1.2rem; color: var(--fg); }
+.markdown-content h4 { font-size: 1rem;   color: var(--fg-muted); text-transform: uppercase; letter-spacing: .04em; }
+
+.markdown-content p, .markdown-content ul, .markdown-content ol { margin: 0.85em 0; }
+.markdown-content ul, .markdown-content ol { padding-left: 1.5em; }
+.markdown-content li { margin: .25em 0; }
+.markdown-content li::marker { color: var(--accent); }
+
+.markdown-content blockquote {
+  margin: 1em 0; padding: .5em 1em;
+  border-left: 3px solid var(--quote-bar);
+  background: var(--quote-bg);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  color: var(--fg-muted);
+}
+
+.markdown-content code {
+  font-family: var(--font-mono); font-size: .9em;
+  background: var(--code-bg); padding: 1px 5px; border-radius: 4px;
+}
+.markdown-content pre {
+  margin: 1em 0; padding: 14px 16px;
+  border-radius: var(--radius);
+  overflow: auto;
+  box-shadow: var(--shadow);
+}
+.markdown-content pre code { background: transparent; padding: 0; }
+
+.markdown-content table {
+  border-collapse: collapse; margin: 1em 0; font-size: .95em;
+  background: var(--bg-elev); border-radius: var(--radius); overflow: hidden;
+  box-shadow: var(--shadow);
+}
+.markdown-content th, .markdown-content td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+.markdown-content th { background: var(--bg-sidebar); }
+
+.markdown-content a { color: var(--link); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 2px; }
+.markdown-content a:hover { text-decoration-thickness: 2px; }
+
+.markdown-content hr { border: 0; border-top: 1px solid var(--border); margin: 2em 0; }
+
+.markdown-content img { border-radius: var(--radius); margin: 1em auto; }
+
+.markdown-content input[type="checkbox"] { margin-right: .5em; }
+
+.frontmatter-block {
+  background: var(--bg-elev); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 8px 12px; margin-bottom: 1em;
+  font-size: var(--fs-small);
+}
+.frontmatter-block summary { cursor: pointer; color: var(--fg-muted); }
+.frontmatter-block pre { margin-top: 8px; }
+
+.mermaid-block { margin: 1em 0; text-align: center; }
+.mermaid-block svg { max-width: 100%; height: auto; }
