@@ -12,7 +12,7 @@ export function parseFrontmatter(raw: string): FrontmatterResult {
   try {
     const parsed = matter(raw);
     return {
-      data: parsed.data && Object.keys(parsed.data).length >= 0 ? parsed.data : null,
+      data: parsed.data ?? null,
       body: parsed.content.replace(/^\n+/, ''),
     };
   } catch {
