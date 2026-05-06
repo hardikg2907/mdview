@@ -1,0 +1,47 @@
+{
+  "name": "mdview",
+  "version": "0.1.0",
+  "description": "Local CLI markdown viewer with live reload, outline navigation, and folder browsing",
+  "type": "module",
+  "bin": {
+    "mdview": "./bin/mdview.mjs"
+  },
+  "files": ["bin", "dist"],
+  "scripts": {
+    "dev:client": "vite",
+    "build:client": "vite build",
+    "build:server": "tsup",
+    "build": "npm run build:client && npm run build:server",
+    "start": "node bin/mdview.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.client.json --noEmit"
+  },
+  "dependencies": {
+    "@fastify/static": "^7.0.4",
+    "chokidar": "^4.0.1",
+    "fastify": "^5.0.0",
+    "gray-matter": "^4.0.3",
+    "markdown-it": "^14.1.0",
+    "markdown-it-anchor": "^9.2.0",
+    "markdown-it-task-lists": "^2.1.1",
+    "open": "^10.1.0",
+    "shiki": "^1.22.0"
+  },
+  "devDependencies": {
+    "@preact/signals": "^1.3.0",
+    "@types/markdown-it": "^14.1.2",
+    "@types/node": "^22.7.0",
+    "happy-dom": "^15.7.4",
+    "mermaid": "^11.3.0",
+    "preact": "^10.24.2",
+    "tsup": "^8.3.0",
+    "typescript": "^5.6.3",
+    "vite": "^6.0.0",
+    "vitest": "^2.1.0",
+    "wouter-preact": "^3.3.5"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
