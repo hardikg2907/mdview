@@ -13,9 +13,8 @@
     "isolatedModules": true,
     "verbatimModuleSyntax": false,
     "outDir": "./dist",
-    "rootDir": "./src",
     "types": ["node"]
   },
-  "include": ["src/cli.ts", "src/server/**/*", "src/shared/**/*", "tests/server/**/*"],
+  "include": ["src/cli.ts", "src/server/**/*", "src/shared/**/*", "src/types/**/*", "tests/server/**/*"],
   "exclude": ["src/client", "tests/client", "node_modules", "dist"]
 }
