@@ -17,6 +17,8 @@ import { Header } from './components/Header.js';
 import { ReadingProgress } from './components/ReadingProgress.js';
 import { Lightbox } from './components/Lightbox.js';
 import { ContentSkeleton } from './components/ContentSkeleton.js';
+import { SearchBar } from './components/SearchBar.js';
+import { searchOpenSignal, closeSearch } from './hooks/useSearch.js';
 import { IconPanelLeftOpen, IconPanelRightOpen } from './components/Icons.js';
 import type { TreeNode } from '../shared/types.js';
 
@@ -65,6 +67,9 @@ export function App() {
   }, [tree, currentPath]);
 
   useEffect(() => { void loadFile(currentPath); }, [currentPath]);
+
+  // Close search whenever the file changes (highlights would be stale)
+  useEffect(() => { closeSearch(); }, [currentPath]);
 
   // After file loads, restore hash anchor (if any)
   useEffect(() => {
@@ -178,6 +183,9 @@ export function App() {
 
       <main class="pane-main" ref={mainRef as never}>
         <ReadingProgress scroller={mainRef.current} trigger={file} />
+        {searchOpenSignal.value && (
+          <SearchBar scroller={mainRef.current} fileTrigger={file} />
+        )}
         {fileLoading.value && !file && <ContentSkeleton />}
         {fileError.value && <div class="status status-error">Error: {fileError.value}</div>}
         {file && <Content file={file} onInternalNavigate={handleInternalNav} />}
