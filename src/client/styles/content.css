@@ -117,6 +117,19 @@
   color: var(--link-hover);
   text-decoration-thickness: 2px;
 }
+.markdown-content a.is-external .external-icon {
+  display: inline-block;
+  margin-left: .15em;
+  font-size: .8em;
+  font-weight: 600;
+  vertical-align: 0.08em;
+  opacity: .7;
+  transition: opacity var(--transition), transform var(--transition);
+}
+.markdown-content a.is-external:hover .external-icon {
+  opacity: 1;
+  transform: translate(1px, -1px);
+}
 
 /* ===== Blockquote — confident accent bar + paper tint ===== */
 .markdown-content blockquote {

@@ -4,6 +4,7 @@ import { renderMermaidIn } from '../lib/mermaid-loader.js';
 import { wireInternalLinks } from '../lib/link-router.js';
 import { wireCopyButtons } from '../lib/copy-buttons.js';
 import { wirePermalinks } from '../lib/permalinks.js';
+import { markExternalLinks } from '../lib/external-links.js';
 
 interface Props {
   file: RenderedFile;
@@ -20,6 +21,7 @@ export function Content({ file, onInternalNavigate }: Props) {
     wireInternalLinks(ref.current, onInternalNavigate);
     wireCopyButtons(ref.current);
     wirePermalinks(ref.current);
+    markExternalLinks(ref.current);
   }, [file]);
 
   return (
