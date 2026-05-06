@@ -30,3 +30,6 @@
 .bc-sep { color: var(--fg-muted); margin: 0 4px; }
 .bc-item { display: inline-flex; align-items: center; }
 .bc-item:last-child .bc-text { color: var(--accent); font-weight: 500; }
+
+.status { color: var(--fg-muted); padding: 1em 0; }
+.status-error { color: #c2410c; }
