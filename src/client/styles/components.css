@@ -396,6 +396,53 @@
 }
 
 /* ============================================================
+   LOADING SKELETON
+   ============================================================ */
+.skeleton {
+  max-width: var(--line-width);
+  margin: 0 auto;
+  padding-top: 1em;
+}
+.skeleton > * {
+  background: linear-gradient(
+    90deg,
+    var(--bg-elev) 0%,
+    var(--accent-tint) 50%,
+    var(--bg-elev) 100%
+  );
+  background-size: 200% 100%;
+  border-radius: var(--radius-sm);
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+.skeleton__h1 {
+  height: 36px; width: 70%; margin: .4em 0 .6em;
+}
+.skeleton__h2 {
+  height: 24px; width: 50%; margin: 2em 0 .8em;
+}
+.skeleton__meta {
+  height: 12px; width: 40%; margin-bottom: 1.6em;
+}
+.skeleton__line {
+  height: 14px; margin: .55em 0;
+}
+.skeleton__code {
+  height: 110px; margin: 1.5em 0;
+  background: linear-gradient(
+    90deg,
+    var(--code-bg) 0%,
+    var(--accent-tint) 50%,
+    var(--code-bg) 100%
+  );
+  background-size: 200% 100%;
+}
+@keyframes skeleton-pulse {
+  0%   { background-position: 200% 0; opacity: .9; }
+  50%  { opacity: .6; }
+  100% { background-position: -200% 0; opacity: .9; }
+}
+
+/* ============================================================
    STATUS
    ============================================================ */
 .status {
