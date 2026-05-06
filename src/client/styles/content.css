@@ -237,6 +237,14 @@
   margin: 1.3em auto;
   box-shadow: var(--shadow-md);
 }
+.markdown-content img.img-zoomable {
+  cursor: zoom-in;
+  transition: transform var(--transition), box-shadow var(--transition);
+}
+.markdown-content img.img-zoomable:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-lg, var(--shadow-md));
+}
 
 /* ===== Task lists — checkbox only, no bullet ===== */
 .markdown-content ul.contains-task-list {

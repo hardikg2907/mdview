@@ -5,6 +5,7 @@ import { wireInternalLinks } from '../lib/link-router.js';
 import { wireCopyButtons } from '../lib/copy-buttons.js';
 import { wirePermalinks } from '../lib/permalinks.js';
 import { markExternalLinks } from '../lib/external-links.js';
+import { wireImageLightbox } from '../lib/image-lightbox.js';
 import { computeDocStats, formatStats } from '../lib/doc-stats.js';
 
 interface Props {
@@ -25,6 +26,7 @@ export function Content({ file, onInternalNavigate }: Props) {
     wireCopyButtons(ref.current);
     wirePermalinks(ref.current);
     markExternalLinks(ref.current);
+    wireImageLightbox(ref.current);
   }, [file]);
 
   return (

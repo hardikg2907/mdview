@@ -15,6 +15,7 @@ import { Content } from './components/Content.js';
 import { Outline } from './components/Outline.js';
 import { Header } from './components/Header.js';
 import { ReadingProgress } from './components/ReadingProgress.js';
+import { Lightbox } from './components/Lightbox.js';
 import { IconPanelLeftOpen, IconPanelRightOpen } from './components/Icons.js';
 import type { TreeNode } from '../shared/types.js';
 
@@ -180,6 +181,8 @@ export function App() {
         {fileError.value && <div class="status status-error">Error: {fileError.value}</div>}
         {file && <Content file={file} onInternalNavigate={handleInternalNav} />}
       </main>
+
+      <Lightbox />
 
       <aside class="pane-outline" aria-label="Outline">
         {outlineCollapsed ? (
