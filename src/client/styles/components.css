@@ -12,3 +12,15 @@
 .tree-file.is-disabled:hover { background: transparent; }
 .tree .chev { display: inline-block; transition: transform var(--transition); color: var(--fg-muted); }
 .tree .chev.open { transform: rotate(90deg); }
+
+.outline { font-size: var(--fs-small); }
+.outline ul { list-style: none; }
+.outline-row { display: flex; align-items: center; gap: 4px; padding: 2px 0; border-radius: var(--radius); transition: background var(--transition), color var(--transition); }
+.outline-row.is-active { background: var(--accent-soft); color: var(--accent); }
+.outline-row.is-active .outline-link { color: var(--accent); font-weight: 500; }
+.outline-toggle { width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; color: var(--fg-muted); transition: transform var(--transition); }
+.outline-toggle.open { transform: rotate(90deg); }
+.outline-toggle.is-spacer { visibility: hidden; }
+.outline-link { flex: 1; text-align: left; padding: 2px 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.outline-link:hover { color: var(--accent); }
+.outline-empty { color: var(--fg-muted); font-size: var(--fs-small); padding: 8px; }
