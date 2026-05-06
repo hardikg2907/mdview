@@ -1,1 +1,48 @@
-/* Filled in Task 17 */
+:root {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, "Cascadia Mono", "Liberation Mono", Consolas, monospace;
+  --fs-body: 16px;
+  --fs-small: 13px;
+  --line-width: 72ch;
+  --radius: 6px;
+  --transition: 160ms ease;
+}
+
+:root[data-theme="light"], :root:not([data-theme]) {
+  --bg: #fcfbf8;
+  --bg-elev: #ffffff;
+  --bg-sidebar: #f5f3ee;
+  --fg: #1f2328;
+  --fg-muted: #6e7681;
+  --border: #e5e3dc;
+  --link: #2563eb;
+  --accent: #c2410c;
+  --accent-soft: #fde6d6;
+  --code-bg: #f3efe6;
+  --quote-bar: #c2410c;
+  --quote-bg: #fdf3eb;
+  --shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+
+:root[data-theme="dark"] {
+  --bg: #0f1115;
+  --bg-elev: #161a21;
+  --bg-sidebar: #11141a;
+  --fg: #e6edf3;
+  --fg-muted: #8b949e;
+  --border: #21262d;
+  --link: #58a6ff;
+  --accent: #f0883e;
+  --accent-soft: #3a210e;
+  --code-bg: #161a21;
+  --quote-bar: #f0883e;
+  --quote-bg: #1a130a;
+  --shadow: 0 1px 2px rgba(0,0,0,0.5);
+}
+
+:root[data-theme="dark"] .shiki span { color: var(--shiki-dark) !important; }
+:root[data-theme="dark"] .shiki { background-color: var(--shiki-dark-bg) !important; }
+:root[data-theme="light"] .shiki span,
+:root:not([data-theme]) .shiki span { color: var(--shiki-light) !important; }
+:root[data-theme="light"] .shiki,
+:root:not([data-theme]) .shiki { background-color: var(--shiki-light-bg) !important; }
