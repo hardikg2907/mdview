@@ -27,6 +27,15 @@ Originally-deferred MVP-adjacent features. Build as a coordinated push once v1 h
 
 ---
 
+## Phase 4 — Editor extensions (VS Code, Zed)
+
+Distribute the viewer as a native side-panel inside the user's editor instead of (or alongside) the standalone server.
+
+- [ ] **VS Code extension** — webview panel that renders the active `.md` file using the mdview UI; auto-updates when the editor's active file changes; shares the in-editor theme; published to the VS Code Marketplace.
+- [ ] **Zed extension** — equivalent for Zed once their extension API supports webviews; similar UX (split-pane preview, theme follow, live update on save).
+- [ ] **Architecture** — extract the rendering pipeline + frontend into a reusable package so the standalone CLI, VS Code extension, and Zed extension all share one codebase. The extensions ship the renderer in-process (no spawning a Node server).
+- [ ] **Editor-aware features** — "Reveal in editor" link to jump back to source line, sync scroll position with editor cursor, optionally watch only the active file rather than the workspace.
+
 ## Phase 3 — Workspaces
 
 Bigger architectural shift: one long-running server hosts multiple "workspaces" (named projects), switchable from the UI without restarting.
