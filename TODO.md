@@ -18,13 +18,13 @@ Roadmap of pending work. v1 is shipped and in active use; phases 2 and 3 are the
 
 Originally-deferred MVP-adjacent features. Build as a coordinated push once v1 has been used enough to validate the shape.
 
-- [ ] **Folder-wide search** — server endpoint that greps every md file in the open folder; results grouped by file with snippets; reuse the existing search-bar UI for input + a result-list panel.
-- [ ] **Static export** — `mdview --export <out>`: pre-render every md file in the folder to a self-contained HTML bundle; inline assets (or copy to `out/__asset/`); simulate folder navigation client-side; no runtime server required.
-- [ ] **Resizable sidebars** — drag handles between tree/content and content/outline panes; persist widths to `localStorage`; snap to default at min threshold; collapse if dragged below threshold.
-- [ ] **Math / LaTeX** — KaTeX, dynamically imported only when a doc contains `$...$` or `$$...$$`; same lazy pattern as mermaid.
-- [ ] **Custom themes / per-project config** — read `.mdview.json` at folder root for palette, font, line-width, default-collapsed states; built-in theme picker in header (classic / paper / nord / solarized).
-- [ ] **Extended vim-style shortcuts** — `gg` / `G` top/bottom; `H` / `L` prev/next file; `n` / `N` next/prev search match; `]` / `[` next/prev heading at same level; `Ctrl+D` / `Ctrl+U` half-page scroll. Reflect in shortcuts panel.
-- [ ] **Focus mode / minimap** — focus mode dims everything except the section under the active heading; thin minimap rail at right edge showing doc structure, draggable to scroll.
+- [x] **Folder-wide search** — server endpoint that greps every md file in the open folder; results grouped by file with snippets; reuse the existing search-bar UI for input + a result-list panel.
+- [~] **Static export** — dropped. Bundle-size cost (KaTeX SSR + duplicated render code) didn't justify the use case; the live server is the canonical way to read mdview content.
+- [x] **Resizable sidebars** — drag handles between tree/content and content/outline panes; persist widths to `localStorage`; snap to default at min threshold; collapse if dragged below threshold.
+- [x] **Math / LaTeX** — KaTeX, dynamically imported only when a doc contains `$...$` or `$$...$$`; same lazy pattern as mermaid.
+- [x] **Custom themes / per-project config** — read `.mdview.json` at folder root for palette, font, line-width, default-collapsed states; built-in theme picker in header (classic / paper / nord / solarized).
+- [x] **Extended vim-style shortcuts** — `gg` / `G` top/bottom; `H` / `L` prev/next file; `]` / `[` next/prev heading at same level; `Ctrl+D` / `Ctrl+U` half-page scroll. (`n` / `N` deferred — needs persisted-search-state plumbing.) Reflect in shortcuts panel.
+- [x] **Focus mode / minimap** — focus mode dims everything except the section whose content is at the viewport center; thin minimap rail at right edge showing doc structure, draggable to scroll.
 
 ---
 

@@ -6,7 +6,7 @@ import { computeDocStats, formatStats } from '../lib/doc-stats.js';
 import { formatRelativeTime, formatAbsoluteTime } from '../../shared/relative-time.js';
 import { applyFocus, clearFocus } from '../lib/focus-mode.js';
 import { focusModeSignal } from '../hooks/useUiState.js';
-import { activeHeadingId } from '../hooks/useScrollSpy.js';
+import { focusedSectionId } from '../hooks/useFocusedSection.js';
 
 interface Props {
   file: RenderedFile;
@@ -24,15 +24,18 @@ export function Content({ file, onInternalNavigate }: Props) {
     void runWires(ref.current, { onInternalNavigate }, defaultWires);
   }, [file]);
 
-  // Apply focus mode on toggle and on active heading change.
+  // Apply focus mode on toggle and on focused-section change. The focused
+  // section is the one whose content is at the vertical center of the
+  // viewport — distinct from the outline's `activeHeadingId`, which tracks
+  // the topmost-passed heading.
   useEffect(() => {
     if (!ref.current) return;
     if (focusModeSignal.value) {
-      applyFocus(ref.current, activeHeadingId.value);
+      applyFocus(ref.current, focusedSectionId.value);
     } else {
       clearFocus(ref.current);
     }
-  }, [focusModeSignal.value, activeHeadingId.value, file]);
+  }, [focusModeSignal.value, focusedSectionId.value, file]);
 
   return (
     <article class="markdown-body">

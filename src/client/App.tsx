@@ -5,6 +5,7 @@ import { usePalette } from './hooks/usePalette.js';
 import { useTree, treeSignal } from './hooks/useTree.js';
 import { fileSignal, fileLoading, fileError, loadFile } from './hooks/useFile.js';
 import { useScrollSpy, activeHeadingId, lockScrollSpy } from './hooks/useScrollSpy.js';
+import { useFocusedSection } from './hooks/useFocusedSection.js';
 import { useLiveReload } from './hooks/useLiveReload.js';
 import { usePathRouting } from './hooks/usePathRouting.js';
 import {
@@ -95,6 +96,7 @@ export function App() {
   }, [fileSignal.value]);
 
   useScrollSpy(mainRef.current);
+  useFocusedSection(mainRef.current);
   useEffect(() => { setMainScroller(mainRef.current); }, [mainRef.current]);
   useLiveReload({ currentPath, scrollerRef: mainRef });
   useKeyboardShortcuts({

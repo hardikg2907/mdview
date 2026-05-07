@@ -73,8 +73,11 @@ export function useScrollSpy(scrollContainer: HTMLElement | null): void {
       refreshCache();
       compute();
     });
-    const content = scrollContainer.querySelector('.markdown-content');
-    if (content) mo.observe(content, { childList: true, subtree: true });
+    // Observe the scroller (subtree) — catches `.markdown-content` being
+    // added on first file-load AND its innerHTML being swapped on each
+    // file change. Observing `.markdown-content` directly misses the first
+    // case because it doesn't exist yet at hook-mount time.
+    mo.observe(scrollContainer, { childList: true, subtree: true });
 
     scrollContainer.addEventListener('scroll', onScroll, { passive: true });
     return () => {
