@@ -6,9 +6,10 @@ Roadmap of pending work. v1 is shipped and in active use; phases 2 and 3 are the
 
 ## Wrap-up (do soon, before phase 2)
 
-- [ ] Update `README.md` to reflect the real v1 feature set (theme toggle, search, permalinks, copy buttons, lightbox, doc stats, shortcuts panel, etc.)
-- [ ] Update `VERIFICATION.md` to match reality
-- [ ] `npm install -g .` — verify global install works and `mdview` is on PATH
+- [x] Update `README.md` to reflect the real v1 feature set
+- [x] Update `VERIFICATION.md` to match reality
+- [x] Add `docs/ARCHITECTURE.md`, `docs/CONTRIBUTING.md`, `docs/FEATURES.md` for new agents/contributors
+- [x] `npm install -g .` — verify global install works and `mdview` is on PATH
 - [ ] Dogfood: use `mdview` as the daily md reader for at least a week before starting phase 2 — surface real papercuts
 
 ---

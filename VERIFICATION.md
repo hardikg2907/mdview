@@ -1,64 +1,105 @@
-# Verification report — mdview v0.1.0
+# Manual verification scenarios
 
-End-to-end walk of the 8 product-spec scenarios.
+Walk through these against `test-fixtures/showcase.md` after any meaningful change. Subjective — meant for human eyes, not CI.
 
 ## Setup
 
 ```bash
 npm install && npm run build
+node bin/mdview.mjs ./test-fixtures --no-open
+# open http://127.0.0.1:7331/ in a browser
 ```
 
 ## Scenarios
 
 ### 1. Single-file mode
-- `node bin/mdview.mjs ./README.md --no-open`: server boots; `/api/tree` returns single-file tree; `/api/file?path=README.md` returns rendered HTML, outline, title.
-- Edit-and-save propagation: verified via SSE endpoint streaming watcher events.
-- Scroll preservation on reload: implemented in `App.tsx` via `mainRef.current.scrollTop` snapshot/restore around the SSE refetch.
+```bash
+node bin/mdview.mjs ./test-fixtures/showcase.md --no-open
+```
+- Folder tree shows one item (the file).
+- Outline pulls headings from the doc.
+- Edit the file in another editor, save → view updates, scroll position preserved.
 
 ### 2. Folder mode
-- `node bin/mdview.mjs ./<folder> --no-open`: `/api/tree` returns nested tree; non-md files marked `isMarkdown: false`.
-- Cross-file links: server's `tagInternalLinks` adds `data-internal-link="<resolved>"` for `.md`/`.markdown`/`.mdx` hrefs; client's `link-router.ts` intercepts clicks and calls `onNavigate` without a full page load.
+- Folder tree shows nested structure (`assets/`, `linked-doc.md`, `showcase.md`).
+- Click `linked-doc.md` → renders in the viewer (no full page reload).
+- Internal `[link](./linked-doc.md)` inside `showcase.md` navigates same way.
+- Internal `[anchor](#some-id)` jumps within the doc.
 
 ### 3. Long-doc orientation
-- Outline pulled from heading_open tokens, hierarchically nested by `extractOutline`. Tested with the plan file (40+ headings).
-- Collapsibility: each outline node has a fold-button when it has children (`Outline.tsx:34-43`).
-- Scroll-spy + breadcrumb: `useScrollSpy` updates `activeHeadingId` signal on scroll; `Breadcrumbs.tsx` renders the path from root to active node.
+- Outline lists every heading; depth visible via indentation + decay.
+- Scroll to a deep subsection → breadcrumb path updates, outline highlights the right item.
+- Click any outline item → smooth scrolls there + active highlight pins on the right one immediately.
+- Click any breadcrumb segment → smooth scroll to that level.
 
-### 4. Code-heavy doc
-- Server-side Shiki highlights all known languages with `themes: { light: 'github-light', dark: 'github-dark' }`, `defaultColor: false`. Unknown languages lazy-load via `loadLanguage`, fall back to plain `text` on error.
-- Verified via curl: rendered HTML for a code-heavy fixture contains `<pre class="shiki shiki-themes ...">` with theme styles.
+### 4. Code blocks
+- Six languages (TypeScript, Python, Go, JSON, bash, SQL) render with Shiki dual-theme highlighting.
+- Hover a code block → "Copy" button appears top-right.
+- Click "Copy" → clipboard receives the code; button briefly says "Copied".
 
-### 5. Mermaid doc
-- Mermaid fences are emitted as `<div class="mermaid-block" data-source="...">` by `markdown.ts`.
-- Client renders them only on docs that contain such blocks: `mermaid-loader.ts` does `import('mermaid')` only when `.mermaid-block` elements are found in the rendered HTML. Vite confirms `mermaid.core` and friends are split into separate chunks (lazy).
+### 5. Mermaid
+- Mermaid block renders as an SVG diagram.
+- Open DevTools → Network: `mermaid.core` chunk only loads on a page that contains a mermaid block.
 
-### 6. Theme follow
-- `useTheme.ts` listens to `prefers-color-scheme: dark` MQ and sets `data-theme` on `documentElement`. Theme variables in `theme.css` swap accordingly.
-- Verified by reading code rather than running in a browser; toggling color scheme switches theme without page reload per the implementation.
+### 6. Themes
+- Theme toggle (sun/moon icon, header right) flips light/dark instantly.
+- Reload — chosen theme persists.
+- `⌘\` shortcut also toggles.
 
-### 7. Anchor stability
-- `App.tsx` reads `window.location.hash` after file load and `scrollIntoView` on the matching id (auto for first paint, smooth for in-app jumps).
-- `markdown-it-anchor` adds stable slug ids to all headings.
+### 7. Anchors
+- Hover any heading → `#` appears on the right.
+- Click it → URL copied to clipboard.
+- Paste URL into a new tab → lands at exactly that section.
 
-### 8. Visual / engagement check
-- Tasteful color: H1 uses `--accent` (warm orange both modes), H2/H3 in `--fg`, blockquotes have a left bar in `--quote-bar` plus soft `--quote-bg` background, code blocks have rounded corners + soft shadow, outline active highlight uses `--accent-soft` background.
-- Smooth transitions: `--transition: 160ms ease` on outline highlight, link hover, tree-item background, chevron rotation.
-- Comfortable line width: `--line-width: 72ch` clamps prose width.
-- Best-effort assessment: feels inviting in CSS review; subjective UX judgement requires opening a real browser.
+### 8. Search
+- Press `/` or `⌘F` → search bar opens, input auto-focused.
+- Type a word → matches highlight in content; counter shows "1 / N".
+- Press `Enter` → next match (smooth scrolls into view).
+- Press `Esc` → search closes, highlights cleared.
+
+### 9. Quick switcher
+- Press `⌘P` → palette opens.
+- Type a fragment → results filter, accent-colored letters show what matched.
+- Arrow keys navigate; Enter opens; Esc closes.
+- Current file shows a "current" tag.
+
+### 10. Images & lightbox
+- `wave.svg` and `star.svg` render inline at their relative paths.
+- Hover an image → cursor becomes `zoom-in`.
+- Click → fullscreen lightbox with backdrop blur.
+- Esc or click outside → closes.
+
+### 11. External links
+- External links (e.g. https://vercel.com) get a small `↗` icon after the link text.
+- Click → opens in new tab.
+- Hover → icon brightens to accent color and lifts slightly.
+
+### 12. Task lists
+- `- [x] done` → custom-styled accent-filled checkbox with white check.
+- `- [ ] todo` → hollow checkbox.
+- No bullet point in front of checkboxes.
+
+### 13. Live reload
+- Edit `showcase.md` in another editor (add a heading or change a paragraph).
+- Save — view re-renders within ~100ms.
+- Scroll position is preserved.
+
+### 14. Sidebar collapse
+- Click the panel-left icon (header left) → tree collapses to a thin "FILES" rail; click rail to re-expand.
+- Same on the right with the panel-right icon and outline.
+- Reload — collapse state persists.
+
+### 15. Shortcuts panel
+- Press `?` (or click the keyboard icon in the header) → modal lists all shortcuts in three groups (Navigation / Find / View).
+- Esc or click-outside closes.
 
 ## Tests
-- Server: 31 / 31 passing (markdown, shiki, frontmatter, outline, resolve, tree, links).
-- Client: 3 / 3 passing (scroll-spy logic).
-- Both `tsc --noEmit` invocations clean.
 
-## Build size
-- Client bundle: ~3 MB total (mostly mermaid + transitive deps, all lazy-loaded). Initial-load JS for non-mermaid docs: ~30 KB.
-- Server bundle: ~14 KB (`bin/mdview.mjs`).
+```bash
+npm test            # 34 vitest unit tests
+npm run typecheck   # both tsconfigs clean
+```
 
-## Known follow-ups (deferred per spec)
-- Search (within-doc, across-folder)
-- Static export (`--export`)
-- Math / LaTeX
-- Custom themes
-- Vim-style keybindings
-- Focus mode / minimap
+## Known follow-ups
+
+See [`TODO.md`](TODO.md) for the phase 2/3/4 roadmap.
