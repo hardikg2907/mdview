@@ -9,6 +9,11 @@ import {
   closeShortcutsPanel,
   shortcutsPanelSignal,
 } from './useShortcutsPanel.js';
+import {
+  openPalette,
+  closePalette,
+  paletteOpenSignal,
+} from './useCommandPalette.js';
 import { activeHeadingId } from './useScrollSpy.js';
 
 function flattenIds(nodes: OutlineNode[]): string[] {
@@ -44,6 +49,11 @@ export function useKeyboardShortcuts({ outline, onJumpHeading }: Args): void {
           ev.preventDefault();
           return;
         }
+        if (paletteOpenSignal.value) {
+          closePalette();
+          ev.preventDefault();
+          return;
+        }
         if (shortcutsPanelSignal.value) {
           closeShortcutsPanel();
           ev.preventDefault();
@@ -54,6 +64,13 @@ export function useKeyboardShortcuts({ outline, onJumpHeading }: Args): void {
           ev.preventDefault();
           return;
         }
+      }
+
+      // ⌘P / Ctrl+P — open file switcher
+      if (meta && ev.key.toLowerCase() === 'p') {
+        ev.preventDefault();
+        openPalette();
+        return;
       }
 
       // ? — open shortcuts panel (allowed even while typing if Shift+/)

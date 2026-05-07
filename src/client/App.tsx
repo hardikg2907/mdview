@@ -17,6 +17,7 @@ import { Header } from './components/Header.js';
 import { ReadingProgress } from './components/ReadingProgress.js';
 import { Lightbox } from './components/Lightbox.js';
 import { ShortcutsPanel } from './components/ShortcutsPanel.js';
+import { CommandPalette } from './components/CommandPalette.js';
 import { ContentSkeleton } from './components/ContentSkeleton.js';
 import { SearchBar } from './components/SearchBar.js';
 import { searchOpenSignal, closeSearch } from './hooks/useSearch.js';
@@ -201,6 +202,7 @@ export function App() {
 
       <Lightbox />
       <ShortcutsPanel />
+      <CommandPalette currentPath={currentPath} onSelect={handleSelect} />
 
       <aside class="pane-outline" aria-label="Outline">
         {outlineCollapsed ? (

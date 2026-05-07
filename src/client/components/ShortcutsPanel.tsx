@@ -22,6 +22,7 @@ const GROUPS: Array<{ heading: string; items: Shortcut[] }> = [
   {
     heading: 'Find',
     items: [
+      { keys: [Mod, 'P'], label: 'Switch file (quick switcher)' },
       { keys: [Mod, 'F'], label: 'Open in-doc search' },
       { keys: ['/'], label: 'Open search (no modifier)' },
       { keys: ['Enter'], label: 'Next match (in search)' },
