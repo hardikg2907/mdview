@@ -6,3 +6,4 @@ bin/*.map
 *.log
 .vscode
 .idea
+mdview-*.tgz

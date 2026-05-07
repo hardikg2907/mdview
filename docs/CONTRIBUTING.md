@@ -33,7 +33,7 @@ Run all three before sending a change:
 
 ```bash
 npm run typecheck     # tsc --noEmit on both server and client tsconfigs
-npm test              # vitest run — 34 tests
+npm test              # vitest run — 97 tests
 npm run build         # vite + tsup must both succeed
 ```
 
@@ -41,39 +41,47 @@ npm run build         # vite + tsup must both succeed
 
 ```
 src/
-├── cli.ts                          ← CLI entry point, args, port fallback
-├── shared/
-│   └── types.ts                    ← types shared between server and client
+├── cli.ts                          ← CLI entry: args, port-fallback, graceful shutdown
+├── shared/                         ← cross-runtime modules — no Node-only or DOM-only deps
+│   ├── types.ts
+│   ├── search-pattern.ts            ← compilePattern (used by client + server)
+│   ├── relative-time.ts             ← formatRelativeTime
+│   └── tree-utils.ts                ← MD_EXT, flattenMdRelPaths
+├── render/                         ← server-agnostic markdown render pipeline
+│   ├── markdown.ts
+│   ├── shiki.ts
+│   ├── frontmatter.ts
+│   ├── outline.ts
+│   ├── links.ts                     ← tagInternalLinks, rewriteImageSrc
+│   └── math.ts                      ← KaTeX placeholder emission
 ├── server/
-│   ├── index.ts                    ← createServer factory
+│   ├── index.ts                     ← createServer factory + .mdview.json watcher
+│   ├── config.ts                    ← validateConfig + loadProjectConfig
 │   ├── routes/
-│   │   ├── api-file.ts             ← GET /api/file
-│   │   ├── api-tree.ts             ← GET /api/tree
-│   │   ├── api-asset.ts            ← GET /__asset/*
-│   │   └── sse.ts                  ← GET /api/watch
-│   ├── render/                     ← markdown rendering pipeline
-│   │   ├── markdown.ts
-│   │   ├── shiki.ts
-│   │   ├── frontmatter.ts
-│   │   ├── outline.ts
-│   │   └── links.ts                ← tagInternalLinks, rewriteImageSrc
+│   │   ├── api-file.ts              ← GET /api/file
+│   │   ├── api-tree.ts              ← GET /api/tree (carries project config)
+│   │   ├── api-asset.ts             ← GET /__asset/*
+│   │   ├── api-search.ts            ← GET /api/search
+│   │   └── sse.ts                   ← GET /api/watch
 │   ├── fs/
-│   │   ├── resolve.ts              ← resolveSafePath (security boundary!)
-│   │   └── tree.ts                 ← walkFolder
-│   └── watcher.ts                  ← chokidar wrapper
+│   │   ├── resolve.ts               ← resolveSafePath (security boundary!)
+│   │   ├── tree.ts                  ← walkFolder
+│   │   └── grep.ts                  ← folder-wide search backend
+│   └── watcher.ts                   ← chokidar wrapper + emitSynthetic
 └── client/
-    ├── main.tsx                    ← Preact mount
-    ├── App.tsx                     ← top-level orchestration
+    ├── main.tsx                    ← Preact mount + JetBrains Mono CSS
+    ├── App.tsx                     ← top-level orchestration (slim — most logic in hooks)
+    ├── shortcuts.ts                ← keyboard shortcut registry (single source of truth)
     ├── components/                 ← UI components (panes + overlays)
     ├── hooks/                      ← signals + effects (use*.ts)
-    ├── lib/                        ← DOM augmentation helpers (wire*.ts) + pure utils
-    └── styles/                     ← CSS — see "Styling" below
+    ├── lib/                        ← DOM augmentation helpers + pure utils
+    └── styles/                     ← reset / theme / layout / content / components
 
 tests/
 ├── server/                         ← vitest unit tests for server logic
 └── client/                         ← vitest tests for pure client logic
 
-test-fixtures/                      ← manual-test markdown files
+test-fixtures/                      ← manual-test markdown files (showcase.md, math.md, …)
 docs/                               ← architecture, contributing, features
 ```
 
@@ -82,19 +90,23 @@ docs/                               ← architecture, contributing, features
 | Adding... | Goes in... |
 |-----------|------------|
 | A new server endpoint | `src/server/routes/<name>.ts` + register in `src/server/index.ts` |
-| A new piece of rendering logic | `src/server/render/<name>.ts` + call from `routes/api-file.ts` |
+| A new piece of rendering logic | `src/render/<name>.ts` + call from `routes/api-file.ts` (or use as a markdown-it plugin) |
+| A new module that has to run on both client and server | `src/shared/<name>.ts` (no Node-only or DOM-only deps) |
 | A new pane / overlay component | `src/client/components/<Name>.tsx` |
 | A new piece of cross-component state | `src/client/hooks/use<Name>.ts` (signal-based) |
-| A new behavior that walks the rendered HTML | `src/client/lib/<name>.ts` exporting `wireXxx(root)`; call from `Content.tsx` |
-| A new keyboard shortcut | edit `src/client/hooks/useKeyboardShortcuts.ts` + add to `components/ShortcutsPanel.tsx` |
+| A new piece of **persisted** cross-component state | use `createPersistedBool` / `createPersistedNumber` / `createPersistedString` / `createPersistedSignal` from `src/client/lib/persisted-signal.ts` — don't roll your own localStorage |
+| A new behavior that walks the rendered HTML | `src/client/lib/<name>.ts` exporting a `wireXxx(root, ctx)` function; add it to the `defaultWires` array in `src/client/lib/wires.ts` |
+| A new keyboard shortcut | append a single entry to `src/client/shortcuts.ts` — both the dispatcher and the help modal read from there |
 | A new icon | append to `src/client/components/Icons.tsx` (inline SVG, inherits `currentColor`) |
-| A new theme variable | edit `src/client/styles/theme.css` (use the existing `:root[data-theme=...]` blocks) |
+| A new theme variable | edit `src/client/styles/theme.css` (use the existing `:root[data-theme=...]` blocks); for a new palette, add `:root[data-palette="X"][data-theme="..."]` blocks |
+| A new tooltip on a control | add `data-tooltip="..."` to the element (keep `aria-label` for screen readers); the CSS rule in `components.css` does the rest |
 
 ## Conventions
 
 ### Imports
 - Use `.js` extensions even in `.ts`/`.tsx` source. Node ESM + bundler convention.
 - Type-only imports use `import type {...}`.
+- Things that need to run in both client and server live in `src/shared/`. Don't import client-only or server-only modules from there.
 
 ### Components
 - Use `class=` not `className=` (Preact convention).
@@ -102,25 +114,30 @@ docs/                               ← architecture, contributing, features
 - Keep components small. If a component grows past ~120 lines, split it.
 
 ### State
-- **Cross-component state → signals** in `src/client/hooks/use*.ts`. Pattern:
+- **Cross-component state → signals** in `src/client/hooks/use*.ts`.
+- **Persisted state → `createPersistedSignal` (or a typed variant)**. Pattern:
   ```ts
-  // useFoo.ts
-  import { signal } from '@preact/signals';
-  export const fooSignal = signal<Foo>(defaultValue);
-  export function setFoo(next: Foo): void { fooSignal.value = next; }
+  const fooBool = createPersistedBool('mdview-foo', false);
+  export const fooSignal = fooBool.signal;
+  export const setFoo = fooBool.set;
   ```
-- **Component-local transient state → `useState`**. E.g. an input's value while the user types.
-- Don't `useState` for shared state — it leads to prop drilling and the kind of update-batching bugs we hit early on with the search counter.
+- **Component-local transient state → `useState`**.
+- Don't `useState` for shared state — it leads to prop drilling and update-batching bugs.
 
 ### DOM augmentation
-- After `innerHTML = file.html`, the only way to add behavior to rendered nodes is a `wireXxx(root)` helper in `src/client/lib/`.
-- Every helper MUST be idempotent. Use a marker class or `dataset.<flag> = '1'` to skip already-processed nodes — live reload re-runs all helpers on the same DOM.
+- After `innerHTML = file.html`, the only way to add behavior to rendered nodes is to add a `Wire` entry to `src/client/lib/wires.ts`. The `runWires` helper in `Content.tsx` will pick it up automatically.
+- Every wire MUST be idempotent. Use a marker class or `dataset.<flag> = '1'` to skip already-processed nodes — live reload re-runs all wires on the same DOM.
 - Don't call `.innerHTML = ...` inside helpers. Use `document.createElement` + `append`.
+
+### Keyboard shortcuts
+- One entry in `src/client/shortcuts.ts` registers the matcher, runner, displayed keys, and group. Both the runtime dispatcher and the help modal read from this same array.
+- For sequence shortcuts (e.g. `gg`), use a module-scoped timestamp variable; reset it in `resetPendingSequences(ev)` so the dispatcher cleans up after non-matching keys.
 
 ### Security
 - Every filesystem read on the server goes through `resolveSafePath(rootAbsPath, rel)`. No exceptions.
 - External links: `target="_blank"` MUST pair with `rel="noopener noreferrer"`.
 - Don't introduce `eval`, `new Function`, or `innerHTML` from user-controlled strings.
+- `.mdview.json` validation lives in `src/server/config.ts`. Any new field that flows into CSS must be tightly type-checked there.
 - Server binds to `127.0.0.1` only — keep it that way.
 
 ### TypeScript
@@ -128,19 +145,20 @@ docs/                               ← architecture, contributing, features
 - Avoid `any`. `as never` is acceptable as a narrowing cast for library types we don't control (see `shiki.ts`'s `loadLanguage(lang as never)`).
 
 ### Styling
-- One stylesheet per concern: `reset.css`, `theme.css` (CSS vars only), `layout.css` (3-pane grid), `content.css` (markdown typography), `components.css` (everything else).
+- One stylesheet per concern: `reset.css`, `theme.css` (CSS vars + palettes), `layout.css` (3-pane grid), `content.css` (markdown typography), `components.css` (everything else, including tooltips).
 - Use CSS variables for colors, fonts, radii, transitions. Never hardcode `#abc123` outside `theme.css`.
 - Animations: 160–220 ms `ease`. Don't go longer or use elastic easings.
 - Use `transition` on hover/focus states. Match `var(--transition)` for consistency.
+- Tooltip pattern: `data-tooltip="text"` on the element; optionally `data-tooltip-side="top"` or `data-tooltip-align="left"|"right"` for placement.
 
 ### Commits
-- Conventional-ish commit messages: `feat(ui): ...`, `fix: ...`, `chore: ...`, `docs: ...`.
+- Conventional-ish commit messages: `feat(ui): ...`, `fix: ...`, `chore: ...`, `docs: ...`, `refactor: ...`.
 - One logical change per commit. Don't bundle unrelated work.
 
 ## Testing patterns
 
 ### Server logic — TDD where it's easy
-Logic-heavy modules (parsers, resolvers, walkers, link rewriters, outline extractors) have unit tests under `tests/server/`. Add a test file when you add a new module of this kind.
+Logic-heavy modules (parsers, resolvers, walkers, link rewriters, outline extractors, the math plugin, grep, config validator) have unit tests under `tests/server/`. Add a test file when you add a new module of this kind.
 
 Example template (`tests/server/<name>.test.ts`):
 ```ts
@@ -157,51 +175,57 @@ describe('yourFunction', () => {
 Run a single file: `npx vitest run tests/server/<name>.test.ts`.
 
 ### Client logic — pure functions only
-We don't snapshot-test components. We DO test pure functions extracted from components (see `pickActiveId` extracted from `useScrollSpy`).
+We don't snapshot-test components. We DO test pure functions extracted from components (see `pickActiveId`, `filterOutline`, `nextSameLevelHeading`, `compilePattern`, `formatRelativeTime`).
 
 If you write a tricky pure function inside a component or hook, extract it and test the extracted function. Don't test through the React rendering layer.
 
 ### UI — manual via `test-fixtures/`
-`test-fixtures/showcase.md` exercises every rendering feature. Walk through it after any UI change:
+`test-fixtures/showcase.md` exercises every rendering feature; `test-fixtures/math.md` covers KaTeX inline + block; `test-fixtures/linked-doc.md` is a navigation target. Walk through them after any UI change:
 
 ```bash
 node bin/mdview.mjs ./test-fixtures --no-open
 # open http://127.0.0.1:7331/ in a browser
 ```
 
-Verify whatever you changed renders correctly across light + dark themes.
+Verify whatever you changed renders correctly across light + dark themes AND across all four palettes.
 
 ## How to add a feature: worked example
 
 Suppose you want to add a "back to top" button that appears after the user scrolls.
 
-1. **Component**: create `src/client/components/BackToTop.tsx`. Take `scroller: HTMLElement | null` as a prop. Use `useEffect` to attach a scroll listener; use `useState` for visible/hidden. Render a `<button>` with an SVG icon when scrollTop > 600.
+1. **Component**: create `src/client/components/BackToTop.tsx`. Use `mainScrollerSignal.value` instead of taking the scroller as a prop. Use `useEffect` to attach a scroll listener; use `useState` for visible/hidden. Render a `<button>` with an SVG icon when scrollTop > 600. Add `data-tooltip="Back to top"` on the button.
 2. **Style**: add `.back-to-top` to `src/client/styles/components.css`. Position: fixed, bottom-right, accent background, smooth fade-in transition.
-3. **Mount**: import in `App.tsx`, render inside `<main class="pane-main">` after the other overlays. Pass `scroller={mainRef.current}`.
-4. **Verify**:
+3. **Mount**: import in `App.tsx`, render inside `<main class="pane-main">`.
+4. **(Optional) Shortcut**: append an entry to `src/client/shortcuts.ts` with a key like `gg` (already taken — pick something else) or expose a button only.
+5. **Verify**:
    - `npm run typecheck`
    - `npm run build`
    - `node bin/mdview.mjs ./test-fixtures --no-open`, open in browser, scroll a long doc, check button appears.
-5. **Commit**: `feat(ui): back-to-top button on long scroll`.
+6. **Commit**: `feat(ui): back-to-top button on long scroll`.
 
 ## How to debug
 
-- **Server-side issue?** Add `console.log` to the relevant `src/server/...` file, run `npm run build:server`, restart the server. Or use `node --inspect bin/mdview.mjs ...` and attach Chrome DevTools.
+- **Server-side issue?** Add `console.log` to the relevant `src/server/...` file, run `npm run build:server`, restart the server. Set `MDVIEW_DEBUG=1` for full stack traces. Or use `node --inspect bin/mdview.mjs ...` and attach Chrome DevTools.
 - **Client-side issue?** Use `npm run dev:client` for HMR + DevTools. The Preact DevTools browser extension works.
 - **Live reload not firing?** Check the `EventSource` in DevTools' Network tab — `/api/watch` should be open with a stream of events.
-- **Mermaid not rendering?** Check the browser console for the `import('mermaid')` chunk loading. The diagram's source is base64-decoded from `data-source` on the `.mermaid-block` div.
+- **Mermaid not rendering?** Check the browser console for the `import('mermaid')` chunk loading. The diagram's source is URL-decoded from `data-source` on the `.mermaid-block` div.
+- **Math not rendering?** Same idea — check for the `katex` chunk loading and the `katex.min.css` `<link>` injection.
+- **Outline highlights wrong heading or focus mode lags?** Both are scroll-spy-related. The pure functions (`pickActiveId`, `nextSameLevelHeading`, `filterOutline`) are tested. The hooks themselves use bounding-rect deltas + `MutationObserver` on the **scroller subtree** (not `.markdown-content` directly — that doesn't exist at hook-mount because `<Content>` is gated on file-loaded).
 
 ## Things to know about how the agents got here
 
 - Built end-to-end in May 2026 across multiple iterations.
-- Phase 1 (MVP) used a **subagent-driven implementation plan** with batched commits. The original plan is at `docs/superpowers/plans/2026-05-06-mdview-implementation.md` for historical reference.
-- Phase 2+ are tracked in [`TODO.md`](../TODO.md).
-- The product spec lives outside this repo at `~/.claude/plans/i-want-to-create-enumerated-eich.md`.
+- Phase 1 (MVP) used a **subagent-driven implementation plan** with batched commits. Original plan at `docs/superpowers/plans/2026-05-06-mdview-implementation.md` for historical reference.
+- Phase 2 push (resizable sidebars, vim shortcuts, math, palettes/config, folder search, focus + minimap, last-updated, JetBrains Mono, outline filter, search options) landed in `a80842f`. The `refactor: drop static export…` commit (`721e76d`) reverted the originally-planned static export feature; bundle cost outweighed value.
+- Phase 3 (workspaces) and Phase 4 (editor extensions) are tracked in [`TODO.md`](../TODO.md).
 
 ## Anti-patterns we explicitly avoid
 
 - ❌ Adding state via `useState` for things multiple components need. Use signals.
-- ❌ Mutating the rendered HTML directly from `useEffect` in a component instead of via a `wireXxx` helper.
+- ❌ Hand-rolling `localStorage` `try/catch` blocks. Use `createPersistedSignal`.
+- ❌ Mutating the rendered HTML directly from `useEffect` in a component instead of via a wire.
+- ❌ Two implementations of the same flatten / regex-compile / persistence helper. Search `src/shared/` and `src/client/lib/` before writing new utilities.
+- ❌ Adding a shortcut in two places (handler + panel). Single registry: `src/client/shortcuts.ts`.
 - ❌ Creating a separate UI for each feature instead of reusing the existing overlay pattern (see `Lightbox`, `ShortcutsPanel`, `CommandPalette`).
 - ❌ Skipping `resolveSafePath` for "internal" or "trusted" file paths. There's no such thing as a trusted user-supplied path.
 - ❌ Big refactors bundled with feature work. Land them separately.
