@@ -1,3 +1,5 @@
+import { compilePattern, type SearchOptions, DEFAULT_OPTIONS } from '../../shared/search-pattern.js';
+
 export interface SearchHit {
   node: Text;
   start: number;
@@ -29,9 +31,14 @@ function isInsideMark(node: Node): boolean {
   return false;
 }
 
-export function findHits(root: HTMLElement, query: string): SearchHit[] {
+export function findHits(
+  root: HTMLElement,
+  query: string,
+  opts: SearchOptions = DEFAULT_OPTIONS,
+): SearchHit[] {
   if (!query) return [];
-  const needle = query.toLowerCase();
+  const pattern = compilePattern(query, opts);
+  if (!pattern.valid) return [];
   const hits: SearchHit[] = [];
 
   // Restrict search to the rendered markdown only — exclude search bar UI,
@@ -53,13 +60,8 @@ export function findHits(root: HTMLElement, query: string): SearchHit[] {
   let current: Node | null = walker.nextNode();
   while (current) {
     const text = current.nodeValue ?? '';
-    const lower = text.toLowerCase();
-    let from = 0;
-    while (from < lower.length) {
-      const idx = lower.indexOf(needle, from);
-      if (idx === -1) break;
-      hits.push({ node: current as Text, start: idx, end: idx + needle.length });
-      from = idx + needle.length;
+    for (const m of pattern.matchAll(text)) {
+      hits.push({ node: current as Text, start: m.index, end: m.index + m.length });
     }
     current = walker.nextNode();
   }

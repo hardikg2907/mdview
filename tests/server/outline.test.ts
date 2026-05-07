@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { extractOutline } from '../../src/server/render/outline.js';
-import { renderMarkdown } from '../../src/server/render/markdown.js';
+import { extractOutline } from '../../src/render/outline.js';
+import { renderMarkdown } from '../../src/render/markdown.js';
 
 describe('extractOutline', () => {
   it('builds a flat outline for a single level', async () => {

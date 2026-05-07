@@ -1,15 +1,30 @@
-import { useEffect, useRef, useState, useCallback } from 'preact/hooks';
+import { useEffect, useRef } from 'preact/hooks';
+import { setMainScroller } from './hooks/useScroller.js';
 import { useTheme } from './hooks/useTheme.js';
+import { usePalette } from './hooks/usePalette.js';
 import { useTree, treeSignal } from './hooks/useTree.js';
 import { fileSignal, fileLoading, fileError, loadFile } from './hooks/useFile.js';
-import { useScrollSpy, activeHeadingId } from './hooks/useScrollSpy.js';
-import { useSSE } from './hooks/useSSE.js';
+import { useScrollSpy, activeHeadingId, lockScrollSpy } from './hooks/useScrollSpy.js';
+import { useLiveReload } from './hooks/useLiveReload.js';
+import { usePathRouting } from './hooks/usePathRouting.js';
 import {
   treeCollapsedSignal,
   outlineCollapsedSignal,
+  treeWidthSignal,
+  outlineWidthSignal,
+  minimapSignal,
   toggleTreeCollapsed,
   toggleOutlineCollapsed,
+  setTreeWidth,
+  setOutlineWidth,
+  resetTreeWidth,
+  resetOutlineWidth,
+  SIDEBAR_WIDTH_MIN,
+  SIDEBAR_WIDTH_MAX,
+  SIDEBAR_COLLAPSE_THRESHOLD,
 } from './hooks/useUiState.js';
+import { Resizer } from './components/Resizer.js';
+import { Minimap } from './components/Minimap.js';
 import { FolderTree } from './components/FolderTree.js';
 import { Content } from './components/Content.js';
 import { Outline } from './components/Outline.js';
@@ -25,16 +40,6 @@ import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts.js';
 import { IconPanelLeftOpen, IconPanelRightOpen } from './components/Icons.js';
 import type { TreeNode } from '../shared/types.js';
 
-function initialPath(): string | null {
-  const sp = new URLSearchParams(window.location.search);
-  return sp.get('file');
-}
-
-function pushPath(relPath: string, hash = ''): void {
-  const url = `?file=${encodeURIComponent(relPath)}${hash}`;
-  history.pushState({ file: relPath }, '', url);
-}
-
 function findFirstMd(nodes: TreeNode[]): string | null {
   for (const n of nodes) {
     if (n.type === 'file' && n.isMarkdown) return n.relPath;
@@ -48,12 +53,15 @@ function findFirstMd(nodes: TreeNode[]): string | null {
 
 export function App() {
   useTheme();
+  usePalette();
   const tree = useTree();
-  const [currentPath, setCurrentPath] = useState<string | null>(initialPath());
+  const { currentPath, setCurrentPath, navigate } = usePathRouting();
   const mainRef = useRef<HTMLElement | null>(null);
 
   const treeCollapsed = treeCollapsedSignal.value;
   const outlineCollapsed = outlineCollapsedSignal.value;
+  const treeWidth = treeWidthSignal.value;
+  const outlineWidth = outlineWidthSignal.value;
 
   // First load: if no path and dir-mode, load the first md file
   useEffect(() => {
@@ -70,8 +78,6 @@ export function App() {
   }, [tree, currentPath]);
 
   useEffect(() => { void loadFile(currentPath); }, [currentPath]);
-
-  // Close search whenever the file changes (highlights would be stale)
   useEffect(() => { closeSearch(); }, [currentPath]);
 
   // After file loads, restore hash anchor (if any)
@@ -89,41 +95,17 @@ export function App() {
   }, [fileSignal.value]);
 
   useScrollSpy(mainRef.current);
+  useEffect(() => { setMainScroller(mainRef.current); }, [mainRef.current]);
+  useLiveReload({ currentPath, scrollerRef: mainRef });
   useKeyboardShortcuts({
     outline: fileSignal.value?.outline ?? [],
     onJumpHeading: (id) => handleJump(id),
+    navigate: (relPath: string) => navigate(relPath),
   });
 
-  // Live reload: re-fetch the current file on change
-  const onWatch = useCallback((e: { kind: string; relPath: string }) => {
-    if (e.relPath === currentPath) {
-      const top = mainRef.current?.scrollTop ?? 0;
-      void loadFile(currentPath).then(() => {
-        requestAnimationFrame(() => {
-          if (mainRef.current) mainRef.current.scrollTop = top;
-        });
-      });
-    }
-    if (e.kind === 'add' || e.kind === 'unlink') {
-      void fetch('/api/tree').then((r) => r.json()).then((d) => (treeSignal.value = d));
-    }
-  }, [currentPath]);
-  useSSE(onWatch);
-
-  // browser back/forward
-  useEffect(() => {
-    const onPop = () => setCurrentPath(initialPath());
-    window.addEventListener('popstate', onPop);
-    return () => window.removeEventListener('popstate', onPop);
-  }, []);
-
-  const handleSelect = (relPath: string) => {
-    setCurrentPath(relPath);
-    pushPath(relPath);
-  };
+  const handleSelect = (relPath: string) => navigate(relPath);
   const handleInternalNav = (relPath: string, hash: string) => {
-    setCurrentPath(relPath);
-    pushPath(relPath, hash);
+    navigate(relPath, hash);
     if (hash) {
       requestAnimationFrame(() => {
         document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: 'smooth' });
@@ -132,7 +114,7 @@ export function App() {
   };
   const handleJump = (id: string) => {
     history.replaceState(history.state, '', `#${id}`);
-    activeHeadingId.value = id;
+    lockScrollSpy(id);
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
   };
   const handleJumpHeading = (id: string | null) => {
@@ -154,8 +136,19 @@ export function App() {
     outlineCollapsed ? 'outline-collapsed' : '',
   ].filter(Boolean).join(' ');
 
+  const shellStyle = `--tree-width:${treeWidth}px;--outline-width:${outlineWidth}px`;
+
+  const handleCollapseTree = () => {
+    resetTreeWidth();
+    if (!treeCollapsed) toggleTreeCollapsed();
+  };
+  const handleCollapseOutline = () => {
+    resetOutlineWidth();
+    if (!outlineCollapsed) toggleOutlineCollapsed();
+  };
+
   return (
-    <div class={shellClasses}>
+    <div class={shellClasses} style={shellStyle}>
       <aside class="pane-tree" aria-label="File tree">
         {treeCollapsed ? (
           <button
@@ -178,6 +171,19 @@ export function App() {
         )}
       </aside>
 
+      {!treeCollapsed && (
+        <Resizer
+          side="left"
+          ariaLabel="Resize file tree"
+          getCurrent={() => treeWidthSignal.value}
+          onResize={setTreeWidth}
+          collapseAt={SIDEBAR_COLLAPSE_THRESHOLD}
+          onCollapse={handleCollapseTree}
+          min={SIDEBAR_WIDTH_MIN}
+          max={SIDEBAR_WIDTH_MAX}
+        />
+      )}
+
       <header class="pane-header">
         <Header
           outline={file?.outline ?? []}
@@ -193,16 +199,34 @@ export function App() {
 
       <main class="pane-main" ref={mainRef as never}>
         {searchOpenSignal.value && (
-          <SearchBar scroller={mainRef.current} fileTrigger={file} />
+          <SearchBar
+            scroller={mainRef.current}
+            fileTrigger={file}
+            onOpenFile={handleSelect}
+          />
         )}
         {fileLoading.value && !file && <ContentSkeleton />}
         {fileError.value && <div class="status status-error">Error: {fileError.value}</div>}
         {file && <Content file={file} onInternalNavigate={handleInternalNav} />}
+        {file && minimapSignal.value && <Minimap outline={file.outline} />}
       </main>
 
       <Lightbox />
       <ShortcutsPanel />
       <CommandPalette currentPath={currentPath} onSelect={handleSelect} />
+
+      {!outlineCollapsed && (
+        <Resizer
+          side="right"
+          ariaLabel="Resize outline"
+          getCurrent={() => outlineWidthSignal.value}
+          onResize={setOutlineWidth}
+          collapseAt={SIDEBAR_COLLAPSE_THRESHOLD}
+          onCollapse={handleCollapseOutline}
+          min={SIDEBAR_WIDTH_MIN}
+          max={SIDEBAR_WIDTH_MAX}
+        />
+      )}
 
       <aside class="pane-outline" aria-label="Outline">
         {outlineCollapsed ? (

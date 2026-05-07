@@ -1,5 +1,7 @@
 import { render } from 'preact';
 import { App } from './App.js';
+import '@fontsource/jetbrains-mono/400.css';
+import '@fontsource/jetbrains-mono/600.css';
 import './styles/reset.css';
 import './styles/theme.css';
 import './styles/layout.css';

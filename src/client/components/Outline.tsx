@@ -1,6 +1,8 @@
-import { useState } from 'preact/hooks';
-import type { OutlineNode } from '../../shared/types.js';
+import { useMemo, useState } from 'preact/hooks';
+import type { HeadingLevel, OutlineNode } from '../../shared/types.js';
 import { activeHeadingId } from '../hooks/useScrollSpy.js';
+import { outlineLevelsSignal, toggleLevel } from '../hooks/useOutlineLevels.js';
+import { filterOutline, ALL_LEVELS } from '../lib/outline-filter.js';
 import { IconChevronRight } from './Icons.js';
 
 interface Props {
@@ -9,15 +11,43 @@ interface Props {
 }
 
 export function Outline({ nodes, onJump }: Props) {
-  if (nodes.length === 0) return <div class="outline-empty">No headings</div>;
+  const visible = outlineLevelsSignal.value;
+  const filtered = useMemo(() => filterOutline(nodes, visible), [nodes, visible]);
+
   return (
     <nav class="outline" aria-label="Document outline">
-      <div class="outline-title">On this page</div>
-      <ul>
-        {nodes.map((n) => (
-          <OutlineItem key={n.id} node={n} onJump={onJump} depth={0} />
-        ))}
-      </ul>
+      <div class="outline-head">
+        <span class="outline-title">On this page</span>
+        <div class="outline-level-pills" role="group" aria-label="Filter by heading level">
+          {ALL_LEVELS.map((lvl) => {
+            const on = visible.has(lvl);
+            return (
+              <button
+                key={lvl}
+                type="button"
+                class={`outline-level-pill${on ? ' is-on' : ''}`}
+                aria-pressed={on}
+                aria-label={`${on ? 'Hide' : 'Show'} heading level ${lvl}`}
+                data-tooltip={`${on ? 'Hide' : 'Show'} H${lvl}`}
+                onClick={() => toggleLevel(lvl)}
+              >
+                {lvl}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      {filtered.length === 0 ? (
+        <div class="outline-empty">
+          {nodes.length === 0 ? 'No headings' : 'All levels hidden'}
+        </div>
+      ) : (
+        <ul>
+          {filtered.map((n) => (
+            <OutlineItem key={n.id} node={n} onJump={onJump} depth={0} />
+          ))}
+        </ul>
+      )}
     </nav>
   );
 }
@@ -32,7 +62,6 @@ function OutlineItem({ node, onJump, depth }: ItemProps) {
   const [collapsed, setCollapsed] = useState(false);
   const hasChildren = node.children.length > 0;
   const isActive = activeHeadingId.value === node.id;
-  // Cap depth styling at 5 to avoid runaway indent
   const cappedDepth = Math.min(depth, 5);
 
   return (
@@ -70,3 +99,6 @@ function OutlineItem({ node, onJump, depth }: ItemProps) {
     </li>
   );
 }
+
+// re-export for callers that want to inspect the level type explicitly
+export type { HeadingLevel };

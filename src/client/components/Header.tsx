@@ -7,10 +7,19 @@ import {
   IconPanelRightClose,
   IconPanelRightOpen,
   IconKeyboard,
+  IconFocus,
+  IconMinimap,
 } from './Icons.js';
+import { PalettePicker } from './PalettePicker.js';
 import type { OutlineNode } from '../../shared/types.js';
 import { themeSignal, toggleTheme } from '../hooks/useTheme.js';
 import { openShortcutsPanel } from '../hooks/useShortcutsPanel.js';
+import {
+  focusModeSignal,
+  minimapSignal,
+  toggleFocusMode,
+  toggleMinimap,
+} from '../hooks/useUiState.js';
 
 interface Props {
   outline: OutlineNode[];
@@ -32,13 +41,17 @@ export function Header({
   onJumpHeading,
 }: Props) {
   const theme = themeSignal.value;
+  const treeTip = treeCollapsed ? 'Show file tree (⌘B)' : 'Hide file tree (⌘B)';
+  const outlineTip = outlineCollapsed ? 'Show outline (⌘.)' : 'Hide outline (⌘.)';
+  const themeTip = theme === 'dark' ? 'Switch to light (⌘\\)' : 'Switch to dark (⌘\\)';
   return (
     <div class="header-inner">
       <div class="header-left">
         <button
           class="icon-btn"
-          aria-label={treeCollapsed ? 'Show file tree' : 'Hide file tree'}
-          title={treeCollapsed ? 'Show file tree' : 'Hide file tree'}
+          aria-label={treeTip}
+          data-tooltip={treeTip}
+          data-tooltip-align="left"
           onClick={onToggleTree}
         >
           {treeCollapsed ? <IconPanelLeftOpen /> : <IconPanelLeftClose />}
@@ -52,25 +65,45 @@ export function Header({
 
       <div class="header-right">
         <button
+          class={`icon-btn${focusModeSignal.value ? ' is-active' : ''}`}
+          aria-label="Toggle focus mode"
+          aria-pressed={focusModeSignal.value}
+          data-tooltip="Focus mode (f)"
+          onClick={toggleFocusMode}
+        >
+          <IconFocus />
+        </button>
+        <button
+          class={`icon-btn${minimapSignal.value ? ' is-active' : ''}`}
+          aria-label="Toggle minimap"
+          aria-pressed={minimapSignal.value}
+          data-tooltip="Minimap (m)"
+          onClick={toggleMinimap}
+        >
+          <IconMinimap />
+        </button>
+        <button
           class="icon-btn"
           aria-label="Keyboard shortcuts"
-          title="Keyboard shortcuts (?)"
+          data-tooltip="Shortcuts (?)"
           onClick={openShortcutsPanel}
         >
           <IconKeyboard />
         </button>
+        <PalettePicker />
         <button
           class="icon-btn theme-btn"
-          aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
-          title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+          aria-label={themeTip}
+          data-tooltip={themeTip}
           onClick={toggleTheme}
         >
           {theme === 'dark' ? <IconSun /> : <IconMoon />}
         </button>
         <button
           class="icon-btn"
-          aria-label={outlineCollapsed ? 'Show outline' : 'Hide outline'}
-          title={outlineCollapsed ? 'Show outline' : 'Hide outline'}
+          aria-label={outlineTip}
+          data-tooltip={outlineTip}
+          data-tooltip-align="right"
           onClick={onToggleOutline}
         >
           {outlineCollapsed ? <IconPanelRightOpen /> : <IconPanelRightClose />}

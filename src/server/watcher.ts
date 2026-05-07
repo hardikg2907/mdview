@@ -6,6 +6,8 @@ import type { WatchEvent } from '../shared/types.js';
 export interface Watcher {
   on(event: 'event', listener: (e: WatchEvent) => void): void;
   off(event: 'event', listener: (e: WatchEvent) => void): void;
+  /** Emit an event that didn't come from chokidar (e.g. config reload). */
+  emitSynthetic(e: WatchEvent): void;
   close(): Promise<void>;
 }
 
@@ -19,7 +21,7 @@ export function createWatcher(rootAbsPath: string): Watcher {
     awaitWriteFinish: { stabilityThreshold: 60, pollInterval: 30 },
   });
 
-  function emit(kind: WatchEvent['kind'], abs: string) {
+  function emit(kind: 'change' | 'add' | 'unlink', abs: string) {
     const rel = path.relative(rootAbsPath, abs).split(path.sep).join('/');
     if (!rel) return;
     emitter.emit('event', { kind, relPath: rel } satisfies WatchEvent);
@@ -32,6 +34,7 @@ export function createWatcher(rootAbsPath: string): Watcher {
   return {
     on: (event, listener) => emitter.on(event, listener),
     off: (event, listener) => emitter.off(event, listener),
+    emitSynthetic: (e) => emitter.emit('event', e),
     close: () => watcher.close(),
   };
 }

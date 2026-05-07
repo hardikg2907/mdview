@@ -136,6 +136,15 @@
 }
 .outline ul { list-style: none; }
 
+.outline-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 2px 10px 10px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 8px;
+}
 .outline-title {
   font-family: var(--font-mono);
   font-size: 10.5px;
@@ -143,9 +152,34 @@
   text-transform: uppercase;
   letter-spacing: .14em;
   color: var(--fg-muted);
-  padding: 2px 10px 12px;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 8px;
+}
+.outline-level-pills {
+  display: inline-flex;
+  gap: 2px;
+  background: var(--bg-sidebar-2);
+  padding: 2px;
+  border-radius: 999px;
+}
+.outline-level-pill {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 0;
+  background: transparent;
+  color: var(--fg-subtle);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--transition), color var(--transition);
+}
+.outline-level-pill:hover { color: var(--accent); }
+.outline-level-pill.is-on {
+  background: var(--accent);
+  color: var(--bg);
 }
 
 .outline-li {
@@ -329,17 +363,68 @@
   position: sticky;
   top: 4px;
   margin: 0 auto 1em;
-  max-width: 460px;
+  max-width: 560px;
   z-index: 20;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  padding: 6px 8px 6px 12px;
+  padding: 6px 8px 6px 8px;
   background: var(--bg-elev);
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: 16px;
   box-shadow: var(--shadow-md);
   font-family: var(--font-sans);
+}
+.search-scope {
+  display: inline-flex;
+  background: var(--bg-sidebar);
+  border-radius: 999px;
+  padding: 2px;
+  gap: 2px;
+}
+.scope-pill {
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+  background: transparent;
+  border: 0;
+  padding: 4px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+}
+.scope-pill.is-active {
+  background: var(--accent);
+  color: var(--bg);
+}
+.scope-pill:hover:not(.is-active) { color: var(--accent); }
+.search-options {
+  display: inline-flex;
+  gap: 2px;
+}
+.search-opt {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  min-width: 26px;
+  height: 24px;
+  padding: 0 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--fg-subtle);
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition), border-color var(--transition);
+}
+.search-opt:hover { color: var(--accent); }
+.search-opt.is-on {
+  background: var(--accent-tint);
+  color: var(--accent-strong);
+  border-color: var(--accent);
 }
 .search-input {
   flex: 1;
@@ -782,4 +867,247 @@ mark.search-hit.is-active {
 .status-error {
   color: var(--accent-strong);
   font-style: normal;
+}
+
+/* ============================================================
+   PALETTE PICKER
+   ============================================================ */
+.palette-picker {
+  position: relative;
+  display: inline-flex;
+}
+.palette-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 50;
+  min-width: 180px;
+  padding: 6px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.palette-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-sans);
+  font-size: var(--fs-small);
+  color: var(--fg);
+  text-align: left;
+  background: transparent;
+  cursor: pointer;
+  transition: background-color var(--transition);
+}
+.palette-menu-item:hover {
+  background: var(--accent-tint);
+}
+.palette-menu-item.is-active {
+  color: var(--accent-strong);
+  font-weight: 600;
+}
+.palette-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  flex-shrink: 0;
+}
+.palette-swatch-classic { background: linear-gradient(135deg, #fcfbf6 50%, #c2410c 50%); }
+.palette-swatch-paper   { background: linear-gradient(135deg, #f7f1e3 50%, #8b5a2b 50%); }
+.palette-swatch-nord    { background: linear-gradient(135deg, #eceff4 50%, #5e81ac 50%); }
+.palette-swatch-solarized { background: linear-gradient(135deg, #fdf6e3 50%, #b58900 50%); }
+
+/* ============================================================
+   FOLDER SEARCH RESULTS
+   ============================================================ */
+.search-results {
+  flex-basis: 100%;
+  max-height: 60vh;
+  overflow-y: auto;
+  margin-top: 2px;
+  background: var(--bg-elev);
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  font-size: 13px;
+}
+.search-empty {
+  padding: 14px 16px;
+  color: var(--fg-muted);
+  font-style: italic;
+}
+.search-file-group {
+  border-bottom: 1px solid var(--border);
+}
+.search-file-group:last-child { border-bottom: 0; }
+.search-file-head {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background: var(--bg-sidebar);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+  position: sticky;
+  top: 0;
+}
+.search-file-path { color: var(--fg-strong); }
+.search-file-count { color: var(--fg-muted); }
+.search-file-group ul { list-style: none; padding: 0; margin: 0; }
+.search-hit-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: baseline;
+  gap: 10px;
+  padding: 5px 14px;
+  cursor: pointer;
+  border-left: 2px solid transparent;
+  transition: background var(--transition), border-color var(--transition);
+}
+.search-hit-row:hover,
+.search-hit-row.is-active {
+  background: var(--accent-tint);
+  border-left-color: var(--accent);
+}
+.search-hit-line {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--fg-subtle);
+  white-space: nowrap;
+}
+.search-hit-snippet {
+  font-family: var(--font-serif);
+  color: var(--fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ============================================================
+   MINIMAP
+   ============================================================ */
+.minimap {
+  position: fixed;
+  right: 4px;
+  top: var(--header-height);
+  bottom: 0;
+  width: 22px;
+  z-index: 8;
+  pointer-events: auto;
+  cursor: pointer;
+  /* Background visible only on hover for a subtle feel */
+  transition: background-color var(--transition);
+}
+.minimap:hover { background: var(--accent-tint); }
+.minimap-bar {
+  position: absolute;
+  left: 4px;
+  height: 2px;
+  background: var(--fg-subtle);
+  border-radius: 1px;
+  transition: background var(--transition), width var(--transition);
+  pointer-events: none;
+}
+.minimap-bar.minimap-level-1 { width: 16px; background: var(--fg-strong); }
+.minimap-bar.minimap-level-2 { width: 12px; background: var(--fg-muted); }
+.minimap-bar.minimap-level-3 { width: 8px; }
+.minimap-bar.minimap-level-4,
+.minimap-bar.minimap-level-5,
+.minimap-bar.minimap-level-6 { width: 5px; background: var(--fg-subtle); opacity: .7; }
+.minimap-bar.is-active {
+  background: var(--accent) !important;
+  height: 3px;
+  box-shadow: 0 0 0 2px var(--accent-tint);
+}
+.minimap-viewport {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  border-top: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  pointer-events: none;
+}
+
+/* Active state for header toggle buttons (focus, minimap) */
+.icon-btn.is-active {
+  color: var(--accent);
+  background: var(--accent-tint);
+}
+
+/* When the outline is collapsed AND minimap is on, keep the minimap from
+   sitting under the outline rail. The pane-outline rail is only 36px wide. */
+
+/* ============================================================
+   TOOLTIPS — custom, subtle, hover-only
+   Targets elements with [data-tooltip="text"]. Keep `aria-label`
+   for screen readers; this is the visual hint only.
+   ============================================================ */
+[data-tooltip] {
+  position: relative;
+}
+[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%) translateY(-2px);
+  background: var(--fg-strong);
+  color: var(--bg);
+  padding: 3px 7px;
+  border-radius: 4px;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 100ms ease 380ms, transform 100ms ease 380ms;
+  z-index: 1000;
+  box-shadow: var(--shadow);
+}
+[data-tooltip]:hover::after,
+[data-tooltip]:focus-visible::after {
+  opacity: .92;
+  transform: translateX(-50%) translateY(0);
+}
+/* Position-side variants: tooltip below by default; some controls need above
+   to avoid clipping (sticky search bar at top of pane). */
+[data-tooltip][data-tooltip-side="top"]::after {
+  top: auto;
+  bottom: calc(100% + 6px);
+  transform: translateX(-50%) translateY(2px);
+}
+[data-tooltip][data-tooltip-side="top"]:hover::after,
+[data-tooltip][data-tooltip-side="top"]:focus-visible::after {
+  transform: translateX(-50%) translateY(0);
+}
+/* Right-aligned controls (header right side): align tooltip to the right
+   edge of the trigger so it doesn't clip past the viewport. */
+[data-tooltip][data-tooltip-align="right"]::after {
+  left: auto;
+  right: 0;
+  transform: translateX(0) translateY(-2px);
+}
+[data-tooltip][data-tooltip-align="right"]:hover::after,
+[data-tooltip][data-tooltip-align="right"]:focus-visible::after {
+  transform: translateX(0) translateY(0);
+}
+[data-tooltip][data-tooltip-align="left"]::after {
+  left: 0;
+  right: auto;
+  transform: translateX(0) translateY(-2px);
+}
+[data-tooltip][data-tooltip-align="left"]:hover::after,
+[data-tooltip][data-tooltip-align="left"]:focus-visible::after {
+  transform: translateX(0) translateY(0);
 }

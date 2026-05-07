@@ -15,6 +15,7 @@ export interface RenderedFile {
   outline: OutlineNode[];
   frontmatter: Record<string, unknown> | null;
   title: string | null;        // extracted from H1 or frontmatter.title
+  lastModified: number;        // file mtime, milliseconds since epoch
 }
 
 export interface TreeNode {
@@ -34,4 +35,20 @@ export interface RootInfo {
 export type WatchEvent =
   | { kind: 'change'; relPath: string }
   | { kind: 'add'; relPath: string }
-  | { kind: 'unlink'; relPath: string };
+  | { kind: 'unlink'; relPath: string }
+  | { kind: 'config'; relPath: string };
+
+export type Palette = 'classic' | 'paper' | 'nord' | 'solarized';
+export const PALETTES: readonly Palette[] = ['classic', 'paper', 'nord', 'solarized'];
+
+export type FontFamily = 'serif' | 'sans' | 'mono';
+
+export interface ProjectConfig {
+  palette?: Palette;
+  fontFamily?: FontFamily;
+  lineWidth?: string;
+  defaultCollapsed?: {
+    tree?: boolean;
+    outline?: boolean;
+  };
+}

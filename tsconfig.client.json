@@ -18,5 +18,5 @@
       "react-dom": ["./node_modules/preact/compat"]
     }
   },
-  "include": ["src/client/**/*", "src/shared/**/*", "tests/client/**/*"]
+  "include": ["src/client/**/*", "src/shared/**/*", "src/types/**/*", "tests/client/**/*"]
 }

@@ -1,46 +1,62 @@
-import { useEffect } from 'preact/hooks';
-import { signal } from '@preact/signals';
+import { createPersistedBool, createPersistedNumber } from '../lib/persisted-signal.js';
 
-const TREE_KEY = 'mdview-tree-collapsed';
-const OUTLINE_KEY = 'mdview-outline-collapsed';
+const tree = createPersistedBool('mdview-tree-collapsed', false);
+const outline = createPersistedBool('mdview-outline-collapsed', false);
+const focusMode = createPersistedBool('mdview-focus-mode', false);
+const minimap = createPersistedBool('mdview-minimap', false);
 
-function readBool(key: string): boolean {
-  try {
-    return localStorage.getItem(key) === '1';
-  } catch {
-    return false;
-  }
+export const focusModeSignal = focusMode.signal;
+export const minimapSignal = minimap.signal;
+
+export function toggleFocusMode(): void {
+  focusMode.set(!focusMode.signal.value);
 }
 
-function writeBool(key: string, v: boolean): void {
-  try {
-    localStorage.setItem(key, v ? '1' : '0');
-  } catch {
-    // best-effort
-  }
+export function toggleMinimap(): void {
+  minimap.set(!minimap.signal.value);
 }
 
-export const treeCollapsedSignal = signal<boolean>(readBool(TREE_KEY));
-export const outlineCollapsedSignal = signal<boolean>(readBool(OUTLINE_KEY));
+export const TREE_WIDTH_DEFAULT = 264;
+export const OUTLINE_WIDTH_DEFAULT = 280;
+export const SIDEBAR_WIDTH_MIN = 180;
+export const SIDEBAR_WIDTH_MAX = 480;
+/** If a drag ends below this width, snap to collapsed instead. */
+export const SIDEBAR_COLLAPSE_THRESHOLD = 140;
+
+const treeWidth = createPersistedNumber('mdview-tree-width', TREE_WIDTH_DEFAULT, {
+  min: SIDEBAR_WIDTH_MIN,
+  max: SIDEBAR_WIDTH_MAX,
+});
+const outlineWidth = createPersistedNumber('mdview-outline-width', OUTLINE_WIDTH_DEFAULT, {
+  min: SIDEBAR_WIDTH_MIN,
+  max: SIDEBAR_WIDTH_MAX,
+});
+
+export const treeCollapsedSignal = tree.signal;
+export const outlineCollapsedSignal = outline.signal;
+export const treeWidthSignal = treeWidth.signal;
+export const outlineWidthSignal = outlineWidth.signal;
 
 export function toggleTreeCollapsed(): void {
-  const next = !treeCollapsedSignal.value;
-  treeCollapsedSignal.value = next;
-  writeBool(TREE_KEY, next);
+  tree.set(!tree.signal.value);
 }
 
 export function toggleOutlineCollapsed(): void {
-  const next = !outlineCollapsedSignal.value;
-  outlineCollapsedSignal.value = next;
-  writeBool(OUTLINE_KEY, next);
+  outline.set(!outline.signal.value);
 }
 
-// Hook for components that just need to subscribe and read.
-export function useUiState(): { treeCollapsed: boolean; outlineCollapsed: boolean } {
-  // No-op effect ensures Preact tracks signal usage during render.
-  useEffect(() => {}, []);
-  return {
-    treeCollapsed: treeCollapsedSignal.value,
-    outlineCollapsed: outlineCollapsedSignal.value,
-  };
+export function setTreeWidth(px: number): void {
+  treeWidth.set(px);
+}
+
+export function setOutlineWidth(px: number): void {
+  outlineWidth.set(px);
+}
+
+export function resetTreeWidth(): void {
+  treeWidth.set(TREE_WIDTH_DEFAULT);
+}
+
+export function resetOutlineWidth(): void {
+  outlineWidth.set(OUTLINE_WIDTH_DEFAULT);
 }

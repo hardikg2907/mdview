@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef } from 'preact/hooks';
 import type { RenderedFile } from '../../shared/types.js';
-import { renderMermaidIn } from '../lib/mermaid-loader.js';
-import { wireInternalLinks } from '../lib/link-router.js';
-import { wireCopyButtons } from '../lib/copy-buttons.js';
-import { wirePermalinks } from '../lib/permalinks.js';
-import { markExternalLinks } from '../lib/external-links.js';
-import { wireImageLightbox } from '../lib/image-lightbox.js';
+import { runWires } from '../lib/wire-pipeline.js';
+import { defaultWires } from '../lib/wires.js';
 import { computeDocStats, formatStats } from '../lib/doc-stats.js';
+import { formatRelativeTime, formatAbsoluteTime } from '../../shared/relative-time.js';
+import { applyFocus, clearFocus } from '../lib/focus-mode.js';
+import { focusModeSignal } from '../hooks/useUiState.js';
+import { activeHeadingId } from '../hooks/useScrollSpy.js';
 
 interface Props {
   file: RenderedFile;
@@ -21,13 +21,18 @@ export function Content({ file, onInternalNavigate }: Props) {
   useEffect(() => {
     if (!ref.current) return;
     ref.current.innerHTML = file.html;
-    void renderMermaidIn(ref.current);
-    wireInternalLinks(ref.current, onInternalNavigate);
-    wireCopyButtons(ref.current);
-    wirePermalinks(ref.current);
-    markExternalLinks(ref.current);
-    wireImageLightbox(ref.current);
+    void runWires(ref.current, { onInternalNavigate }, defaultWires);
   }, [file]);
+
+  // Apply focus mode on toggle and on active heading change.
+  useEffect(() => {
+    if (!ref.current) return;
+    if (focusModeSignal.value) {
+      applyFocus(ref.current, activeHeadingId.value);
+    } else {
+      clearFocus(ref.current);
+    }
+  }, [focusModeSignal.value, activeHeadingId.value, file]);
 
   return (
     <article class="markdown-body">
@@ -39,7 +44,18 @@ export function Content({ file, onInternalNavigate }: Props) {
       )}
       {stats.words > 0 && (
         <div class="doc-stats" aria-label="Document statistics">
-          {formatStats(stats)}
+          <span>{formatStats(stats)}</span>
+          {file.lastModified > 0 && (
+            <>
+              <span class="doc-stats-sep" aria-hidden>·</span>
+              <span
+                class="doc-stats-updated"
+                title={formatAbsoluteTime(file.lastModified)}
+              >
+                Updated {formatRelativeTime(file.lastModified)}
+              </span>
+            </>
+          )}
         </div>
       )}
       <div ref={ref} class="markdown-content" />

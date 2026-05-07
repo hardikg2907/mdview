@@ -13,6 +13,7 @@ export function useSSE(onEvent: (e: WatchEvent) => void): void {
     es.addEventListener('change', handler as EventListener);
     es.addEventListener('add', handler as EventListener);
     es.addEventListener('unlink', handler as EventListener);
+    es.addEventListener('config', handler as EventListener);
     return () => es.close();
   }, [onEvent]);
 }

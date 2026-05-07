@@ -8,7 +8,7 @@
     "Söhne", "Inter Tight", -apple-system, BlinkMacSystemFont,
     "Segoe UI", "Helvetica Neue", Arial, sans-serif;
   --font-mono:
-    ui-monospace, "JetBrains Mono", "SF Mono", "Cascadia Mono",
+    "JetBrains Mono", ui-monospace, "SF Mono", "Cascadia Mono",
     Menlo, Monaco, Consolas, "Liberation Mono", monospace;
 
   --fs-body: 17px;
@@ -91,6 +91,117 @@
   --paper-grain:
     radial-gradient(circle at 1px 1px, rgba(245, 200, 140, .035) 1px, transparent 0);
   --paper-grain-size: 22px 22px;
+}
+
+/* ===== Palettes (per-project + user override) ===== */
+/* The default 'classic' palette inherits whatever theme.css already set
+   above. Other palettes override the relevant color vars. They're scoped to
+   work in both light and dark themes. */
+
+/* Paper — warmer, more sepia */
+:root[data-palette="paper"][data-theme="light"] {
+  --bg: #f7f1e3;
+  --bg-elev: #fdf9ed;
+  --bg-sidebar: #efe7d2;
+  --bg-sidebar-2: #e7debe;
+  --accent: #8b5a2b;
+  --accent-strong: #6f4720;
+  --accent-soft: #f1e2c5;
+  --accent-tint: #f6ecd6;
+  --link: #8b5a2b;
+  --link-hover: #6f4720;
+  --quote-bar: #8b5a2b;
+}
+:root[data-palette="paper"][data-theme="dark"] {
+  --bg: #1a140d;
+  --bg-elev: #221a10;
+  --accent: #e0a663;
+  --accent-strong: #f0bb7d;
+  --link: #e0a663;
+  --link-hover: #f0bb7d;
+}
+
+/* Nord — cool blues, frosty */
+:root[data-palette="nord"][data-theme="light"] {
+  --bg: #eceff4;
+  --bg-elev: #ffffff;
+  --bg-sidebar: #e5e9f0;
+  --bg-sidebar-2: #d8dee9;
+  --fg: #2e3440;
+  --fg-strong: #2e3440;
+  --fg-muted: #4c566a;
+  --fg-subtle: #6c7a8e;
+  --border: #d8dee9;
+  --border-strong: #c0c8d4;
+  --accent: #5e81ac;
+  --accent-strong: #4c6f95;
+  --accent-soft: #d8e0ec;
+  --accent-tint: #ebf0f7;
+  --link: #5e81ac;
+  --link-hover: #4c6f95;
+  --quote-bar: #5e81ac;
+  --quote-bg: #ebf0f7;
+  --code-bg: #e5e9f0;
+}
+:root[data-palette="nord"][data-theme="dark"] {
+  --bg: #2e3440;
+  --bg-elev: #3b4252;
+  --bg-sidebar: #292e39;
+  --bg-sidebar-2: #353b48;
+  --fg: #eceff4;
+  --fg-strong: #ffffff;
+  --fg-muted: #b8c2d0;
+  --fg-subtle: #6c7a8e;
+  --border: #3b4252;
+  --border-strong: #4c566a;
+  --accent: #88c0d0;
+  --accent-strong: #b6dde7;
+  --accent-soft: #3b4252;
+  --accent-tint: #353b48;
+  --link: #88c0d0;
+  --link-hover: #b6dde7;
+  --quote-bar: #88c0d0;
+  --quote-bg: #353b48;
+  --code-bg: #3b4252;
+}
+
+/* Solarized — Ethan Schoonover's classic palette */
+:root[data-palette="solarized"][data-theme="light"] {
+  --bg: #fdf6e3;
+  --bg-elev: #ffffff;
+  --bg-sidebar: #eee8d5;
+  --bg-sidebar-2: #e3dfc8;
+  --fg: #586e75;
+  --fg-strong: #002b36;
+  --fg-muted: #93a1a1;
+  --border: #e3dfc8;
+  --accent: #b58900;
+  --accent-strong: #806300;
+  --accent-soft: #f4ecc9;
+  --accent-tint: #fbf6df;
+  --link: #268bd2;
+  --link-hover: #1e6da3;
+  --quote-bar: #b58900;
+  --code-bg: #eee8d5;
+}
+:root[data-palette="solarized"][data-theme="dark"] {
+  --bg: #002b36;
+  --bg-elev: #073642;
+  --bg-sidebar: #001b22;
+  --bg-sidebar-2: #073642;
+  --fg: #93a1a1;
+  --fg-strong: #fdf6e3;
+  --fg-muted: #586e75;
+  --border: #073642;
+  --border-strong: #135362;
+  --accent: #b58900;
+  --accent-strong: #e0aa00;
+  --accent-soft: #073642;
+  --accent-tint: #08313e;
+  --link: #268bd2;
+  --link-hover: #4ba0db;
+  --quote-bar: #b58900;
+  --code-bg: #073642;
 }
 
 /* Smooth global transitions on theme swap */

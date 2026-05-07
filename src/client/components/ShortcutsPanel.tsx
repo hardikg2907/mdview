@@ -1,47 +1,27 @@
-import { useEffect } from 'preact/hooks';
+import { useEffect, useMemo } from 'preact/hooks';
 import { shortcutsPanelSignal, closeShortcutsPanel } from '../hooks/useShortcutsPanel.js';
+import {
+  shortcuts,
+  displayOnlyShortcuts,
+  type Shortcut,
+  type ShortcutGroup,
+} from '../shortcuts.js';
 
-const isMac =
-  typeof navigator !== 'undefined' && /mac/i.test(navigator.platform || navigator.userAgent);
-const Mod = isMac ? '⌘' : 'Ctrl';
+const GROUP_ORDER: ShortcutGroup[] = ['Navigation', 'Find', 'View'];
 
-interface Shortcut {
-  keys: string[];
-  label: string;
+function groupShortcuts(all: Shortcut[]): Array<{ heading: ShortcutGroup; items: Shortcut[] }> {
+  const map = new Map<ShortcutGroup, Shortcut[]>();
+  for (const g of GROUP_ORDER) map.set(g, []);
+  for (const s of all) map.get(s.group)?.push(s);
+  return GROUP_ORDER.map((heading) => ({ heading, items: map.get(heading) ?? [] }));
 }
-
-const GROUPS: Array<{ heading: string; items: Shortcut[] }> = [
-  {
-    heading: 'Navigation',
-    items: [
-      { keys: ['j'], label: 'Next heading' },
-      { keys: ['k'], label: 'Previous heading' },
-      { keys: ['Esc'], label: 'Close search / lightbox / this panel' },
-    ],
-  },
-  {
-    heading: 'Find',
-    items: [
-      { keys: [Mod, 'P'], label: 'Switch file (quick switcher)' },
-      { keys: [Mod, 'F'], label: 'Open in-doc search' },
-      { keys: ['/'], label: 'Open search (no modifier)' },
-      { keys: ['Enter'], label: 'Next match (in search)' },
-      { keys: ['⇧', 'Enter'], label: 'Previous match (in search)' },
-    ],
-  },
-  {
-    heading: 'View',
-    items: [
-      { keys: [Mod, 'B'], label: 'Toggle file tree' },
-      { keys: [Mod, '.'], label: 'Toggle outline' },
-      { keys: [Mod, '\\'], label: 'Toggle theme' },
-      { keys: ['?'], label: 'Show this shortcuts panel' },
-    ],
-  },
-];
 
 export function ShortcutsPanel() {
   const open = shortcutsPanelSignal.value;
+  const groups = useMemo(
+    () => groupShortcuts([...shortcuts, ...displayOnlyShortcuts]),
+    [],
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -75,15 +55,15 @@ export function ShortcutsPanel() {
           </button>
         </div>
         <div class="shortcuts-body">
-          {GROUPS.map((group) => (
+          {groups.filter((g) => g.items.length > 0).map((group) => (
             <section key={group.heading} class="shortcuts-group">
               <h3 class="shortcuts-group-title">{group.heading}</h3>
               <ul>
                 {group.items.map((item) => (
-                  <li key={item.label}>
+                  <li key={item.id}>
                     <span class="shortcut-label">{item.label}</span>
                     <span class="shortcut-keys">
-                      {item.keys.map((k, i) => (
+                      {item.displayKeys.map((k, i) => (
                         <span key={`${k}-${i}`}>
                           {i > 0 && <span class="shortcut-plus" aria-hidden>+</span>}
                           <kbd>{k}</kbd>

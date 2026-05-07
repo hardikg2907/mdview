@@ -2,6 +2,7 @@ import MarkdownIt from 'markdown-it';
 import anchor from 'markdown-it-anchor';
 import taskLists from 'markdown-it-task-lists';
 import { highlightCode } from './shiki.js';
+import { mathPlugin } from './math.js';
 
 export interface RenderResult {
   html: string;
@@ -26,6 +27,7 @@ md.use(anchor, {
       .replace(/\s+/g, '-'),
 });
 md.use(taskLists, { enabled: false, label: false });
+md.use(mathPlugin);
 
 export async function renderMarkdown(source: string): Promise<RenderResult> {
   const tokens = md.parse(source, {});

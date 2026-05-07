@@ -1,14 +1,17 @@
 import type { FastifyInstance } from 'fastify';
 import path from 'node:path';
 import { walkFolder } from '../fs/tree.js';
+import type { ConfigState } from '../index.js';
 import type { RootInfo, TreeNode } from '../../shared/types.js';
 
 export function registerApiTree(
   app: FastifyInstance,
   rootAbsPath: string,
   rootInfo: RootInfo,
+  configState: ConfigState,
 ): void {
   app.get('/api/tree', async (_req, reply) => {
+    const config = configState.current;
     if (rootInfo.rootKind === 'file') {
       const single: TreeNode[] = [
         {
@@ -18,9 +21,9 @@ export function registerApiTree(
           isMarkdown: true,
         },
       ];
-      return reply.send({ root: rootInfo, tree: single });
+      return reply.send({ root: rootInfo, tree: single, config });
     }
     const tree = await walkFolder(rootAbsPath);
-    return reply.send({ root: rootInfo, tree });
+    return reply.send({ root: rootInfo, tree, config });
   });
 }

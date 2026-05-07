@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { highlightCode } from '../../src/server/render/shiki.js';
+import { highlightCode } from '../../src/render/shiki.js';
 
 describe('highlightCode', () => {
   it('produces shiki-themed html for known language', async () => {

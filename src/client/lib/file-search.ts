@@ -7,13 +7,10 @@ export interface FileEntry {
 
 export function flattenMdFiles(tree: TreeNode[]): FileEntry[] {
   const out: FileEntry[] = [];
-  function walk(nodes: TreeNode[]) {
+  function walk(nodes: TreeNode[]): void {
     for (const n of nodes) {
-      if (n.type === 'file' && n.isMarkdown) {
-        out.push({ relPath: n.relPath, name: n.name });
-      } else if (n.type === 'dir' && n.children) {
-        walk(n.children);
-      }
+      if (n.type === 'file' && n.isMarkdown) out.push({ relPath: n.relPath, name: n.name });
+      else if (n.type === 'dir' && n.children) walk(n.children);
     }
   }
   walk(tree);

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { renderMarkdown } from '../../src/server/render/markdown.js';
+import { renderMarkdown } from '../../src/render/markdown.js';
 
 describe('renderMarkdown', () => {
   it('renders headings with stable slug ids', async () => {

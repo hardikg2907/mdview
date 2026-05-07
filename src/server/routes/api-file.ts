@@ -1,10 +1,10 @@
 import type { FastifyInstance } from 'fastify';
-import { readFile } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import { resolveSafePath } from '../fs/resolve.js';
-import { renderMarkdown } from '../render/markdown.js';
-import { extractOutline } from '../render/outline.js';
-import { parseFrontmatter } from '../render/frontmatter.js';
-import { tagInternalLinks, rewriteImageSrc } from '../render/links.js';
+import { renderMarkdown } from '../../render/markdown.js';
+import { extractOutline } from '../../render/outline.js';
+import { parseFrontmatter } from '../../render/frontmatter.js';
+import { tagInternalLinks, rewriteImageSrc } from '../../render/links.js';
 import type { RenderedFile, RootInfo } from '../../shared/types.js';
 
 export function registerApiFile(
@@ -36,8 +36,14 @@ export function registerApiFile(
     }
 
     let raw: string;
+    let mtimeMs: number;
     try {
-      raw = await readFile(absPath, 'utf8');
+      const [content, st] = await Promise.all([
+        readFile(absPath, 'utf8'),
+        stat(absPath),
+      ]);
+      raw = content;
+      mtimeMs = st.mtimeMs;
     } catch {
       return reply.code(404).send({ error: 'File not found' });
     }
@@ -51,7 +57,14 @@ export function registerApiFile(
       outline[0]?.text ??
       null;
 
-    const result: RenderedFile = { relPath, html, outline, frontmatter: data, title };
+    const result: RenderedFile = {
+      relPath,
+      html,
+      outline,
+      frontmatter: data,
+      title,
+      lastModified: mtimeMs,
+    };
     return reply.send(result);
   });
 }

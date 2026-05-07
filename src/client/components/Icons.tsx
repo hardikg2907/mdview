@@ -141,6 +141,39 @@ export function IconKeyboard({ size = 16, class: cls }: IconProps) {
   );
 }
 
+export function IconPalette({ size = 16, class: cls }: IconProps) {
+  return (
+    <svg {...base(size)} class={cls} aria-hidden>
+      <path d="M12 22a10 10 0 1 1 10-10c0 2.5-2 4-4 4h-2a2 2 0 0 0-2 2v1a3 3 0 0 1-2 3z" />
+      <circle cx="6.5" cy="11.5" r="1" fill="currentColor" stroke="none" />
+      <circle cx="9.5" cy="7" r="1" fill="currentColor" stroke="none" />
+      <circle cx="14.5" cy="7" r="1" fill="currentColor" stroke="none" />
+      <circle cx="17.5" cy="11.5" r="1" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+export function IconFocus({ size = 16, class: cls }: IconProps) {
+  return (
+    <svg {...base(size)} class={cls} aria-hidden>
+      <circle cx="12" cy="12" r="3" />
+      <circle cx="12" cy="12" r="9" />
+    </svg>
+  );
+}
+
+export function IconMinimap({ size = 16, class: cls }: IconProps) {
+  return (
+    <svg {...base(size)} class={cls} aria-hidden>
+      <rect x="4" y="3" width="16" height="18" rx="2" />
+      <line x1="8" y1="7" x2="14" y2="7" />
+      <line x1="8" y1="11" x2="16" y2="11" />
+      <line x1="8" y1="15" x2="12" y2="15" />
+      <line x1="8" y1="19" x2="14" y2="19" />
+    </svg>
+  );
+}
+
 export function IconList({ size = 16, class: cls }: IconProps) {
   return (
     <svg {...base(size)} class={cls} aria-hidden>

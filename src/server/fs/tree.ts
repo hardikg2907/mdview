@@ -1,8 +1,7 @@
 import { readdir } from 'node:fs/promises';
 import path from 'node:path';
+import { MD_EXT } from '../../shared/tree-utils.js';
 import type { TreeNode } from '../../shared/types.js';
-
-const MD_EXT = new Set(['.md', '.markdown', '.mdx']);
 
 export async function walkFolder(root: string, relBase = ''): Promise<TreeNode[]> {
   const absDir = path.join(root, relBase);
