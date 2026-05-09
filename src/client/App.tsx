@@ -81,6 +81,21 @@ export function App() {
   useEffect(() => { void loadFile(currentPath); }, [currentPath]);
   useEffect(() => { closeSearch(); }, [currentPath]);
 
+  // Update browser tab title to reflect the currently-open file.
+  useEffect(() => {
+    const f = fileSignal.value;
+    let name: string | null = null;
+    if (f) {
+      if (f.title) {
+        name = f.title;
+      } else if (currentPath) {
+        const idx = currentPath.lastIndexOf('/');
+        name = idx >= 0 ? currentPath.slice(idx + 1) : currentPath;
+      }
+    }
+    document.title = name ? `${name} | mdview` : 'mdview';
+  }, [fileSignal.value, currentPath]);
+
   // After file loads, restore hash anchor (if any)
   useEffect(() => {
     if (!fileSignal.value || !mainRef.current) return;

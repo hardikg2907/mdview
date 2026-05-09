@@ -14,7 +14,6 @@ export interface ServerOptions {
   rootAbsPath: string;
   rootInfo: RootInfo;
   clientDir: string;
-  port: number;
 }
 
 export interface ConfigState {

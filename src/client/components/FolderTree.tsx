@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import type { TreeNode } from '../../shared/types.js';
 import { IconChevronRight, IconFolder, IconFolderOpen, IconFile, IconFileMd } from './Icons.js';
 
@@ -32,7 +32,11 @@ interface ItemProps {
 }
 
 function TreeItem({ node, currentPath, onSelect, depth }: ItemProps) {
-  const [open, setOpen] = useState(true);
+  const isAncestor = currentPath !== null && currentPath.startsWith(node.relPath + '/');
+  const [open, setOpen] = useState(isAncestor);
+  useEffect(() => {
+    if (isAncestor) setOpen(true);
+  }, [currentPath]);
   // Indent: leftmost gutter for guide rails + per-level offset.
   const indent = `${10 + depth * 14}px`;
 
