@@ -20,8 +20,37 @@ export interface ConfigState {
   current: ProjectConfig | null;
 }
 
+const CSP_HTML = [
+  "default-src 'self'",
+  "script-src 'self'",
+  // KaTeX + mermaid inject inline styles into rendered output; the rest of
+  // the policy is strict.
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob:",
+  "font-src 'self' data:",
+  "connect-src 'self'",
+  "frame-ancestors 'none'",
+  "base-uri 'none'",
+  "form-action 'none'",
+].join('; ');
+
 export async function createServer(opts: ServerOptions): Promise<FastifyInstance> {
   const app = Fastify({ logger: false });
+
+  // Threat model: a user opens an untrusted .md file. markdown-it is configured
+  // with html: true so raw <script> in source would otherwise execute and could
+  // exfiltrate sibling files via /__asset/* and /api/file. The CSP below blocks
+  // inline + remote scripts on the SPA shell, which is where rendered markdown
+  // is injected.
+  app.addHook('onSend', async (_req, reply, payload) => {
+    const ct = String(reply.getHeader('content-type') ?? '');
+    if (ct.startsWith('text/html')) {
+      reply.header('content-security-policy', CSP_HTML);
+      reply.header('x-content-type-options', 'nosniff');
+      reply.header('referrer-policy', 'no-referrer');
+    }
+    return payload;
+  });
 
   const watcher = createWatcher(opts.rootAbsPath);
 

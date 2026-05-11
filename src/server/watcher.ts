@@ -22,6 +22,8 @@ export function createWatcher(rootAbsPath: string): Watcher {
   });
 
   function emit(kind: 'change' | 'add' | 'unlink', abs: string) {
+    // Normalize to URL-shaped relPath ('/'-separated) on every OS so Windows
+    // (`\`) events match the same wire format the rest of the API serves.
     const rel = path.relative(rootAbsPath, abs).split(path.sep).join('/');
     if (!rel) return;
     emitter.emit('event', { kind, relPath: rel } satisfies WatchEvent);

@@ -1,9 +1,14 @@
 import path from 'node:path';
-import { existsSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createServer } from './server/index.js';
 import openBrowser from 'open';
 import type { RootInfo } from './shared/types.js';
+
+type ParseResult =
+  | { kind: 'run'; args: Args }
+  | { kind: 'help' }
+  | { kind: 'version' };
 
 function printUsage(): void {
   console.error(`
@@ -15,6 +20,7 @@ Usage:
 Options:
   --port <n>               Port to listen on (default: 7331; auto-fallback)
   --no-open                Don't auto-launch the browser
+  --version, -v            Print version and exit
   --help, -h               Show this help
 
 Examples:
@@ -31,11 +37,31 @@ interface Args {
   open: boolean;
 }
 
-function parseArgs(argv: string[]): Args | null {
+function readVersion(): string {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const candidates = [
+    path.resolve(here, '../package.json'),
+    path.resolve(here, '../../package.json'),
+  ];
+  for (const p of candidates) {
+    try {
+      const raw = readFileSync(p, 'utf8');
+      const v = JSON.parse(raw).version;
+      if (typeof v === 'string') return v;
+    } catch {
+      // try next
+    }
+  }
+  return 'unknown';
+}
+
+function parseArgs(argv: string[]): ParseResult {
   const args: Args = { target: '.', port: 7331, portExplicit: false, open: true };
+  let targetSet = false;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]!;
-    if (a === '-h' || a === '--help') return null;
+    if (a === '-h' || a === '--help') return { kind: 'help' };
+    if (a === '-v' || a === '--version') return { kind: 'version' };
     if (a === '--no-open') { args.open = false; continue; }
     if (a === '--port') {
       const v = argv[++i];
@@ -45,10 +71,12 @@ function parseArgs(argv: string[]): Args | null {
       args.portExplicit = true;
       continue;
     }
-    if (a.startsWith('--')) throw new Error(`Unknown flag: ${a}`);
+    if (a.startsWith('-')) throw new Error(`Unknown flag: ${a}`);
+    if (targetSet) throw new Error(`Unexpected argument: ${a}`);
     args.target = a;
+    targetSet = true;
   }
-  return args;
+  return { kind: 'run', args };
 }
 
 function detectRoot(target: string): { rootAbsPath: string; rootInfo: RootInfo } {
@@ -74,6 +102,19 @@ function detectRoot(target: string): { rootAbsPath: string; rootInfo: RootInfo }
   throw new Error(`Unsupported path type: ${abs}`);
 }
 
+function portFinderHint(port: number): string {
+  switch (process.platform) {
+    case 'darwin':
+      return `lsof -nP -iTCP:${port} -sTCP:LISTEN`;
+    case 'linux':
+      return `ss -ltnp 'sport = :${port}'  (or: lsof -nP -iTCP:${port} -sTCP:LISTEN)`;
+    case 'win32':
+      return `netstat -ano | findstr :${port}  (then: tasklist /FI "PID eq <pid>")`;
+    default:
+      return `lsof -nP -iTCP:${port} -sTCP:LISTEN`;
+  }
+}
+
 async function listen(
   app: Awaited<ReturnType<typeof createServer>>,
   port: number,
@@ -88,7 +129,7 @@ async function listen(
         throw new Error(
           `Port ${port} is already in use.\n` +
             `Try a different port (e.g. --port ${port + 1}) or stop whatever is bound to ${port}.\n` +
-            `On macOS you can find the process with: lsof -nP -iTCP:${port} -sTCP:LISTEN`,
+            `Find the process with: ${portFinderHint(port)}`,
         );
       }
       throw err;
@@ -110,15 +151,17 @@ async function listen(
 }
 
 async function main(): Promise<void> {
-  let args: Args | null;
+  let parsed: ParseResult;
   try {
-    args = parseArgs(process.argv.slice(2));
+    parsed = parseArgs(process.argv.slice(2));
   } catch (err) {
     console.error((err as Error).message);
     printUsage();
     process.exit(2);
   }
-  if (!args) { printUsage(); process.exit(0); }
+  if (parsed.kind === 'help') { printUsage(); process.exit(0); }
+  if (parsed.kind === 'version') { console.log(readVersion()); process.exit(0); }
+  const args = parsed.args;
 
   const { rootAbsPath, rootInfo } = detectRoot(args.target);
 
@@ -162,7 +205,10 @@ async function main(): Promise<void> {
     process.exit(0);
   };
   process.on('SIGINT', shutdown);
+  // Windows does not deliver SIGTERM/SIGHUP — these handlers are no-ops there;
+  // Ctrl+C (SIGINT) is the supported way to stop the server on Windows.
   process.on('SIGTERM', shutdown);
+  if (process.platform !== 'win32') process.on('SIGHUP', shutdown);
 }
 
 function formatError(err: unknown): { message: string; code: number } | null {
@@ -180,7 +226,8 @@ function formatError(err: unknown): { message: string; code: number } | null {
   if (
     msg.startsWith('Path does not exist') ||
     msg.startsWith('Unsupported path type') ||
-    msg.startsWith('Could not bind a port')
+    msg.startsWith('Could not bind a port') ||
+    msg.startsWith('Unexpected argument')
   ) {
     return { message: `mdview: ${msg}`, code: 1 };
   }

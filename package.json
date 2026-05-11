@@ -2,13 +2,35 @@
   "name": "mdview",
   "version": "0.1.1",
   "description": "Local CLI markdown viewer with live reload, outline navigation, and folder browsing",
+  "license": "MIT",
+  "author": "Hardik Garg <hardik.garg@idfy.com>",
+  "keywords": [
+    "markdown",
+    "md",
+    "viewer",
+    "cli",
+    "live-reload",
+    "preview",
+    "docs"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hardikgarg/mdview.git"
+  },
+  "homepage": "https://github.com/hardikgarg/mdview#readme",
+  "bugs": {
+    "url": "https://github.com/hardikgarg/mdview/issues"
+  },
   "type": "module",
   "bin": {
     "mdview": "./bin/mdview.mjs"
   },
   "files": [
-    "bin",
-    "dist"
+    "bin/mdview.mjs",
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
   ],
   "scripts": {
     "dev:client": "vite",

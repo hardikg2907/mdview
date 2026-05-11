@@ -12,6 +12,9 @@ export async function walkFolder(root: string, relBase = ''): Promise<TreeNode[]
     if (entry.name.startsWith('.')) continue;
     if (entry.name === 'node_modules') continue;
 
+    // relPaths are URL-shaped (always '/'), not OS-native. resolveSafePath uses
+    // path.resolve which accepts '/' on Windows, and the client/links code
+    // assumes forward slashes. Do not "fix" this with path.join.
     const childRel = relBase ? `${relBase}/${entry.name}` : entry.name;
 
     if (entry.isDirectory()) {

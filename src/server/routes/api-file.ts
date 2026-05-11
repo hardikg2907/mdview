@@ -28,6 +28,13 @@ export function registerApiFile(
       relPath = requested;
     }
 
+    // Restrict to markdown extensions. Without this, /api/file?path=.env
+    // returns the file's contents inside the rendered response, since the
+    // route otherwise reads any file under root.
+    if (!/\.(md|markdown|mdx)$/i.test(relPath)) {
+      return reply.code(400).send({ error: 'Only markdown files are supported' });
+    }
+
     let absPath: string;
     try {
       absPath = resolveSafePath(rootAbsPath, relPath);

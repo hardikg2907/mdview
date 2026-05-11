@@ -33,6 +33,10 @@ interface GrepOptions extends Partial<SearchOptions> {
   perFileCap?: number;
   globalCap?: number;
   snippetRadius?: number;
+  /** Per-line wall-clock budget for regex matching (defaults 5 ms). */
+  perLineBudgetMs?: number;
+  /** Skip lines longer than this in regex mode — defence against ReDoS on pathological lines (defaults 10_000). */
+  maxLineLenForRegex?: number;
 }
 
 function buildSnippet(line: string, start: number, end: number, radius: number): {
@@ -60,6 +64,9 @@ export async function grepFiles(
   const perFileCap = opts.perFileCap ?? 20;
   const globalCap = opts.globalCap ?? 200;
   const snippetRadius = opts.snippetRadius ?? 60;
+  const perLineBudgetMs = opts.perLineBudgetMs ?? 5;
+  const maxLineLenForRegex = opts.maxLineLenForRegex ?? 10_000;
+  const regexMode = opts.regex ?? false;
 
   if (!query || query.length === 0) {
     return { query, results: [], truncated: false };
@@ -97,14 +104,26 @@ export async function grepFiles(
       continue;
     }
     const { body } = parseFrontmatter(raw);
-    const lines = body.split('\n');
+    // Split on both LF and CRLF — a Windows-authored .md leaves a trailing \r
+    // on every line otherwise, breaking \b end-of-line matches and snippet rendering.
+    const lines = body.split(/\r?\n/);
 
     const fileHits: SearchHit[] = [];
     let fileTotal = 0;
     let fileTruncated = false;
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i]!;
-      for (const m of pattern.matchAll(line)) {
+      // Skip pathologically-long lines in regex mode — single exec() against
+      // an ultra-long line is the main ReDoS shape we can't time-cancel.
+      if (regexMode && line.length > maxLineLenForRegex) {
+        fileTruncated = true;
+        continue;
+      }
+      const { matches, truncated: lineTruncated } = regexMode
+        ? pattern.matchAllWithBudget(line, perLineBudgetMs)
+        : { matches: pattern.matchAll(line), truncated: false };
+      if (lineTruncated) fileTruncated = true;
+      for (const m of matches) {
         fileTotal++;
         if (fileHits.length < perFileCap) {
           const { snippet, highlight } = buildSnippet(

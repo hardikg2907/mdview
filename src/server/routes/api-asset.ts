@@ -42,7 +42,13 @@ export function registerApiAsset(app: FastifyInstance, rootAbsPath: string): voi
       return reply.code(404).send({ error: 'Not a file' });
     }
     const ext = path.extname(abs).toLowerCase();
-    const mime = MIME[ext] ?? 'application/octet-stream';
+    const mime = MIME[ext];
+    if (!mime) {
+      // Allow-list known media types only. Without this, /__asset/.env or any
+      // dotfile under the watched root would be readable by anything that can
+      // reach the server (a script in a rendered .md, or any other localhost tab).
+      return reply.code(404).send({ error: 'Asset type not allowed' });
+    }
     reply.header('content-type', mime);
     reply.header('content-length', st.size);
     reply.header('cache-control', 'no-cache');
