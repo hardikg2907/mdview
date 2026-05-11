@@ -49,6 +49,19 @@ describe('tagInternalLinks', () => {
     const out = tagInternalLinks(html, 'a.md');
     expect(out).not.toContain('data-internal-link');
   });
+
+  it('decodes percent-encoded paths in data-internal-link so the router does not double-encode', () => {
+    const html = '<a href="foo%20bar.md">x</a>';
+    const out = tagInternalLinks(html, 'guides/intro.md');
+    expect(out).toContain('data-internal-link="guides/foo bar.md"');
+    expect(out).toContain('href="guides/foo%20bar.md"');
+  });
+
+  it('keeps the literal target when percent-encoding is malformed', () => {
+    const html = '<a href="bad%2.md">x</a>';
+    const out = tagInternalLinks(html, 'a.md');
+    expect(out).toContain('data-internal-link="bad%2.md"');
+  });
 });
 
 describe('rewriteImageSrc', () => {

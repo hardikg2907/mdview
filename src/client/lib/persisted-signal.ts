@@ -5,10 +5,33 @@ interface PersistOptions<T> {
   serialize: (v: T) => string;
 }
 
+// Whether we've already logged a localStorage access failure. Safari ITP and
+// private modes can throw on every access; we only want to warn once per
+// session so the console stays readable while still leaving a breadcrumb.
+let loggedReadFailure = false;
+
+/**
+ * Reads a value from localStorage.
+ *
+ * Returns `null` for both "key not set" and "access denied" — callers can't
+ * meaningfully recover from the latter, so collapsing them keeps the signal
+ * API simple. The access-denied case is logged once per session via
+ * `console.warn` so the situation is visible during debugging (e.g. Safari
+ * private mode, ITP, blocked storage).
+ */
 function safeRead(key: string): string | null {
   try {
     return localStorage.getItem(key);
-  } catch {
+  } catch (err) {
+    if (!loggedReadFailure) {
+      loggedReadFailure = true;
+      // eslint-disable-next-line no-console
+      console.warn(
+        '[mdview] localStorage read blocked; falling back to defaults. ' +
+          'Theme/UI prefs will not persist across reloads.',
+        err,
+      );
+    }
     return null;
   }
 }
@@ -17,7 +40,8 @@ function safeWrite(key: string, value: string): void {
   try {
     localStorage.setItem(key, value);
   } catch {
-    // best-effort; quota or privacy mode
+    // best-effort; quota exceeded, privacy mode, or storage disabled.
+    // Read path already warned, so no extra logging here.
   }
 }
 

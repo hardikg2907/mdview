@@ -13,8 +13,15 @@ export function tagInternalLinks(html: string, currentRelPath: string): string {
     if (!MD_EXT_RE.test(target)) return full;
 
     const resolved = path.normalize(path.join(currentDir, target));
-    const internal = `${resolved}${query ?? ''}${hash ?? ''}`;
-    return `<a ${pre}href="${internal}" data-internal-link="${internal}"${post}>`;
+    let decoded: string;
+    try {
+      decoded = decodeURIComponent(resolved);
+    } catch {
+      decoded = resolved;
+    }
+    const href = `${resolved}${query ?? ''}${hash ?? ''}`;
+    const internal = `${decoded}${query ?? ''}${hash ?? ''}`;
+    return `<a ${pre}href="${href}" data-internal-link="${internal}"${post}>`;
   });
 }
 

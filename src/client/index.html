@@ -4,6 +4,43 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>mdview</title>
+    <script>
+      // Pre-paint theme/palette bootstrap. Runs synchronously before any CSS
+      // or app code so we don't flash the wrong theme (FOUC), even when
+      // localStorage is unavailable (Safari private mode / ITP). Defensive:
+      // any error falls back to OS preference for theme and the default
+      // palette. Values are validated against fixed allow-lists before being
+      // applied to dataset attributes.
+      (function () {
+        var THEMES = ['light', 'dark'];
+        var PALETTES = ['classic', 'paper', 'nord', 'solarized'];
+        var theme = null;
+        var palette = null;
+        try {
+          var t = localStorage.getItem('mdview-theme');
+          if (t && THEMES.indexOf(t) !== -1) theme = t;
+          var p = localStorage.getItem('mdview-palette');
+          if (p && PALETTES.indexOf(p) !== -1) palette = p;
+        } catch (_e) {
+          // localStorage blocked (private mode / ITP / cookies disabled).
+          // Fall through to defaults.
+        }
+        if (!theme) {
+          try {
+            theme =
+              window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+                ? 'dark'
+                : 'light';
+          } catch (_e) {
+            theme = 'light';
+          }
+        }
+        if (!palette) palette = 'classic';
+        var root = document.documentElement;
+        root.dataset.theme = theme;
+        root.dataset.palette = palette;
+      })();
+    </script>
   </head>
   <body>
     <div id="app"></div>

@@ -60,6 +60,33 @@ export async function createServer(opts: ServerOptions): Promise<FastifyInstance
       reply.code(404).send({ error: 'Not found' });
       return;
     }
+
+    // Parse pathname only — strip query string before extension check.
+    const qIndex = req.url.indexOf('?');
+    const rawPath = qIndex >= 0 ? req.url.slice(0, qIndex) : req.url;
+
+    // Reject CR/LF in the URL to prevent header injection / response splitting
+    // when we build the redirect Location header below.
+    if (/[\r\n]/.test(rawPath)) {
+      reply.code(404).send({ error: 'Not found' });
+      return;
+    }
+
+    // If a markdown-shaped path got here, something rendered a real <a href> to
+    // it instead of intercepting client-side. Redirect into the SPA's ?file=
+    // entrypoint so the right file loads instead of the SPA fallback picking a
+    // random last-viewed file.
+    if (/\.(md|markdown|mdx)$/i.test(rawPath)) {
+      // Strip the leading slash; the file endpoint expects a root-relative path.
+      const relPath = rawPath.replace(/^\/+/, '');
+      // Same-origin redirect only: we control the path entirely; encodeURIComponent
+      // prevents the user-controlled segment from breaking out of the query value
+      // or smuggling CR/LF into the Location header.
+      const location = `/?file=${encodeURIComponent(relPath)}`;
+      reply.code(302).header('Location', location).send();
+      return;
+    }
+
     return reply.sendFile('index.html');
   });
 

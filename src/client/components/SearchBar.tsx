@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { useSignal } from '@preact/signals';
 import {
   clearHighlights,
@@ -11,6 +11,7 @@ import {
   fetchFolderSearch,
   type FolderSearchResults,
 } from '../lib/folder-search.js';
+import { debounce } from '../lib/debounce.js';
 import {
   closeSearch,
   searchScopeSignal,
@@ -31,6 +32,7 @@ interface Props {
 }
 
 const FOLDER_DEBOUNCE_MS = 250;
+const DOC_DEBOUNCE_MS = 150;
 
 export function SearchBar({ scroller, fileTrigger: _fileTrigger, onOpenFile }: Props) {
   const [query, setQuery] = useState('');
@@ -56,30 +58,50 @@ export function SearchBar({ scroller, fileTrigger: _fileTrigger, onOpenFile }: P
     inputRef.current?.select();
   }, []);
 
-  // Doc-mode search effect
+  // Doc-mode search effect (debounced for typing; immediate clears for empty)
+  const runDocSearch = useMemo(
+    () =>
+      debounce(
+        (
+          el: HTMLElement,
+          q: string,
+          opts: { caseSensitive: boolean; wholeWord: boolean; regex: boolean },
+        ) => {
+          clearHighlights(el);
+          const found = findHits(el, q, opts);
+          hits.value = found;
+          activeIdx.value = 0;
+          if (found.length > 0) {
+            highlightHits(found, 0);
+            domCount.value = el.querySelectorAll('mark.search-hit').length;
+            requestAnimationFrame(() => {
+              el.querySelector('mark.search-hit.is-active')
+                ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            });
+          } else {
+            domCount.value = 0;
+          }
+        },
+        DOC_DEBOUNCE_MS,
+      ),
+    // hits/activeIdx/domCount are stable signal references
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
   useEffect(() => {
     if (scope !== 'doc') return;
     if (!scroller) return;
-    clearHighlights(scroller);
     if (!query.trim()) {
+      runDocSearch.cancel();
+      clearHighlights(scroller);
       hits.value = [];
       activeIdx.value = 0;
       domCount.value = 0;
       return;
     }
-    const found = findHits(scroller, query, { caseSensitive, wholeWord, regex: regexMode });
-    hits.value = found;
-    activeIdx.value = 0;
-    if (found.length > 0) {
-      highlightHits(found, 0);
-      domCount.value = scroller.querySelectorAll('mark.search-hit').length;
-      requestAnimationFrame(() => {
-        scroller.querySelector('mark.search-hit.is-active')
-          ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      });
-    } else {
-      domCount.value = 0;
-    }
+    runDocSearch(scroller, query, { caseSensitive, wholeWord, regex: regexMode });
+    return () => runDocSearch.cancel();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, scope, scroller, _fileTrigger, caseSensitive, wholeWord, regexMode]);
 
@@ -93,36 +115,57 @@ export function SearchBar({ scroller, fileTrigger: _fileTrigger, onOpenFile }: P
   }, [activeIdx.value, scope, scroller, hits.value.length]);
 
   // Folder-mode debounced fetch
+  const folderAbortRef = useRef<AbortController | null>(null);
+  const runFolderSearch = useMemo(
+    () =>
+      debounce(
+        (
+          q: string,
+          opts: { caseSensitive: boolean; wholeWord: boolean; regex: boolean },
+        ) => {
+          folderAbortRef.current?.abort();
+          const ctl = new AbortController();
+          folderAbortRef.current = ctl;
+          (async () => {
+            try {
+              const res = await fetchFolderSearch(q, opts, ctl.signal);
+              if (ctl.signal.aborted) return;
+              folderResults.value = res;
+              folderError.value = null;
+              folderActive.value = 0;
+            } catch (err) {
+              if ((err as Error).name === 'AbortError') return;
+              folderError.value = (err as Error).message;
+            } finally {
+              if (folderAbortRef.current === ctl) folderAbortRef.current = null;
+              if (!ctl.signal.aborted) folderLoading.value = false;
+            }
+          })();
+        },
+        FOLDER_DEBOUNCE_MS,
+      ),
+    // signal refs and the abort ref are stable
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
   useEffect(() => {
     if (scope !== 'folder') return;
     if (!query.trim()) {
+      runFolderSearch.cancel();
+      folderAbortRef.current?.abort();
+      folderAbortRef.current = null;
       folderResults.value = null;
       folderError.value = null;
       folderLoading.value = false;
       return;
     }
     folderLoading.value = true;
-    const ctl = new AbortController();
-    const t = setTimeout(async () => {
-      try {
-        const res = await fetchFolderSearch(
-          query.trim(),
-          { caseSensitive, wholeWord, regex: regexMode },
-          ctl.signal,
-        );
-        folderResults.value = res;
-        folderError.value = null;
-        folderActive.value = 0;
-      } catch (err) {
-        if ((err as Error).name === 'AbortError') return;
-        folderError.value = (err as Error).message;
-      } finally {
-        folderLoading.value = false;
-      }
-    }, FOLDER_DEBOUNCE_MS);
+    runFolderSearch(query.trim(), { caseSensitive, wholeWord, regex: regexMode });
     return () => {
-      clearTimeout(t);
-      ctl.abort();
+      runFolderSearch.cancel();
+      folderAbortRef.current?.abort();
+      folderAbortRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query, scope, caseSensitive, wholeWord, regexMode]);

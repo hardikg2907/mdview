@@ -38,6 +38,7 @@ import { ContentSkeleton } from './components/ContentSkeleton.js';
 import { SearchBar } from './components/SearchBar.js';
 import { searchOpenSignal, closeSearch } from './hooks/useSearch.js';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts.js';
+import { useAltWheelScroll } from './hooks/useAltWheelScroll.js';
 import { IconPanelLeftOpen, IconPanelRightOpen } from './components/Icons.js';
 import type { TreeNode } from '../shared/types.js';
 
@@ -119,6 +120,8 @@ export function App() {
     onJumpHeading: (id) => handleJump(id),
     navigate: (relPath: string) => navigate(relPath),
   });
+  // IDE-style fast scroll: hold Option/Alt while scrolling for ~4x speed.
+  useAltWheelScroll(mainRef);
 
   const handleSelect = (relPath: string) => navigate(relPath);
   const handleInternalNav = (relPath: string, hash: string) => {

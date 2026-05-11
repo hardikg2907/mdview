@@ -83,4 +83,74 @@ describe('wireInternalLinks', () => {
     );
     expect(calls).toEqual([{ rel: 'other.md', hash: '' }]);
   });
+
+  // Belt-and-suspenders fallback: even if server-side tagging missed a link,
+  // an untagged same-origin .md link should still be intercepted instead of
+  // letting the browser do a real navigation (which would land on the SPA
+  // fallback without ?file= set).
+  it('intercepts untagged same-origin .md links and resolves them to a relPath', () => {
+    const root = setup('<a href="/scoping/prds/foo.md">x</a>');
+    const calls: Array<{ rel: string; hash: string }> = [];
+    wireInternalLinks(root, (rel, hash) => calls.push({ rel, hash }));
+
+    const ev = new MouseEvent('click', { bubbles: true, cancelable: true });
+    root.querySelector('a')!.dispatchEvent(ev);
+    expect(ev.defaultPrevented).toBe(true);
+    expect(calls).toEqual([{ rel: 'scoping/prds/foo.md', hash: '' }]);
+  });
+
+  it('decodes percent-encoded pathnames when intercepting untagged .md links', () => {
+    const root = setup('<a href="/foo%20bar.md">x</a>');
+    const calls: Array<{ rel: string; hash: string }> = [];
+    wireInternalLinks(root, (rel, hash) => calls.push({ rel, hash }));
+
+    root.querySelector('a')!.dispatchEvent(
+      new MouseEvent('click', { bubbles: true, cancelable: true }),
+    );
+    expect(calls).toEqual([{ rel: 'foo bar.md', hash: '' }]);
+  });
+
+  it('preserves the hash on untagged .md links', () => {
+    const root = setup('<a href="/docs/intro.md#section-2">x</a>');
+    const calls: Array<{ rel: string; hash: string }> = [];
+    wireInternalLinks(root, (rel, hash) => calls.push({ rel, hash }));
+
+    root.querySelector('a')!.dispatchEvent(
+      new MouseEvent('click', { bubbles: true, cancelable: true }),
+    );
+    expect(calls).toEqual([{ rel: 'docs/intro.md', hash: '#section-2' }]);
+  });
+
+  it('does not intercept untagged links that are not markdown', () => {
+    const root = setup('<a href="/other.txt">x</a>');
+    const calls: Array<{ rel: string; hash: string }> = [];
+    wireInternalLinks(root, (rel, hash) => calls.push({ rel, hash }));
+
+    const ev = new MouseEvent('click', { bubbles: true, cancelable: true });
+    root.querySelector('a')!.dispatchEvent(ev);
+    expect(ev.defaultPrevented).toBe(false);
+    expect(calls).toEqual([]);
+  });
+
+  it('does not intercept untagged .md links opened with target=_blank', () => {
+    const root = setup('<a href="/foo.md" target="_blank">x</a>');
+    const calls: Array<{ rel: string; hash: string }> = [];
+    wireInternalLinks(root, (rel, hash) => calls.push({ rel, hash }));
+
+    const ev = new MouseEvent('click', { bubbles: true, cancelable: true });
+    root.querySelector('a')!.dispatchEvent(ev);
+    expect(ev.defaultPrevented).toBe(false);
+    expect(calls).toEqual([]);
+  });
+
+  it('does not intercept untagged links flagged for download', () => {
+    const root = setup('<a href="/foo.md" download>x</a>');
+    const calls: Array<{ rel: string; hash: string }> = [];
+    wireInternalLinks(root, (rel, hash) => calls.push({ rel, hash }));
+
+    const ev = new MouseEvent('click', { bubbles: true, cancelable: true });
+    root.querySelector('a')!.dispatchEvent(ev);
+    expect(ev.defaultPrevented).toBe(false);
+    expect(calls).toEqual([]);
+  });
 });
