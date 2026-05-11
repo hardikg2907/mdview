@@ -13,6 +13,7 @@ import {
   treeWidthSignal,
   outlineWidthSignal,
   minimapSignal,
+  wideLayoutSignal,
   toggleTreeCollapsed,
   toggleOutlineCollapsed,
   setTreeWidth,
@@ -63,6 +64,7 @@ export function App() {
   const outlineCollapsed = outlineCollapsedSignal.value;
   const treeWidth = treeWidthSignal.value;
   const outlineWidth = outlineWidthSignal.value;
+  const wideLayout = wideLayoutSignal.value;
 
   // First load: if no path and dir-mode, load the first md file
   useEffect(() => {
@@ -112,6 +114,13 @@ export function App() {
 
   useScrollSpy(mainRef.current);
   useEffect(() => { setMainScroller(mainRef.current); }, [mainRef.current]);
+  useEffect(() => {
+    if (wideLayout) {
+      document.documentElement.dataset.wide = '1';
+    } else {
+      delete document.documentElement.dataset.wide;
+    }
+  }, [wideLayout]);
   useLiveReload({ currentPath, scrollerRef: mainRef });
   useKeyboardShortcuts({
     outline: fileSignal.value?.outline ?? [],
@@ -184,6 +193,7 @@ export function App() {
               tree={treeData.tree}
               currentPath={currentPath}
               onSelect={handleSelect}
+              onCollapse={toggleTreeCollapsed}
             />
           )
         )}
@@ -206,10 +216,6 @@ export function App() {
         <Header
           outline={file?.outline ?? []}
           fileName={file?.title ?? null}
-          treeCollapsed={treeCollapsed}
-          outlineCollapsed={outlineCollapsed}
-          onToggleTree={toggleTreeCollapsed}
-          onToggleOutline={toggleOutlineCollapsed}
           onJumpHeading={handleJumpHeading}
         />
         <ReadingProgress scroller={mainRef.current} trigger={file} />
@@ -258,7 +264,13 @@ export function App() {
             <span class="rail-label">OUTLINE</span>
           </button>
         ) : (
-          file && <Outline nodes={file.outline} onJump={handleJump} />
+          file && (
+            <Outline
+              nodes={file.outline}
+              onJump={handleJump}
+              onCollapse={toggleOutlineCollapsed}
+            />
+          )
         )}
       </aside>
     </div>

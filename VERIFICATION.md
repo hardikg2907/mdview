@@ -42,6 +42,18 @@ node bin/mdview.mjs ./test-fixtures/showcase.md --no-open
 - Drag below the collapse threshold (~140 px) → pane snaps to collapsed rail and width resets to default.
 - `⌘B` / `⌘.` still toggle correctly afterwards.
 
+### 4a. Collapse controls live inside the panes
+- Tree expanded → "Files" head bar at the top of the tree pane has a single collapse button on the right (`⌘B` tooltip). Header has no tree-toggle button.
+- Click the in-pane button → tree collapses to the vertical "FILES" rail. Click the rail → tree expands again.
+- Outline expanded → outline head row shows the level pills and a single collapse button (`⌘.` tooltip). Header has no outline-toggle button.
+- Both controls remain consistent through `⌘B` / `⌘.` keyboard toggles.
+
+### 4b. View menu + wide layout
+- Header right side shows three icons: a gear (View), theme toggle, and the keyboard `?` button. Nothing else.
+- Click the gear → popover lists Focus mode, Minimap, Wide layout, a divider, and five palette swatches with checks on the active palette.
+- Toggle "Wide layout" (or press `w`) → main column visibly relaxes from ~70ch to ~100ch; reload persists the choice.
+- Toggle Focus, Minimap, and palettes from inside the menu — behavior matches the previous separate buttons.
+
 ### 5. Outline level filter
 - Outline header shows six small pills `1 2 3 4 5 6`.
 - Click `5` and `6` → headings at those levels disappear; their children (if any) get promoted up.

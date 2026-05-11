@@ -4,9 +4,11 @@ const tree = createPersistedBool('mdview-tree-collapsed', false);
 const outline = createPersistedBool('mdview-outline-collapsed', false);
 const focusMode = createPersistedBool('mdview-focus-mode', false);
 const minimap = createPersistedBool('mdview-minimap', false);
+const wideLayout = createPersistedBool('mdview-wide-layout', false);
 
 export const focusModeSignal = focusMode.signal;
 export const minimapSignal = minimap.signal;
+export const wideLayoutSignal = wideLayout.signal;
 
 export function toggleFocusMode(): void {
   focusMode.set(!focusMode.signal.value);
@@ -14,6 +16,10 @@ export function toggleFocusMode(): void {
 
 export function toggleMinimap(): void {
   minimap.set(!minimap.signal.value);
+}
+
+export function toggleWideLayout(): void {
+  wideLayout.set(!wideLayout.signal.value);
 }
 
 export const TREE_WIDTH_DEFAULT = 264;

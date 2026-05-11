@@ -14,6 +14,7 @@
   --fs-body: 17px;
   --fs-small: 13px;
   --line-width: 70ch;
+  --line-width-wide: 100ch;
   --radius: 8px;
   --radius-sm: 4px;
   --transition: 200ms ease;
@@ -257,6 +258,11 @@
   --selection-fg: #000000;
   --shadow: 0 0 0 1px #ffffff;
   --shadow-md: 0 0 0 2px #ffffff;
+}
+
+/* Wide layout: relaxes the reading-column cap. */
+:root[data-wide="1"] {
+  --line-width: var(--line-width-wide);
 }
 
 /* Smooth global transitions on theme swap */

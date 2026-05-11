@@ -3,14 +3,15 @@ import type { HeadingLevel, OutlineNode } from '../../shared/types.js';
 import { activeHeadingId } from '../hooks/useScrollSpy.js';
 import { outlineLevelsSignal, toggleLevel } from '../hooks/useOutlineLevels.js';
 import { filterOutline, ALL_LEVELS } from '../lib/outline-filter.js';
-import { IconChevronRight } from './Icons.js';
+import { IconChevronRight, IconPanelRightClose } from './Icons.js';
 
 interface Props {
   nodes: OutlineNode[];
   onJump: (id: string) => void;
+  onCollapse: () => void;
 }
 
-export function Outline({ nodes, onJump }: Props) {
+export function Outline({ nodes, onJump, onCollapse }: Props) {
   const visible = outlineLevelsSignal.value;
   const filtered = useMemo(() => filterOutline(nodes, visible), [nodes, visible]);
 
@@ -18,23 +19,34 @@ export function Outline({ nodes, onJump }: Props) {
     <nav class="outline" aria-label="Document outline">
       <div class="outline-head">
         <span class="outline-title">On this page</span>
-        <div class="outline-level-pills" role="group" aria-label="Filter by heading level">
-          {ALL_LEVELS.map((lvl) => {
-            const on = visible.has(lvl);
-            return (
-              <button
-                key={lvl}
-                type="button"
-                class={`outline-level-pill${on ? ' is-on' : ''}`}
-                aria-pressed={on}
-                aria-label={`${on ? 'Hide' : 'Show'} heading level ${lvl}`}
-                data-tooltip={`${on ? 'Hide' : 'Show'} H${lvl}`}
-                onClick={() => toggleLevel(lvl)}
-              >
-                {lvl}
-              </button>
-            );
-          })}
+        <div class="outline-head-actions">
+          <div class="outline-level-pills" role="group" aria-label="Filter by heading level">
+            {ALL_LEVELS.map((lvl) => {
+              const on = visible.has(lvl);
+              return (
+                <button
+                  key={lvl}
+                  type="button"
+                  class={`outline-level-pill${on ? ' is-on' : ''}`}
+                  aria-pressed={on}
+                  aria-label={`${on ? 'Hide' : 'Show'} heading level ${lvl}`}
+                  data-tooltip={`${on ? 'Hide' : 'Show'} H${lvl}`}
+                  onClick={() => toggleLevel(lvl)}
+                >
+                  {lvl}
+                </button>
+              );
+            })}
+          </div>
+          <button
+            class="pane-head-btn"
+            aria-label="Hide outline"
+            data-tooltip="Hide outline (⌘.)"
+            data-tooltip-align="right"
+            onClick={onCollapse}
+          >
+            <IconPanelRightClose size={14} />
+          </button>
         </div>
       </div>
       {filtered.length === 0 ? (

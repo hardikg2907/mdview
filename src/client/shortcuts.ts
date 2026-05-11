@@ -4,6 +4,7 @@ import {
   toggleOutlineCollapsed,
   toggleFocusMode,
   toggleMinimap,
+  toggleWideLayout,
 } from './hooks/useUiState.js';
 import { toggleTheme } from './hooks/useTheme.js';
 import { openSearch } from './hooks/useSearch.js';
@@ -178,6 +179,15 @@ export const shortcuts: Shortcut[] = [
     whenTyping: 'block',
     match: (ev) => !meta(ev) && !ev.shiftKey && ev.key === 'm',
     run: () => toggleMinimap(),
+  },
+  {
+    id: 'toggle-wide-layout',
+    group: 'View',
+    label: 'Toggle wide layout',
+    displayKeys: ['w'],
+    whenTyping: 'block',
+    match: (ev) => !meta(ev) && !ev.shiftKey && ev.key === 'w',
+    run: () => toggleWideLayout(),
   },
 
   // ===== Navigation =====

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] — 2026-05-11
+
+### Added
+- **Wide layout** toggle widens the reading column from 70ch to 100ch for docs that benefit from more horizontal space (tables, wide code blocks). Persisted as `mdview-wide-layout` and bound to the `w` keyboard shortcut.
+- **Consolidated View menu** in the header — a single gear-icon popover containing Focus mode, Minimap, Wide layout, and the palette picker. Replaces the row of five separate header buttons. Theme and shortcuts (`?`) remain as standalone icons.
+
+### Changed
+- **Tree and outline collapse controls now live inside their respective panes** (a small head bar with the section label and a collapse button). The duplicate toggle buttons on the left and right edges of the header have been removed. The vertical "FILES" / "OUTLINE" rail buttons (shown when a pane is collapsed) are unchanged and remain the way to expand a collapsed pane.
+
+### Removed
+- `PalettePicker.tsx` component (replaced by the palette section inside `ViewMenu.tsx`).
+
 ## [0.2.0] — 2026-05-11
 
 ### Added
@@ -61,5 +73,6 @@ Initial v1 release plus phase-2 features. Highlights:
 - Friendly CLI error messages and graceful shutdown.
 
 [Unreleased]: about:blank
+[0.2.1]: about:blank
 [0.2.0]: about:blank
 [0.1.0]: about:blank

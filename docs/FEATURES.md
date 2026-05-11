@@ -7,8 +7,9 @@ Comprehensive catalog of what `mdview` does today (post Phase 2, May 2026).
 | Feature | Implementation |
 |---------|----------------|
 | 3-pane shell (file tree / content / outline) | CSS grid in `layout.css` |
-| Collapsible sidebars with thin label rails when collapsed | `useUiState`, persisted in `localStorage` (`mdview-tree-collapsed`, `mdview-outline-collapsed`) |
+| Collapsible sidebars with thin label rails when collapsed | `useUiState`, persisted in `localStorage` (`mdview-tree-collapsed`, `mdview-outline-collapsed`); collapse buttons live inside each pane (no duplicate header toggles) |
 | **Resizable sidebars** with drag handles | `Resizer.tsx` — pointer-driven, pointer-capture, persisted widths (`mdview-tree-width`, `mdview-outline-width`); collapses below threshold |
+| **Wide layout toggle** — relaxes the reading-column cap (70ch → 100ch) | `useUiState` (`mdview-wide-layout`), `data-wide` attribute, View menu toggle, `w` shortcut |
 | Folder tree with folder/file icons, expand/collapse | `FolderTree.tsx` |
 | Outline sidebar with depth indentation, scroll-spy, per-node fold | `Outline.tsx`, `useScrollSpy.ts` |
 | **Outline level filter (H1–H6 toggle pills)** | `Outline.tsx` head + `useOutlineLevels.ts` + `lib/outline-filter.ts`; persisted |
@@ -76,7 +77,7 @@ Comprehensive catalog of what `mdview` does today (post Phase 2, May 2026).
 | Light + dark themes | CSS variables in `theme.css`, swapped via `data-theme` on `<html>` |
 | OS preference detection | `useTheme.ts` matchMedia subscription |
 | Manual override (persisted) | `themeSignal` + `localStorage` key `mdview-theme` |
-| **Palette picker — classic / paper / nord / solarized / high-contrast** | `PalettePicker.tsx` in header; `usePalette.ts` resolves user override > project config > default; `data-palette` attribute on `<html>` |
+| **Palette picker — classic / paper / nord / solarized / high-contrast** | `ViewMenu.tsx` in header (consolidated gear menu); `usePalette.ts` resolves user override > project config > default; `data-palette` attribute on `<html>` |
 | **High-contrast palette** | `data-palette="high-contrast"` — near-pure-white / near-pure-black prose, bolder accents, stronger borders; pairs with `github-light-high-contrast` / `github-dark-high-contrast` Shiki themes |
 | **Per-project config (`.mdview.json`)** | `src/server/config.ts` validates & loads; included in `/api/tree` response; live-reloaded |
 | Synchronous theme/palette bootstrap (no FOUC on reload) | Inline `<head>` script in `src/client/index.html` reads `mdview-theme` / `mdview-palette` from `localStorage`, validates against allow-list, and sets `data-theme` / `data-palette` before first paint |
@@ -97,7 +98,7 @@ Comprehensive catalog of what `mdview` does today (post Phase 2, May 2026).
 | **`⇧H` / `⇧L`** | Previous / next file in folder |
 | **`Ctrl+D` / `Ctrl+U`** | Half-page down / up |
 | **`Alt`/`⌥` + scroll** | Fast scroll (~4×) in the main pane (`useAltWheelScroll.ts`) |
-| **`f` / `m`** | Toggle focus mode / minimap |
+| **`f` / `m` / `w`** | Toggle focus mode / minimap / wide layout |
 | `Enter` / `Shift+Enter` | Next / previous match in search |
 | `Esc` | Close search / lightbox / panel |
 | `?` | Open shortcuts panel |

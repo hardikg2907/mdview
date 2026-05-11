@@ -1,26 +1,48 @@
 import { useEffect, useState } from 'preact/hooks';
 import type { TreeNode } from '../../shared/types.js';
-import { IconChevronRight, IconFolder, IconFolderOpen, IconFile, IconFileMd } from './Icons.js';
+import {
+  IconChevronRight,
+  IconFolder,
+  IconFolderOpen,
+  IconFile,
+  IconFileMd,
+  IconPanelLeftClose,
+} from './Icons.js';
 
 interface Props {
   tree: TreeNode[];
   currentPath: string | null;
   onSelect: (relPath: string) => void;
+  onCollapse: () => void;
 }
 
-export function FolderTree({ tree, currentPath, onSelect }: Props) {
+export function FolderTree({ tree, currentPath, onSelect, onCollapse }: Props) {
   return (
-    <ul class="tree" role="tree">
-      {tree.map((node) => (
-        <TreeItem
-          key={node.relPath}
-          node={node}
-          currentPath={currentPath}
-          onSelect={onSelect}
-          depth={0}
-        />
-      ))}
-    </ul>
+    <div class="pane-content">
+      <div class="pane-head">
+        <span class="pane-head-title">Files</span>
+        <button
+          class="pane-head-btn"
+          aria-label="Hide file tree"
+          data-tooltip="Hide file tree (⌘B)"
+          data-tooltip-align="right"
+          onClick={onCollapse}
+        >
+          <IconPanelLeftClose size={14} />
+        </button>
+      </div>
+      <ul class="tree" role="tree">
+        {tree.map((node) => (
+          <TreeItem
+            key={node.relPath}
+            node={node}
+            currentPath={currentPath}
+            onSelect={onSelect}
+            depth={0}
+          />
+        ))}
+      </ul>
+    </div>
   );
 }
 
