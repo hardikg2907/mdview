@@ -124,11 +124,12 @@ node bin/mdview.mjs ./test-fixtures/showcase.md --no-open
 - All entries appear in the shortcuts panel (`?`).
 
 ### 16. Focus mode
-- Toggle focus mode (header `⊙` button or `f` key).
-- The section whose heading is currently "active" (same heading that's highlighted in the outline, breadcrumb, and minimap) is bright; everything else dims to 25 %.
-- Scroll — the focused section follows the active heading (so outline, focus dim, breadcrumb, and minimap always agree on which section is current).
+- Toggle focus mode (View menu → Focus mode, or `f` key).
+- The section currently under your eyes (the heading just above the top-third line, ~35 % from the viewport top) is bright; everything else dims to 25 %.
+- Scroll slowly through a long section: the focus highlight stays on that section until the **next** heading enters the reading zone — then it hands off. Compare with the outline / breadcrumb / minimap, which still highlight the previous heading until it scrolls past the viewport top (the two anchors are intentionally different — navigation answers "where am I in the doc?", focus answers "what am I reading right now?").
 - Scroll to the very top → the **first** heading's section is focused. Scroll to the very bottom → the **last** heading's section is focused, even if that last section is shorter than half the viewport.
-- Refresh while focus mode is on → dimming applies as soon as the file loads (not only after sidebar interaction).
+- Click a heading in the outline → focus jumps to that section immediately (does not wait for the scroll animation).
+- Refresh while focus mode is on → dimming applies as soon as the file loads.
 
 ### 17. Minimap
 - Toggle minimap (header bar-grid button or `m` key).

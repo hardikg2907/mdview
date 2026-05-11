@@ -25,7 +25,7 @@ Comprehensive catalog of what `mdview` does today (post Phase 2, May 2026).
 
 | Feature | Implementation |
 |---------|----------------|
-| **Focus mode — dims everything except the current section** | `lib/focus-mode.ts` (`applyFocus` / `clearFocus`) driven by `activeHeadingId` from `useScrollSpy` — same source of truth as outline / breadcrumb / minimap, so the four always agree. Toggled by `f` or the header button. |
+| **Focus mode — dims everything except the section under your eyes** | `lib/focus-mode.ts` (`applyFocus` / `clearFocus`) driven by `focusedHeadingId` from `useScrollSpy`. Distinct from `activeHeadingId` (used by breadcrumb/outline/minimap): focus uses a **top-third reading band** (`FOCUS_BAND_FRACTION = 0.35`) so the highlight rolls forward to a new section the moment its title enters the natural reading zone, instead of clinging to a heading that scrolled off-screen pages ago. Navigation indicators still answer "where am I in the doc?" (top edge); focus answers "what am I reading right now?" (reading zone). Toggled by `f` or the View menu. |
 | **Minimap rail with viewport indicator** | `Minimap.tsx`; bars per heading, click/drag to scroll; toggled by `m` or header button |
 
 ## Rendering

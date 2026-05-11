@@ -6,7 +6,7 @@ import { computeDocStats, formatStats } from '../lib/doc-stats.js';
 import { formatRelativeTime, formatAbsoluteTime } from '../../shared/relative-time.js';
 import { applyFocus, clearFocus } from '../lib/focus-mode.js';
 import { focusModeSignal } from '../hooks/useUiState.js';
-import { activeHeadingId } from '../hooks/useScrollSpy.js';
+import { focusedHeadingId } from '../hooks/useScrollSpy.js';
 
 interface Props {
   file: RenderedFile;
@@ -24,18 +24,19 @@ export function Content({ file, onInternalNavigate }: Props) {
     void runWires(ref.current, { onInternalNavigate }, defaultWires);
   }, [file]);
 
-  // Apply focus mode on toggle and on active-heading change. We reuse
-  // `activeHeadingId` (the topmost-passed heading, with boundary snaps) so
-  // the dimmed/highlighted section stays in lockstep with the outline,
-  // breadcrumb, and minimap highlight.
+  // Apply focus mode on toggle and on focused-heading change. `focusedHeadingId`
+  // tracks the top-third reading band (not the viewport top), so the bright
+  // section is always the one under the reader's eyes — rolls forward to the
+  // next section as soon as its title enters the natural reading zone, instead
+  // of clinging to a heading that scrolled off-screen pages ago.
   useEffect(() => {
     if (!ref.current) return;
     if (focusModeSignal.value) {
-      applyFocus(ref.current, activeHeadingId.value);
+      applyFocus(ref.current, focusedHeadingId.value);
     } else {
       clearFocus(ref.current);
     }
-  }, [focusModeSignal.value, activeHeadingId.value, file]);
+  }, [focusModeSignal.value, focusedHeadingId.value, file]);
 
   return (
     <article class="markdown-body">

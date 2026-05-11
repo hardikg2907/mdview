@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-05-11
+
+### Changed
+- **Focus mode now anchors to the top-third reading band (~35% of viewport) instead of the viewport top.** The bright section is always the one under your eyes; previously it could lag behind into a heading that had scrolled off-screen pages ago, with the dim covering the content you were actually reading. Breadcrumb / outline / minimap continue to anchor at the viewport top (they answer "where am I in the doc?"); focus mode answers a different question ("what am I reading right now?"). Implemented as a separate `focusedHeadingId` signal in `useScrollSpy`.
+
 ## [0.2.1] — 2026-05-11
 
 ### Added
@@ -73,6 +78,7 @@ Initial v1 release plus phase-2 features. Highlights:
 - Friendly CLI error messages and graceful shutdown.
 
 [Unreleased]: about:blank
+[0.3.0]: about:blank
 [0.2.1]: about:blank
 [0.2.0]: about:blank
 [0.1.0]: about:blank

@@ -6,9 +6,24 @@ export interface HeadingPos { id: string; top: number; }
 export const activeHeadingId = signal<string | null>(null);
 export const breadcrumbPath = signal<string[]>([]);
 
+/**
+ * Heading anchor used for focus-mode dimming. Distinct from `activeHeadingId`:
+ *   - `activeHeadingId` answers "where am I in the doc?" — anchored at the
+ *     viewport top, drives breadcrumbs/outline/minimap (a navigation signal).
+ *   - `focusedHeadingId` answers "what am I reading right now?" — anchored at
+ *     the top-third reading band, drives the focus-mode highlight so the
+ *     section under your eyes stays bright and the next section dims until
+ *     it actually enters your reading zone.
+ *
+ * They only disagree at section boundaries, which is exactly where the
+ * single-anchor approach felt wrong (focus highlight pointed off-screen up).
+ */
+export const focusedHeadingId = signal<string | null>(null);
+
 let scrollSpyLockedUntil = 0;
 export function lockScrollSpy(id: string, ms = 600): void {
   activeHeadingId.value = id;
+  focusedHeadingId.value = id;
   scrollSpyLockedUntil = performance.now() + ms;
 }
 
@@ -41,6 +56,41 @@ export function pickActiveId(
   return active;
 }
 
+/**
+ * "What am I reading right now?" — picks the most recent heading whose top
+ * has crossed the **top-third reading band** (~35% from the viewport top).
+ *
+ * Anchored at 35% (not 0%) because eyetracking shows readers concentrate in
+ * the upper third of the viewport, not at the very edge. This makes the
+ * focus highlight roll forward to the next section the moment its title
+ * enters the reading zone, so the bright section is always the one under
+ * your eyes — never the heading that scrolled off-screen pages ago.
+ */
+export const FOCUS_BAND_FRACTION = 0.35;
+
+export function pickFocusedId(
+  positions: HeadingPos[],
+  scrollTop: number,
+  clientHeight: number,
+  scrollHeight: number,
+): string | null {
+  if (positions.length === 0) return null;
+  // Same boundary snaps as the active picker: at scroll top/bottom, snap to
+  // first/last so the highlight matches what's visible even if a short
+  // section never crosses the band.
+  if (scrollTop <= 0) return positions[0]!.id;
+  if (scrollTop + clientHeight >= scrollHeight - 1) {
+    return positions[positions.length - 1]!.id;
+  }
+  const bandY = scrollTop + clientHeight * FOCUS_BAND_FRACTION;
+  let focused = positions[0]!.id;
+  for (const p of positions) {
+    if (p.top <= bandY) focused = p.id;
+    else break;
+  }
+  return focused;
+}
+
 export function useScrollSpy(scrollContainer: HTMLElement | null): void {
   useEffect(() => {
     if (!scrollContainer) return;
@@ -65,13 +115,13 @@ export function useScrollSpy(scrollContainer: HTMLElement | null): void {
     function compute(): void {
       if (performance.now() < scrollSpyLockedUntil) return;
       const scroller = scrollContainer!;
-      const next = pickActiveId(
-        cachedPositions,
-        scroller.scrollTop,
-        scroller.clientHeight,
-        scroller.scrollHeight,
-      );
-      if (next !== activeHeadingId.value) activeHeadingId.value = next;
+      const st = scroller.scrollTop;
+      const ch = scroller.clientHeight;
+      const sh = scroller.scrollHeight;
+      const nextActive = pickActiveId(cachedPositions, st, ch, sh);
+      if (nextActive !== activeHeadingId.value) activeHeadingId.value = nextActive;
+      const nextFocused = pickFocusedId(cachedPositions, st, ch, sh);
+      if (nextFocused !== focusedHeadingId.value) focusedHeadingId.value = nextFocused;
     }
 
     function onScroll(): void {

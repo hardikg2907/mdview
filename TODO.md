@@ -52,7 +52,7 @@ Bigger architectural shift: one long-running server hosts multiple "workspaces" 
 
 ## Bugs / Polish (open)
 
-_(none currently flagged — last fix: scroll-spy off-by-pixels on outline jump, 5f383d2)_
+- [ ] **Pre-commit hooks** — wire husky + lint-staged (or simple-git-hooks) to run `npm run typecheck` and `npm test` (or at least vitest --related on staged files) before each commit. Goal: catch the obvious type/test regression before it lands. Keep the hook fast — full build/audit stay in the manual release checklist.
 
 ---
 
