@@ -24,6 +24,8 @@ node bin/mdview.mjs ./test-fixtures/showcase.md --no-open
 - Folder tree shows nested structure (`assets/`, `linked-doc.md`, `math.md`, `showcase.md`).
 - Click `linked-doc.md` → renders in the viewer (no full page reload).
 - Internal `[link](./linked-doc.md)` inside `showcase.md` navigates same way.
+- **Cmd/Ctrl + click** on the same internal link → opens that file in a **new tab**, with the URL `?file=…` populated correctly (not `/path/to/file.md`). The new tab shows the right file, not a random last-viewed one.
+- A link with a percent-encoded space, e.g. `[x](some%20doc.md)`, resolves to the file literally named `some doc.md` (no double-encoding).
 - Internal `[anchor](#some-id)` jumps within the doc.
 
 ### 3. Long-doc orientation
@@ -47,9 +49,10 @@ node bin/mdview.mjs ./test-fixtures/showcase.md --no-open
 - Re-enable a level → its headings reappear in document order.
 
 ### 6. Code blocks
-- Multiple languages render with Shiki dual-theme highlighting; the font is JetBrains Mono.
+- Multiple languages render with Shiki highlighting; the font is JetBrains Mono.
 - Hover a code block → "Copy" button appears top-right.
 - Click "Copy" → clipboard receives the code; button briefly says "Copied".
+- Switch palette via the header swatch (classic ↔ nord ↔ solarized ↔ high-contrast) → code-block colors update **instantly**, no re-render and no flash. Each palette uses a tailored Shiki theme.
 
 ### 7. Mermaid
 - Mermaid block renders as an SVG diagram.
@@ -62,8 +65,10 @@ node bin/mdview.mjs ./test-fixtures/showcase.md --no-open
 
 ### 9. Themes & palettes
 - Theme toggle (sun/moon icon, header right) flips light/dark instantly.
-- Palette picker icon (palette/swatch, header right) opens a menu with four swatches: classic / paper / nord / solarized. Click any → page palette swaps live.
-- Reload — both theme and palette persist.
+- Palette picker icon (palette/swatch, header right) opens a menu with five swatches: classic / paper / nord / solarized / high-contrast. Click any → page palette and code-block colors swap live.
+- High-contrast in dark mode → near-pure-white text on near-black background, bold accent. Light mode → mirror.
+- Reload — both theme and palette persist **without a flash of the default** (an inline `<head>` script applies them before first paint).
+- Hard-reload in Safari private mode → theme/palette still applies; check DevTools console for a single `mdview: localStorage access blocked` warning (acceptable, not an error).
 - `⌘\` shortcut also toggles theme.
 
 ### 10. Per-project config (`.mdview.json`)
@@ -103,12 +108,14 @@ node bin/mdview.mjs ./test-fixtures/showcase.md --no-open
 - `[` / `]` jump to previous / next heading at the same level.
 - `⇧H` / `⇧L` open previous / next markdown file in the folder.
 - `Ctrl+D` / `Ctrl+U` half-page scroll.
+- Hold `Alt` (Windows/Linux) or `⌥ Option` (macOS) while scrolling the mouse wheel / trackpad → scroll speed multiplies (~4×) in the main pane. Without the modifier, scroll behaves normally.
 - All entries appear in the shortcuts panel (`?`).
 
 ### 16. Focus mode
 - Toggle focus mode (header `⊙` button or `f` key).
-- Whatever section's content is at the **vertical center of the viewport** is bright; everything else dims to 25 %.
-- Scroll — the focused section follows the midline (so the bright section transitions as content crosses the center).
+- The section whose heading is currently "active" (same heading that's highlighted in the outline, breadcrumb, and minimap) is bright; everything else dims to 25 %.
+- Scroll — the focused section follows the active heading (so outline, focus dim, breadcrumb, and minimap always agree on which section is current).
+- Scroll to the very top → the **first** heading's section is focused. Scroll to the very bottom → the **last** heading's section is focused, even if that last section is shorter than half the viewport.
 - Refresh while focus mode is on → dimming applies as soon as the file loads (not only after sidebar interaction).
 
 ### 17. Minimap
@@ -165,7 +172,7 @@ node bin/mdview.mjs ./test-fixtures/showcase.md --no-open
 ## Tests
 
 ```bash
-npm test            # 97 vitest unit tests
+npm test            # 216 vitest unit tests
 npm run typecheck   # both tsconfigs clean
 ```
 

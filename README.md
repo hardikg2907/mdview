@@ -38,13 +38,13 @@ node bin/mdview.mjs ./docs
 ### Share with friends without publishing
 
 ```bash
-npm run build && npm pack    # produces mdview-0.1.0.tgz
+npm run build && npm pack    # produces mdview-0.2.0.tgz
 ```
 
 Send them the `.tgz` (Slack/Drive/AirDrop). They install with:
 
 ```bash
-npm install -g ./mdview-0.1.0.tgz
+npm install -g ./mdview-0.2.0.tgz
 ```
 
 If the repo is on GitHub, they can also skip the tarball:
@@ -84,6 +84,7 @@ Closes when you `Ctrl-C` or `kill` the process. Set `MDVIEW_DEBUG=1` for full st
 | `[` / `]` | Previous / next heading at the same level |
 | `⇧H` / `⇧L` | Previous / next file in folder |
 | `Ctrl+D` / `Ctrl+U` | Half-page down / up |
+| `Alt` / `⌥` + scroll | Fast scroll (~4×) in the main pane |
 | `f` / `m` | Toggle focus mode / minimap |
 | `Tab` (in search) | Cycle Doc ↔ Folder scope |
 | `Enter` / `Shift+Enter` | Next / previous match in search |
@@ -98,7 +99,7 @@ Click the keyboard icon in the header anytime to see the full list.
 - 3-pane layout: folder tree, content, outline. Both sidebars collapse to a thin label rail; both have drag handles to resize (widths persist).
 - Editorial typography (serif body, italic accent H1, paper-grain background, JetBrains Mono in code blocks).
 - Light & dark theme — follows your OS preference, with a manual override that persists.
-- Four built-in palettes: classic / paper / nord / solarized. Pick one from the header palette swatch.
+- Five built-in palettes: classic / paper / nord / solarized / high-contrast. Pick one from the header palette swatch. Code blocks follow the palette (Nord syntax in Nord, Solarized in Solarized, etc.).
 - Reading-progress bar pinned to the bottom of the header.
 - Doc stats strip below the H1 (reading time, word count, heading count, "Updated N ago").
 - Focus mode dims everything except the section at the viewport center.
@@ -113,7 +114,7 @@ Click the keyboard icon in the header anytime to see the full list.
 
 **Rendering**
 - CommonMark + GFM (tables, task lists, strikethrough, autolinks).
-- Server-side syntax highlighting via Shiki, dual-theme — zero client highlighter bundle.
+- Server-side syntax highlighting via Shiki, palette-aware (10 variants per token — one for every palette/theme combination) — zero client highlighter bundle, no re-render on theme/palette swap.
 - Mermaid diagrams, lazy-loaded only when a doc contains a `mermaid` fence.
 - Math via KaTeX (`$inline$` and `$$block$$`), lazy-loaded only when a doc contains math.
 - Custom-styled task list checkboxes (filled accent when checked, hollow when unchecked).
@@ -166,11 +167,11 @@ Node 20+, TypeScript, Fastify 5, markdown-it 14, Shiki 1, gray-matter, chokidar 
 ## Tests
 
 ```bash
-npm test            # vitest, server + client (97 tests)
+npm test            # vitest, server + client (216 tests)
 npm run typecheck   # both tsconfigs
 npm run build       # vite (client) + tsup (server CLI)
 ```
 
 ## License
 
-Personal project. No license declared.
+[MIT](LICENSE).

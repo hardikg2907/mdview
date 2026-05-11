@@ -24,7 +24,7 @@ Comprehensive catalog of what `mdview` does today (post Phase 2, May 2026).
 
 | Feature | Implementation |
 |---------|----------------|
-| **Focus mode — dims everything except the section at viewport center** | `useFocusedSection.ts` (separate from outline scroll-spy) + `lib/focus-mode.ts` (`applyFocus`/`clearFocus`); toggled by `f` or header button |
+| **Focus mode — dims everything except the current section** | `lib/focus-mode.ts` (`applyFocus` / `clearFocus`) driven by `activeHeadingId` from `useScrollSpy` — same source of truth as outline / breadcrumb / minimap, so the four always agree. Toggled by `f` or the header button. |
 | **Minimap rail with viewport indicator** | `Minimap.tsx`; bars per heading, click/drag to scroll; toggled by `m` or header button |
 
 ## Rendering
@@ -32,7 +32,7 @@ Comprehensive catalog of what `mdview` does today (post Phase 2, May 2026).
 | Feature | Implementation |
 |---------|----------------|
 | CommonMark + GFM (tables, task lists, strikethrough, autolinks) | `markdown-it` with linkify enabled |
-| Server-side syntax highlighting (Shiki, dual-theme) | `render/shiki.ts` — zero client highlighter bundle |
+| **Server-side syntax highlighting (Shiki, palette-aware)** | `render/shiki.ts` — renders 10 theme variants per token (5 palettes × light/dark) inline as CSS variables; CSS picks the active variant via `[data-palette][data-theme]`. Zero client highlighter bundle. No re-render on palette swap. |
 | Mermaid diagrams (lazy-loaded) | server emits `<div class="mermaid-block">`; `lib/mermaid-loader.ts` does dynamic `import('mermaid')` only when present |
 | **Math / LaTeX (KaTeX, lazy-loaded)** | custom `markdown-it` core rule in `render/math.ts` emits `<span class="math-inline">` and `<div class="math-block">`; `lib/katex-loader.ts` dynamic-imports KaTeX + injects its CSS only when math is present |
 | Front matter (YAML) parsing & display | `render/frontmatter.ts` + `<details>` block in `Content.tsx` |
@@ -76,9 +76,10 @@ Comprehensive catalog of what `mdview` does today (post Phase 2, May 2026).
 | Light + dark themes | CSS variables in `theme.css`, swapped via `data-theme` on `<html>` |
 | OS preference detection | `useTheme.ts` matchMedia subscription |
 | Manual override (persisted) | `themeSignal` + `localStorage` key `mdview-theme` |
-| **Palette picker — classic / paper / nord / solarized** | `PalettePicker.tsx` in header; `usePalette.ts` resolves user override > project config > default; `data-palette` attribute on `<html>` |
+| **Palette picker — classic / paper / nord / solarized / high-contrast** | `PalettePicker.tsx` in header; `usePalette.ts` resolves user override > project config > default; `data-palette` attribute on `<html>` |
+| **High-contrast palette** | `data-palette="high-contrast"` — near-pure-white / near-pure-black prose, bolder accents, stronger borders; pairs with `github-light-high-contrast` / `github-dark-high-contrast` Shiki themes |
 | **Per-project config (`.mdview.json`)** | `src/server/config.ts` validates & loads; included in `/api/tree` response; live-reloaded |
-| Shiki dual-theme color swap (no re-render needed) | Shiki emits `--shiki-light` / `--shiki-dark` CSS vars |
+| Synchronous theme/palette bootstrap (no FOUC on reload) | Inline `<head>` script in `src/client/index.html` reads `mdview-theme` / `mdview-palette` from `localStorage`, validates against allow-list, and sets `data-theme` / `data-palette` before first paint |
 
 ## Keyboard shortcuts
 
@@ -95,6 +96,7 @@ Comprehensive catalog of what `mdview` does today (post Phase 2, May 2026).
 | **`[` / `]`** | Previous / next heading at the same level |
 | **`⇧H` / `⇧L`** | Previous / next file in folder |
 | **`Ctrl+D` / `Ctrl+U`** | Half-page down / up |
+| **`Alt`/`⌥` + scroll** | Fast scroll (~4×) in the main pane (`useAltWheelScroll.ts`) |
 | **`f` / `m`** | Toggle focus mode / minimap |
 | `Enter` / `Shift+Enter` | Next / previous match in search |
 | `Esc` | Close search / lightbox / panel |
