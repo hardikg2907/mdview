@@ -8,6 +8,37 @@ import { signal } from '@preact/signals';
  */
 export const focusedSectionId = signal<string | null>(null);
 
+/**
+ * Pick the active focused-section index given heading positions and current
+ * scroll state. Pure (no DOM) so it's testable in isolation.
+ *
+ * Uses a proportional focus line: at scrollTop=0 the line sits at the top of
+ * the viewport (so the first heading wins), at max scroll it sits at the
+ * bottom (so the last heading wins), and in between it interpolates. A fixed
+ * viewport-center never reaches 0 or scrollHeight, which made the first/last
+ * sections — especially short ones — impossible to focus.
+ */
+export function pickFocusedIndex(
+  tops: number[],
+  scrollTop: number,
+  clientHeight: number,
+  scrollHeight: number,
+): number {
+  if (tops.length === 0) return -1;
+  const maxScroll = scrollHeight - clientHeight;
+  const focusY =
+    maxScroll > 0
+      ? scrollTop + clientHeight * (scrollTop / maxScroll)
+      : scrollTop + clientHeight / 2;
+  let activeIdx = -1;
+  for (let i = 0; i < tops.length; i++) {
+    if (tops[i]! <= focusY) activeIdx = i;
+    else break;
+  }
+  if (activeIdx < 0) activeIdx = 0;
+  return activeIdx;
+}
+
 export function useFocusedSection(scrollContainer: HTMLElement | null): void {
   useEffect(() => {
     if (!scrollContainer) return;
@@ -31,16 +62,13 @@ export function useFocusedSection(scrollContainer: HTMLElement | null): void {
 
     function compute(): void {
       const scroller = scrollContainer!;
-      // The vertical center of the viewport, in scroller content coordinates.
-      const centerY = scroller.scrollTop + scroller.clientHeight / 2;
-      let activeIdx = -1;
-      for (let i = 0; i < cachedTops.length; i++) {
-        if (cachedTops[i]! <= centerY) activeIdx = i;
-        else break;
-      }
-      // If the center is above the first heading, fall back to the first.
-      if (activeIdx < 0 && cachedHeadings.length > 0) activeIdx = 0;
-      const next = activeIdx >= 0 ? cachedHeadings[activeIdx]!.id : null;
+      const idx = pickFocusedIndex(
+        cachedTops,
+        scroller.scrollTop,
+        scroller.clientHeight,
+        scroller.scrollHeight,
+      );
+      const next = idx >= 0 ? cachedHeadings[idx]!.id : null;
       if (next !== focusedSectionId.value) focusedSectionId.value = next;
     }
 
