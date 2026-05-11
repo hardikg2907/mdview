@@ -38,8 +38,8 @@ export type WatchEvent =
   | { kind: 'unlink'; relPath: string }
   | { kind: 'config'; relPath: string };
 
-export type Palette = 'classic' | 'paper' | 'nord' | 'solarized';
-export const PALETTES: readonly Palette[] = ['classic', 'paper', 'nord', 'solarized'];
+export type Palette = 'classic' | 'paper' | 'nord' | 'solarized' | 'high-contrast';
+export const PALETTES: readonly Palette[] = ['classic', 'paper', 'nord', 'solarized', 'high-contrast'];
 
 export type FontFamily = 'serif' | 'sans' | 'mono';
 

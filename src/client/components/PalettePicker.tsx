@@ -8,6 +8,7 @@ const LABELS: Record<Palette, string> = {
   paper: 'Paper',
   nord: 'Nord',
   solarized: 'Solarized',
+  'high-contrast': 'High contrast',
 };
 
 export function PalettePicker() {

@@ -204,6 +204,61 @@
   --code-bg: #073642;
 }
 
+/* High contrast — pure black/white, bold accents, strong borders.
+   Loosely mirrors VSCode "Light/Dark High Contrast" themes. */
+:root[data-palette="high-contrast"][data-theme="light"] {
+  --bg: #ffffff;
+  --bg-elev: #ffffff;
+  --bg-sidebar: #ffffff;
+  --bg-sidebar-2: #f2f2f2;
+  --fg: #000000;
+  --fg-strong: #000000;
+  --fg-muted: #1a1a1a;
+  --fg-subtle: #3a3a3a;
+  --border: #000000;
+  --border-strong: #000000;
+  --accent: #0000ee;
+  --accent-strong: #000099;
+  --accent-soft: #d6d6ff;
+  --accent-tint: #ececff;
+  --link: #0000ee;
+  --link-hover: #000099;
+  --quote-bar: #000000;
+  --quote-bg: #ffffff;
+  --quote-fg: #000000;
+  --code-bg: #f2f2f2;
+  --selection-bg: #000000;
+  --selection-fg: #ffffff;
+  --shadow: 0 0 0 1px #000000;
+  --shadow-md: 0 0 0 2px #000000;
+}
+:root[data-palette="high-contrast"][data-theme="dark"] {
+  --bg: #000000;
+  --bg-elev: #000000;
+  --bg-sidebar: #000000;
+  --bg-sidebar-2: #0a0a0a;
+  --fg: #ffffff;
+  --fg-strong: #ffffff;
+  --fg-muted: #e6e6e6;
+  --fg-subtle: #bdbdbd;
+  --border: #ffffff;
+  --border-strong: #ffffff;
+  --accent: #ffff00;
+  --accent-strong: #ffff66;
+  --accent-soft: #3a3a00;
+  --accent-tint: #1a1a00;
+  --link: #4ec9ff;
+  --link-hover: #9fdcff;
+  --quote-bar: #ffff00;
+  --quote-bg: #000000;
+  --quote-fg: #ffffff;
+  --code-bg: #0a0a0a;
+  --selection-bg: #ffffff;
+  --selection-fg: #000000;
+  --shadow: 0 0 0 1px #ffffff;
+  --shadow-md: 0 0 0 2px #ffffff;
+}
+
 /* Smooth global transitions on theme swap */
 html, body {
   transition: background-color var(--transition), color var(--transition);
@@ -222,13 +277,58 @@ html, body {
   color: var(--selection-fg);
 }
 
-/* Shiki theme switching */
-:root[data-theme="dark"] .shiki span { color: var(--shiki-dark) !important; }
-:root[data-theme="dark"] .shiki { background-color: var(--shiki-dark-bg) !important; }
-:root[data-theme="light"] .shiki span,
-:root:not([data-theme]) .shiki span { color: var(--shiki-light) !important; }
-:root[data-theme="light"] .shiki,
-:root:not([data-theme]) .shiki { background-color: var(--shiki-light-bg) !important; }
+/* Shiki theme switching — palette-aware.
+   Each token carries one CSS variable per (palette, mode) pair (10 total):
+   --shiki-classic-light, --shiki-classic-dark, --shiki-paper-light, …
+   plus matching `*-bg` for the pre background. We pick one based on
+   [data-palette][data-theme]. Defaults (no data-palette → classic; no
+   data-theme → light) mirror the bootstrap script in index.html. */
+
+/* classic (also: default when no data-palette is set) */
+:root[data-palette="classic"][data-theme="light"] .shiki span,
+:root[data-palette="classic"]:not([data-theme]) .shiki span,
+:root:not([data-palette])[data-theme="light"] .shiki span,
+:root:not([data-palette]):not([data-theme]) .shiki span { color: var(--shiki-classic-light) !important; }
+:root[data-palette="classic"][data-theme="light"] .shiki,
+:root[data-palette="classic"]:not([data-theme]) .shiki,
+:root:not([data-palette])[data-theme="light"] .shiki,
+:root:not([data-palette]):not([data-theme]) .shiki { background-color: var(--shiki-classic-light-bg) !important; }
+:root[data-palette="classic"][data-theme="dark"] .shiki span,
+:root:not([data-palette])[data-theme="dark"] .shiki span { color: var(--shiki-classic-dark) !important; }
+:root[data-palette="classic"][data-theme="dark"] .shiki,
+:root:not([data-palette])[data-theme="dark"] .shiki { background-color: var(--shiki-classic-dark-bg) !important; }
+
+/* paper */
+:root[data-palette="paper"][data-theme="light"] .shiki span,
+:root[data-palette="paper"]:not([data-theme]) .shiki span { color: var(--shiki-paper-light) !important; }
+:root[data-palette="paper"][data-theme="light"] .shiki,
+:root[data-palette="paper"]:not([data-theme]) .shiki { background-color: var(--shiki-paper-light-bg) !important; }
+:root[data-palette="paper"][data-theme="dark"] .shiki span { color: var(--shiki-paper-dark) !important; }
+:root[data-palette="paper"][data-theme="dark"] .shiki { background-color: var(--shiki-paper-dark-bg) !important; }
+
+/* nord */
+:root[data-palette="nord"][data-theme="light"] .shiki span,
+:root[data-palette="nord"]:not([data-theme]) .shiki span { color: var(--shiki-nord-light) !important; }
+:root[data-palette="nord"][data-theme="light"] .shiki,
+:root[data-palette="nord"]:not([data-theme]) .shiki { background-color: var(--shiki-nord-light-bg) !important; }
+:root[data-palette="nord"][data-theme="dark"] .shiki span { color: var(--shiki-nord-dark) !important; }
+:root[data-palette="nord"][data-theme="dark"] .shiki { background-color: var(--shiki-nord-dark-bg) !important; }
+
+/* solarized */
+:root[data-palette="solarized"][data-theme="light"] .shiki span,
+:root[data-palette="solarized"]:not([data-theme]) .shiki span { color: var(--shiki-solarized-light) !important; }
+:root[data-palette="solarized"][data-theme="light"] .shiki,
+:root[data-palette="solarized"]:not([data-theme]) .shiki { background-color: var(--shiki-solarized-light-bg) !important; }
+:root[data-palette="solarized"][data-theme="dark"] .shiki span { color: var(--shiki-solarized-dark) !important; }
+:root[data-palette="solarized"][data-theme="dark"] .shiki { background-color: var(--shiki-solarized-dark-bg) !important; }
+
+/* high-contrast */
+:root[data-palette="high-contrast"][data-theme="light"] .shiki span,
+:root[data-palette="high-contrast"]:not([data-theme]) .shiki span { color: var(--shiki-high-contrast-light) !important; }
+:root[data-palette="high-contrast"][data-theme="light"] .shiki,
+:root[data-palette="high-contrast"]:not([data-theme]) .shiki { background-color: var(--shiki-high-contrast-light-bg) !important; }
+:root[data-palette="high-contrast"][data-theme="dark"] .shiki span { color: var(--shiki-high-contrast-dark) !important; }
+:root[data-palette="high-contrast"][data-theme="dark"] .shiki { background-color: var(--shiki-high-contrast-dark-bg) !important; }
 
 /* Scrollbar polish */
 .pane-tree, .pane-outline, .pane-main {

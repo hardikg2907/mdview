@@ -923,6 +923,7 @@ mark.search-hit.is-active {
 .palette-swatch-paper   { background: linear-gradient(135deg, #f7f1e3 50%, #8b5a2b 50%); }
 .palette-swatch-nord    { background: linear-gradient(135deg, #eceff4 50%, #5e81ac 50%); }
 .palette-swatch-solarized { background: linear-gradient(135deg, #fdf6e3 50%, #b58900 50%); }
+.palette-swatch-high-contrast { background: linear-gradient(135deg, #ffffff 50%, #000000 50%); }
 
 /* ============================================================
    FOLDER SEARCH RESULTS

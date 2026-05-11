@@ -12,8 +12,23 @@ export function lockScrollSpy(id: string, ms = 600): void {
   scrollSpyLockedUntil = performance.now() + ms;
 }
 
-export function pickActiveId(positions: HeadingPos[], scrollTop: number): string | null {
+export function pickActiveId(
+  positions: HeadingPos[],
+  scrollTop: number,
+  clientHeight: number,
+  scrollHeight: number,
+): string | null {
   if (positions.length === 0) return null;
+  // Boundary snaps: short first/last sections may never reach the active
+  // selection band under the "topmost-passed heading" rule, since their
+  // heading top can't be scrolled past the viewport offset. Snap to the
+  // first/last position explicitly when the scroller is at either edge so
+  // the outline (and focus-mode dim) stay in sync with the visible content.
+  if (scrollTop <= 0) return positions[0]!.id;
+  // 1px epsilon guards against sub-pixel scrollTop at the bottom.
+  if (scrollTop + clientHeight >= scrollHeight - 1) {
+    return positions[positions.length - 1]!.id;
+  }
   // Matches `scroll-margin-top` on headings in content.css. Plus a small
   // tolerance for sub-pixel rounding from smooth-scroll easing landings.
   const offset = 16;
@@ -49,7 +64,13 @@ export function useScrollSpy(scrollContainer: HTMLElement | null): void {
 
     function compute(): void {
       if (performance.now() < scrollSpyLockedUntil) return;
-      const next = pickActiveId(cachedPositions, scrollContainer!.scrollTop);
+      const scroller = scrollContainer!;
+      const next = pickActiveId(
+        cachedPositions,
+        scroller.scrollTop,
+        scroller.clientHeight,
+        scroller.scrollHeight,
+      );
       if (next !== activeHeadingId.value) activeHeadingId.value = next;
     }
 
