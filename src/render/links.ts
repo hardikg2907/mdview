@@ -19,7 +19,10 @@ export function tagInternalLinks(html: string, currentRelPath: string): string {
     } catch {
       decoded = resolved;
     }
-    const href = `${resolved}${query ?? ''}${hash ?? ''}`;
+    // href points at the SPA's ?file= entrypoint so cmd/ctrl+click opens the
+    // correct file in a new tab directly — no server redirect roundtrip, and
+    // the URL bar shows the right URL immediately on tab open.
+    const href = `?file=${encodeURIComponent(decoded)}${hash ?? ''}`;
     const internal = `${decoded}${query ?? ''}${hash ?? ''}`;
     return `<a ${pre}href="${href}" data-internal-link="${internal}"${post}>`;
   });

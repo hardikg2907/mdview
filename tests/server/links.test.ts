@@ -54,13 +54,24 @@ describe('tagInternalLinks', () => {
     const html = '<a href="foo%20bar.md">x</a>';
     const out = tagInternalLinks(html, 'guides/intro.md');
     expect(out).toContain('data-internal-link="guides/foo bar.md"');
-    expect(out).toContain('href="guides/foo%20bar.md"');
   });
 
   it('keeps the literal target when percent-encoding is malformed', () => {
     const html = '<a href="bad%2.md">x</a>';
     const out = tagInternalLinks(html, 'a.md');
     expect(out).toContain('data-internal-link="bad%2.md"');
+  });
+
+  it('rewrites href to ?file= so cmd/ctrl+click opens the SPA entrypoint directly', () => {
+    const html = '<a href="other.md">x</a>';
+    const out = tagInternalLinks(html, 'guides/intro.md');
+    expect(out).toContain('href="?file=guides%2Fother.md"');
+  });
+
+  it('preserves the anchor hash on the rewritten ?file= href', () => {
+    const html = '<a href="other.md#section-2">x</a>';
+    const out = tagInternalLinks(html, 'guides/intro.md');
+    expect(out).toContain('href="?file=guides%2Fother.md#section-2"');
   });
 });
 
