@@ -12,7 +12,7 @@ Comprehensive catalog of what `mdview` does today (post Phase 2, May 2026).
 | **Wide layout toggle** — relaxes the reading-column cap (70ch → 100ch) | `useUiState` (`mdview-wide-layout`), `data-wide` attribute, View menu toggle, `w` shortcut |
 | Folder tree with folder/file icons, expand/collapse | `FolderTree.tsx` |
 | Outline sidebar with depth indentation, scroll-spy, per-node fold | `Outline.tsx`, `useScrollSpy.ts` |
-| **Outline level filter (H1–H6 toggle pills)** | `Outline.tsx` head + `useOutlineLevels.ts` + `lib/outline-filter.ts`; persisted |
+| **Outline level filter (2-thumb range slider)** | `Outline.tsx` head + `useOutlineLevels.ts` + `lib/outline-filter.ts`; min/max persisted via `mdview-outline-min-level` + `mdview-outline-max-level`; visible set derived as `{min..max}` via a computed signal |
 | Breadcrumbs reflecting current heading; clickable segments | `Breadcrumbs.tsx` |
 | Cross-file `[link](other.md)` navigation inside the SPA | `tagInternalLinks` server-side + `wireInternalLinks` client-side |
 | Per-heading anchor URLs (refresh keeps your spot) | `markdown-it-anchor` + hash-restore in `App.tsx` |
@@ -80,7 +80,7 @@ Comprehensive catalog of what `mdview` does today (post Phase 2, May 2026).
 | **Palette picker — classic / paper / nord / solarized / high-contrast** | `ViewMenu.tsx` in header (consolidated gear menu); `usePalette.ts` resolves user override > project config > default; `data-palette` attribute on `<html>` |
 | **High-contrast palette** | `data-palette="high-contrast"` — near-pure-white / near-pure-black prose, bolder accents, stronger borders; pairs with `github-light-high-contrast` / `github-dark-high-contrast` Shiki themes |
 | **Per-project config (`.mdview.json`)** | `src/server/config.ts` validates & loads; included in `/api/tree` response; live-reloaded |
-| Synchronous theme/palette bootstrap (no FOUC on reload) | Inline `<head>` script in `src/client/index.html` reads `mdview-theme` / `mdview-palette` from `localStorage`, validates against allow-list, and sets `data-theme` / `data-palette` before first paint |
+| Synchronous theme/palette/wide-layout bootstrap (no FOUC on reload) | External script `src/client/public/bootstrap.js` referenced from `<head>` of `index.html`; reads `mdview-theme` / `mdview-palette` / `mdview-wide-layout` from `localStorage`, validates against allow-list, and sets `data-theme` / `data-palette` / `data-wide` before first paint. Must stay external — the strict `script-src 'self'` CSP blocks inline scripts (and adding `'unsafe-inline'` or relaxing the policy is explicitly forbidden by CLAUDE.md §3.1) |
 
 ## Keyboard shortcuts
 

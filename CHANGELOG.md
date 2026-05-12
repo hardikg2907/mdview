@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] — 2026-05-12
+
+### Changed
+- **Outline level filter is now a 2-thumb range slider** instead of six H1–H6 toggle pills. Pick any contiguous heading-level band — e.g. just H2–H3, or H1–H6 for the full outline. State persists as `mdview-outline-min-level` + `mdview-outline-max-level`. The setters auto-correct inversion (drag min past max → both move together), so the user is never trapped at a single level.
+- **Outline collapse button moved to the inner edge of the outline head** (left side, facing the main pane) to match the standard IDE pattern where pane collapse arrows live on the side facing the content area. The file-tree collapse button is unchanged — it already sat on its inner (right) edge.
+
+### Added
+- **Outline pane content pads itself away from the minimap** when both are visible — outline list entries no longer sit under the minimap bars. (Minimap remains at the viewport right edge as before; padding handled via a `has-minimap` class on the shell.)
+
+### Fixed
+- **Theme / palette / wide-layout no longer flash the default on reload.** The pre-paint bootstrap script in `index.html` had been silently blocked by the strict `script-src 'self'` CSP since 0.2.0 (CSPs forbid inline scripts without an explicit hash or `'unsafe-inline'`). Moved the bootstrap to an external `/bootstrap.js` served from `public/` — runs synchronously before first paint, satisfies the CSP without weakening it. Also extends to the new `data-wide` attribute added in 0.2.1.
+- **Slider thumbs are now vertically centred on the track line.** WebKit was rendering the 14 px range thumbs aligned to the top of the runnable track; fixed by setting the runnable-track height to 4 px and adding `margin-top: -5px` on the thumb so it centres on the visual line.
+
+### Security
+- Bumped `mermaid` 11.3 → 11.15 to clear four moderate advisories: `GHSA-87f9-hvmw-gh4p` (CSS injection via config), `GHSA-6m6c-36f7-fhxh` (Gantt-chart infinite-loop DoS), `GHSA-ghcm-xqfw-q4vr` (HTML injection via `classDef` in state diagrams), `GHSA-xcj9-5m2h-648r` (CSS injection via `classDefs`).
+
 ## [0.3.0] — 2026-05-11
 
 ### Changed
@@ -78,6 +94,7 @@ Initial v1 release plus phase-2 features. Highlights:
 - Friendly CLI error messages and graceful shutdown.
 
 [Unreleased]: about:blank
+[0.3.1]: about:blank
 [0.3.0]: about:blank
 [0.2.1]: about:blank
 [0.2.0]: about:blank

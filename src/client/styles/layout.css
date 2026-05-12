@@ -54,6 +54,15 @@
   overflow: hidden auto;
   padding: 18px 14px;
   position: relative;
+  transition: padding-right var(--transition);
+}
+
+/* Minimap floats over the viewport right edge (position: fixed), so when it's
+   visible AND the outline pane is open, the outline list would sit under the
+   minimap bars. Shift the outline content left by the minimap rail's footprint
+   (22px rail + 4px gap + ~6px breathing room ≈ 32px). */
+.app-shell.has-minimap:not(.outline-collapsed) > .pane-outline {
+  padding-right: 32px;
 }
 
 /* When collapsed, padding shrinks so the rail button fills */

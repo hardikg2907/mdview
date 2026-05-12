@@ -157,10 +157,13 @@ export function App() {
   const file = fileSignal.value;
   const treeData = treeSignal.value;
 
+  const minimap = minimapSignal.value;
+
   const shellClasses = [
     'app-shell',
     treeCollapsed ? 'tree-collapsed' : '',
     outlineCollapsed ? 'outline-collapsed' : '',
+    minimap ? 'has-minimap' : '',
   ].filter(Boolean).join(' ');
 
   const shellStyle = `--tree-width:${treeWidth}px;--outline-width:${outlineWidth}px`;

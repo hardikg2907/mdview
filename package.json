@@ -1,6 +1,6 @@
 {
   "name": "mdview",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Local CLI markdown viewer with live reload, outline navigation, and folder browsing",
   "license": "MIT",
   "author": "Hardik Garg <hardikg2907@gmail.com>",
@@ -61,7 +61,7 @@
     "@types/node": "^22.7.0",
     "happy-dom": "^20.9.0",
     "katex": "^0.16.45",
-    "mermaid": "^11.3.0",
+    "mermaid": "^11.15.0",
     "preact": "^10.24.2",
     "tsup": "^8.3.0",
     "typescript": "^5.6.3",

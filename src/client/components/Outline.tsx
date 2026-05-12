@@ -1,8 +1,16 @@
 import { useMemo, useState } from 'preact/hooks';
 import type { HeadingLevel, OutlineNode } from '../../shared/types.js';
 import { activeHeadingId } from '../hooks/useScrollSpy.js';
-import { outlineLevelsSignal, toggleLevel } from '../hooks/useOutlineLevels.js';
-import { filterOutline, ALL_LEVELS } from '../lib/outline-filter.js';
+import {
+  outlineLevelsSignal,
+  outlineMinLevelSignal,
+  outlineMaxLevelSignal,
+  setOutlineMinLevel,
+  setOutlineMaxLevel,
+  OUTLINE_LEVEL_MIN,
+  OUTLINE_LEVEL_MAX,
+} from '../hooks/useOutlineLevels.js';
+import { filterOutline } from '../lib/outline-filter.js';
 import { IconChevronRight, IconPanelRightClose } from './Icons.js';
 
 interface Props {
@@ -13,40 +21,67 @@ interface Props {
 
 export function Outline({ nodes, onJump, onCollapse }: Props) {
   const visible = outlineLevelsSignal.value;
+  const min = outlineMinLevelSignal.value;
+  const max = outlineMaxLevelSignal.value;
   const filtered = useMemo(() => filterOutline(nodes, visible), [nodes, visible]);
+  const depthLabel = min === max ? `H${min}` : `H${min}–H${max}`;
+  const span = OUTLINE_LEVEL_MAX - OUTLINE_LEVEL_MIN;
+  const fillLeft = ((min - OUTLINE_LEVEL_MIN) / span) * 100;
+  const fillRight = 100 - ((max - OUTLINE_LEVEL_MIN) / span) * 100;
 
   return (
     <nav class="outline" aria-label="Document outline">
       <div class="outline-head">
+        <button
+          class="pane-head-btn"
+          aria-label="Hide outline"
+          data-tooltip="Hide outline (⌘.)"
+          data-tooltip-align="left"
+          onClick={onCollapse}
+        >
+          <IconPanelRightClose size={14} />
+        </button>
         <span class="outline-title">On this page</span>
-        <div class="outline-head-actions">
-          <div class="outline-level-pills" role="group" aria-label="Filter by heading level">
-            {ALL_LEVELS.map((lvl) => {
-              const on = visible.has(lvl);
-              return (
-                <button
-                  key={lvl}
-                  type="button"
-                  class={`outline-level-pill${on ? ' is-on' : ''}`}
-                  aria-pressed={on}
-                  aria-label={`${on ? 'Hide' : 'Show'} heading level ${lvl}`}
-                  data-tooltip={`${on ? 'Hide' : 'Show'} H${lvl}`}
-                  onClick={() => toggleLevel(lvl)}
-                >
-                  {lvl}
-                </button>
-              );
-            })}
+        <div
+          class="outline-depth"
+          data-tooltip={`Show ${depthLabel}`}
+          data-tooltip-align="right"
+        >
+          <span class="outline-depth-label" aria-hidden>{depthLabel}</span>
+          <div class="outline-depth-range" role="group" aria-label="Heading depth range">
+            <div class="outline-depth-track" aria-hidden>
+              <div
+                class="outline-depth-track-fill"
+                style={`left:${fillLeft}%;right:${fillRight}%`}
+              />
+            </div>
+            <input
+              type="range"
+              class="outline-depth-slider outline-depth-slider-min"
+              min={OUTLINE_LEVEL_MIN}
+              max={OUTLINE_LEVEL_MAX}
+              step={1}
+              value={min}
+              aria-label={`Minimum heading level (currently H${min})`}
+              onInput={(ev) => {
+                const v = Number((ev.currentTarget as HTMLInputElement).value);
+                if (Number.isFinite(v)) setOutlineMinLevel(v as HeadingLevel);
+              }}
+            />
+            <input
+              type="range"
+              class="outline-depth-slider outline-depth-slider-max"
+              min={OUTLINE_LEVEL_MIN}
+              max={OUTLINE_LEVEL_MAX}
+              step={1}
+              value={max}
+              aria-label={`Maximum heading level (currently H${max})`}
+              onInput={(ev) => {
+                const v = Number((ev.currentTarget as HTMLInputElement).value);
+                if (Number.isFinite(v)) setOutlineMaxLevel(v as HeadingLevel);
+              }}
+            />
           </div>
-          <button
-            class="pane-head-btn"
-            aria-label="Hide outline"
-            data-tooltip="Hide outline (⌘.)"
-            data-tooltip-align="right"
-            onClick={onCollapse}
-          >
-            <IconPanelRightClose size={14} />
-          </button>
         </div>
       </div>
       {filtered.length === 0 ? (

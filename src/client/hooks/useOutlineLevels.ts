@@ -1,33 +1,52 @@
+import { computed } from '@preact/signals';
 import type { HeadingLevel } from '../../shared/types.js';
-import { ALL_LEVELS } from '../lib/outline-filter.js';
-import { createPersistedSignal } from '../lib/persisted-signal.js';
+import { createPersistedNumber } from '../lib/persisted-signal.js';
 
-const persisted = createPersistedSignal<Set<HeadingLevel>>(
-  'mdview-outline-levels',
-  new Set(ALL_LEVELS),
-  {
-    parse(raw) {
-      try {
-        const parsed: unknown = JSON.parse(raw);
-        if (!Array.isArray(parsed)) return null;
-        const valid = parsed.filter(
-          (n): n is HeadingLevel =>
-            typeof n === 'number' && Number.isInteger(n) && n >= 1 && n <= 6,
-        );
-        return valid.length === 0 ? null : new Set(valid);
-      } catch {
-        return null;
-      }
-    },
-    serialize: (s) => JSON.stringify([...s].sort()),
-  },
+export const OUTLINE_LEVEL_MIN: HeadingLevel = 1;
+export const OUTLINE_LEVEL_MAX: HeadingLevel = 6;
+
+const minPersisted = createPersistedNumber(
+  'mdview-outline-min-level',
+  OUTLINE_LEVEL_MIN,
+  { min: OUTLINE_LEVEL_MIN, max: OUTLINE_LEVEL_MAX },
+);
+const maxPersisted = createPersistedNumber(
+  'mdview-outline-max-level',
+  OUTLINE_LEVEL_MAX,
+  { min: OUTLINE_LEVEL_MIN, max: OUTLINE_LEVEL_MAX },
 );
 
-export const outlineLevelsSignal = persisted.signal;
+export const outlineMinLevelSignal = minPersisted.signal;
+export const outlineMaxLevelSignal = maxPersisted.signal;
 
-export function toggleLevel(level: HeadingLevel): void {
-  const next = new Set(persisted.signal.value);
-  if (next.has(level)) next.delete(level);
-  else next.add(level);
-  persisted.set(next);
+/**
+ * Setters enforce `min ≤ max`. If the user drags one thumb past the other,
+ * push the other one along so the range stays valid (don't silently clamp
+ * to the previous bound — that traps the user when both thumbs are equal).
+ */
+export function setOutlineMinLevel(level: HeadingLevel): void {
+  minPersisted.set(level);
+  if (level > maxPersisted.signal.value) {
+    maxPersisted.set(level);
+  }
 }
+
+export function setOutlineMaxLevel(level: HeadingLevel): void {
+  maxPersisted.set(level);
+  if (level < minPersisted.signal.value) {
+    minPersisted.set(level);
+  }
+}
+
+/**
+ * Visible levels derived from the range slider: `{min..max}` inclusive.
+ * Kept as a computed signal so existing consumers (`filterOutline`) work
+ * without changing shape.
+ */
+export const outlineLevelsSignal = computed<ReadonlySet<HeadingLevel>>(() => {
+  const lo = outlineMinLevelSignal.value;
+  const hi = outlineMaxLevelSignal.value;
+  const out = new Set<HeadingLevel>();
+  for (let i = lo; i <= hi; i++) out.add(i as HeadingLevel);
+  return out;
+});
