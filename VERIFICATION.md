@@ -23,6 +23,7 @@ node bin/mdview.mjs ./test-fixtures/showcase.md --no-open
 ### 2. Folder mode
 - Folder tree shows nested structure (`assets/`, `linked-doc.md`, `math.md`, `showcase.md`).
 - Click `linked-doc.md` → renders in the viewer (no full page reload).
+- **Cmd/Ctrl + click `linked-doc.md` in the file tree** → opens that file in a **new tab** with URL `?file=linked-doc.md`. Middle-click and right-click → "Open link in new tab" also work.
 - Internal `[link](./linked-doc.md)` inside `showcase.md` navigates same way.
 - **Cmd/Ctrl + click** on the same internal link → opens that file in a **new tab**, with the URL `?file=…` populated correctly (not `/path/to/file.md`). The new tab shows the right file, not a random last-viewed one.
 - A link with a percent-encoded space, e.g. `[x](some%20doc.md)`, resolves to the file literally named `some doc.md` (no double-encoding).

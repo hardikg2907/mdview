@@ -97,20 +97,42 @@ function TreeItem({ node, currentPath, onSelect, depth }: ItemProps) {
 
   const isMd = node.isMarkdown ?? false;
   const isCurrent = currentPath === node.relPath;
+  const cls = `tree-item tree-file ${isMd ? '' : 'is-disabled'} ${isCurrent ? 'is-current' : ''}`;
+  // Render as a real <a> so the browser handles cmd/ctrl-click (new tab),
+  // middle-click (new tab), and right-click → "Open in new tab" natively.
+  // encodeURIComponent on relPath keeps user-controlled segments from breaking
+  // out of the query value or smuggling CR/LF into the URL.
+  const href = isMd ? `/?file=${encodeURIComponent(node.relPath)}` : undefined;
   return (
     <li class="tree-li tree-li-file" role="treeitem">
-      <button
-        class={`tree-item tree-file ${isMd ? '' : 'is-disabled'} ${isCurrent ? 'is-current' : ''}`}
-        style={{ paddingLeft: indent }}
-        disabled={!isMd}
-        onClick={() => isMd && onSelect(node.relPath)}
-        title={node.name}
-      >
-        <span class="tree-icon" aria-hidden>
-          {isMd ? <IconFileMd size={14} /> : <IconFile size={14} />}
+      {isMd ? (
+        <a
+          class={cls}
+          style={{ paddingLeft: indent }}
+          href={href}
+          title={node.name}
+          onClick={(e) => {
+            // Let the browser handle modifier-clicks natively (new tab/window).
+            // Middle-click fires `auxclick`, not `click`, so it bypasses this
+            // handler entirely and the browser opens the href in a new tab.
+            if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+            e.preventDefault();
+            onSelect(node.relPath);
+          }}
+        >
+          <span class="tree-icon" aria-hidden>
+            <IconFileMd size={14} />
+          </span>
+          <span class="name">{node.name}</span>
+        </a>
+      ) : (
+        <span class={cls} style={{ paddingLeft: indent }} title={node.name}>
+          <span class="tree-icon" aria-hidden>
+            <IconFile size={14} />
+          </span>
+          <span class="name">{node.name}</span>
         </span>
-        <span class="name">{node.name}</span>
-      </button>
+      )}
     </li>
   );
 }
