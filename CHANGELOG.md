@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-05-13
+
 ### Added
 - **Browser tab favicon.** An accent-coloured italic "M" on a rounded square, served as `/favicon.svg`, so an mdview tab is visually distinguishable from other localhost tabs. Pure SVG — scales crisply at any tab size, no PNG variants needed.
 - **Cmd/Ctrl-click a file in the tree to open it in a new tab.** File rows are now real anchors (`<a href="/?file=…">`) instead of buttons, which also enables middle-click → new tab, right-click → "Open link in new tab" / "Copy link", and hover URL preview in the browser status bar. Plain click still uses SPA navigation (no page reload). Non-markdown rows remain non-interactive.
