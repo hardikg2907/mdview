@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-05-14
+
 ### Fixed
 - **No more `EMFILE: too many open files` crash on a repo root.** The file watcher used to descend into anything that wasn't a dotfile or `node_modules`, which on a polyglot monorepo (Elixir `_build/`, Rust `target/`, Python `__pycache__/venv/`, Go `vendor/`, generic `dist/build/out/coverage/`) blows past macOS's 256 soft FD limit (kqueue) and Linux's `inotify.max_user_watches`. Built-in skip list expanded to cover those names at every depth.
 
