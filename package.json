@@ -15,11 +15,11 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/hardikgarg/mdview.git"
+    "url": "git+https://github.com/hardikg2907/mdview.git"
   },
-  "homepage": "https://github.com/hardikgarg/mdview#readme",
+  "homepage": "https://github.com/hardikg2907/mdview#readme",
   "bugs": {
-    "url": "https://github.com/hardikgarg/mdview/issues"
+    "url": "https://github.com/hardikg2907/mdview/issues"
   },
   "type": "module",
   "bin": {

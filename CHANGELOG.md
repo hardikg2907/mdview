@@ -116,9 +116,12 @@ Initial v1 release plus phase-2 features. Highlights:
 - Per-project `.mdview.json` config (palette, font, line-width, default-collapsed sidebars).
 - Friendly CLI error messages and graceful shutdown.
 
-[Unreleased]: about:blank
-[0.3.1]: about:blank
-[0.3.0]: about:blank
-[0.2.1]: about:blank
-[0.2.0]: about:blank
-[0.1.0]: about:blank
+[Unreleased]: https://github.com/hardikg2907/mdview/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/hardikg2907/mdview/compare/v0.5.0...v0.6.0
+[0.5.0]: https://github.com/hardikg2907/mdview/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/hardikg2907/mdview/compare/v0.3.1...v0.4.0
+[0.3.1]: https://github.com/hardikg2907/mdview/compare/v0.3.0...v0.3.1
+[0.3.0]: https://github.com/hardikg2907/mdview/compare/v0.2.1...v0.3.0
+[0.2.1]: https://github.com/hardikg2907/mdview/compare/v0.2.0...v0.2.1
+[0.2.0]: https://github.com/hardikg2907/mdview/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/hardikg2907/mdview/releases/tag/v0.1.0

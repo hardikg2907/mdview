@@ -18,11 +18,11 @@ Reading long markdown docs is hard:
 
 `mdview` is built for that. It's a single-machine, single-user, read-only viewer with editorial typography, persistent navigation, and live reload.
 
-## Install
+## Install from source
 
 ```bash
-git clone <repo>
-cd md-to-html
+git clone https://github.com/hardikg2907/mdview.git
+cd mdview
 npm install
 npm run build
 npm install -g .          # puts `mdview` on your PATH
@@ -38,21 +38,21 @@ node bin/mdview.mjs ./docs
 ### Share with friends without publishing
 
 ```bash
-npm run build && npm pack    # produces mdview-0.2.0.tgz
+npm run build && npm pack    # produces mdview-0.6.0.tgz
 ```
 
 Send them the `.tgz` (Slack/Drive/AirDrop). They install with:
 
 ```bash
-npm install -g ./mdview-0.2.0.tgz
+npm install -g ./mdview-0.6.0.tgz
 ```
 
-If the repo is on GitHub, they can also skip the tarball:
+Or skip the tarball entirely:
 
 ```bash
-npm install -g github:<your-user>/md-to-html
+npm install -g github:hardikg2907/mdview
 # or one-shot
-npx github:<your-user>/md-to-html ./docs
+npx github:hardikg2907/mdview ./docs
 ```
 
 The `prepare` script auto-builds on their machine if `bin/` is absent.
@@ -184,10 +184,14 @@ Node 20+, TypeScript, Fastify 5, markdown-it 14, Shiki 1, gray-matter, chokidar 
 ## Tests
 
 ```bash
-npm test            # vitest, server + client (216 tests)
+npm test            # vitest, server + client (289 tests)
 npm run typecheck   # both tsconfigs
 npm run build       # vite (client) + tsup (server CLI)
 ```
+
+## Reporting issues
+
+Found a bug or have a feature request? File it at [github.com/hardikg2907/mdview/issues](https://github.com/hardikg2907/mdview/issues).
 
 ## License
 
