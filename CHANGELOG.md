@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-05-14
+
 ### Added
 - **Collapsible sections.** Every heading gets a small chevron (hover-revealed when expanded, always visible when collapsed) that folds the section — every trailing sibling up to the next heading of equal-or-shallower level. State is per-tab, survives live-reload of the same file, resets on file switch. Anchor jumps (TOC, internal links, hash restore) auto-expand the target's containing section. In-doc search progressively expands collapsed sections as you cycle into matches that live inside them. Print expands everything and re-collapses after. Keyboard: `e` expand all, `⇧E` collapse all.
 
