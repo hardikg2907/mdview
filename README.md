@@ -1,5 +1,9 @@
 # mdview
 
+[![Version](https://img.shields.io/github/v/tag/hardikg2907/mdview?label=version)](https://github.com/hardikg2907/mdview/releases)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](https://nodejs.org)
+
 A local markdown viewer for reading long, hierarchical docs without losing focus. Run a command, browser opens with a beautifully rendered, navigable view of your file or folder. Edits in your editor show up live. Close terminal to stop.
 
 ```
