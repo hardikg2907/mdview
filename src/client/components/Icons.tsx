@@ -202,6 +202,16 @@ export function IconMaximize({ size = 16, class: cls }: IconProps) {
   );
 }
 
+export function IconInfo({ size = 16, class: cls }: IconProps) {
+  return (
+    <svg {...base(size)} class={cls} aria-hidden>
+      <circle cx="12" cy="12" r="9" />
+      <line x1="12" y1="11" x2="12" y2="16" />
+      <line x1="12" y1="8" x2="12" y2="8" />
+    </svg>
+  );
+}
+
 export function IconList({ size = 16, class: cls }: IconProps) {
   return (
     <svg {...base(size)} class={cls} aria-hidden>

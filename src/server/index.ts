@@ -7,7 +7,8 @@ import { registerApiAsset } from './routes/api-asset.js';
 import { registerApiSearch } from './routes/api-search.js';
 import { registerSse } from './routes/sse.js';
 import { createWatcher } from './watcher.js';
-import { CONFIG_FILENAME, loadProjectConfig } from './config.js';
+import { CONFIG_FILENAME, loadEffectiveConfig } from './config.js';
+import { buildIgnoreSet } from './fs/ignore.js';
 import type { ProjectConfig, RootInfo, WatchEvent } from '../shared/types.js';
 
 export interface ServerOptions {
@@ -18,6 +19,8 @@ export interface ServerOptions {
 
 export interface ConfigState {
   current: ProjectConfig | null;
+  /** Frozen at startup — see comment on the configWatcher below. */
+  ignoreSet: ReadonlySet<string>;
 }
 
 const CSP_HTML = [
@@ -52,9 +55,16 @@ export async function createServer(opts: ServerOptions): Promise<FastifyInstance
     return payload;
   });
 
-  const watcher = createWatcher(opts.rootAbsPath);
+  // Load config (global + project) before starting the watcher so the ignore
+  // set is frozen in: chokidar caches `ignored` at construction time, and a
+  // mid-flight change would leave the FSWatcher and the tree walker disagreeing
+  // about which dirs to surface.
+  const initialConfig = await loadEffectiveConfig(opts.rootAbsPath);
+  const ignoreSet = buildIgnoreSet(initialConfig?.ignore ?? []);
 
-  const configState: ConfigState = { current: await loadProjectConfig(opts.rootAbsPath) };
+  const configState: ConfigState = { current: initialConfig, ignoreSet };
+
+  const watcher = createWatcher(opts.rootAbsPath, { ignore: ignoreSet });
 
   // Dedicated chokidar watch for .mdview.json — the main watcher ignores
   // dotfiles, so we'd never see it otherwise.
@@ -65,7 +75,10 @@ export async function createServer(opts: ServerOptions): Promise<FastifyInstance
     awaitWriteFinish: { stabilityThreshold: 60, pollInterval: 30 },
   });
   const reloadConfig = async (): Promise<void> => {
-    configState.current = await loadProjectConfig(opts.rootAbsPath);
+    // Note: only the scalar fields hot-reload. `ignore` is read once at startup
+    // — changing it requires restarting mdview, because the FSWatcher was
+    // constructed against the original set.
+    configState.current = await loadEffectiveConfig(opts.rootAbsPath);
     const event: WatchEvent = { kind: 'config', relPath: CONFIG_FILENAME };
     watcher.emitSynthetic?.(event);
   };
@@ -76,7 +89,7 @@ export async function createServer(opts: ServerOptions): Promise<FastifyInstance
   registerApiFile(app, opts.rootAbsPath, opts.rootInfo);
   registerApiTree(app, opts.rootAbsPath, opts.rootInfo, configState);
   registerApiAsset(app, opts.rootAbsPath);
-  registerApiSearch(app, opts.rootAbsPath, opts.rootInfo);
+  registerApiSearch(app, opts.rootAbsPath, opts.rootInfo, configState);
   registerSse(app, watcher);
 
   await app.register(import('@fastify/static'), {

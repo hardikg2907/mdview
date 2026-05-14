@@ -2,6 +2,7 @@ import path from 'node:path';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createServer } from './server/index.js';
+import { runConfigSubcommand } from './cli-config.js';
 import openBrowser from 'open';
 import type { RootInfo } from './shared/types.js';
 
@@ -16,6 +17,7 @@ mdview — local markdown viewer
 
 Usage:
   mdview [path]            View file or folder (default: cwd)
+  mdview config <…>        Read or edit the global config (run 'mdview config -h')
 
 Options:
   --port <n>               Port to listen on (default: 7331; auto-fallback)
@@ -24,9 +26,11 @@ Options:
   --help, -h               Show this help
 
 Examples:
-  mdview ./docs            Browse a folder
-  mdview README.md         View a single file
-  mdview --port 9000       Use a specific port
+  mdview ./docs                          Browse a folder
+  mdview README.md                       View a single file
+  mdview --port 9000                     Use a specific port
+  mdview config ignore add deps _site    Hide extra build dirs globally
+  mdview config path                     Print global config path
 `.trim());
 }
 
@@ -151,9 +155,17 @@ async function listen(
 }
 
 async function main(): Promise<void> {
+  const argv = process.argv.slice(2);
+  // `config` is its own subcommand — never starts a server. Dispatch before
+  // arg parsing so the subcommand grammar isn't constrained by the run flags.
+  if (argv[0] === 'config') {
+    const code = await runConfigSubcommand(argv.slice(1));
+    process.exit(code);
+  }
+
   let parsed: ParseResult;
   try {
-    parsed = parseArgs(process.argv.slice(2));
+    parsed = parseArgs(argv);
   } catch (err) {
     console.error((err as Error).message);
     printUsage();

@@ -24,6 +24,25 @@
   letter-spacing: .14em;
   color: var(--fg-muted);
   user-select: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.pane-head-info {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fg-subtle);
+  cursor: help;
+  opacity: .7;
+  transition: opacity var(--transition), color var(--transition);
+  outline: 0;
+  border-radius: 999px;
+}
+.pane-head-info:hover,
+.pane-head-info:focus-visible {
+  opacity: 1;
+  color: var(--accent);
 }
 .pane-head-btn {
   display: inline-flex;
@@ -1298,6 +1317,14 @@ mark.search-hit.is-active {
 [data-tooltip][data-tooltip-align="right"]:hover::after,
 [data-tooltip][data-tooltip-align="right"]:focus-visible::after {
   transform: translateX(0) translateY(0);
+}
+/* Wider variant for explanatory tooltips that don't fit on one line. */
+[data-tooltip][data-tooltip-multiline]::after {
+  white-space: pre-line;
+  max-width: 260px;
+  text-align: left;
+  line-height: 1.5;
+  font-weight: 400;
 }
 [data-tooltip][data-tooltip-align="left"]::after {
   left: 0;

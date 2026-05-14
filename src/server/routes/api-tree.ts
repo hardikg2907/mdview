@@ -23,7 +23,7 @@ export function registerApiTree(
       ];
       return reply.send({ root: rootInfo, tree: single, config });
     }
-    const tree = await walkFolder(rootAbsPath);
+    const tree = await walkFolder(rootAbsPath, { ignore: configState.ignoreSet });
     return reply.send({ root: rootInfo, tree, config });
   });
 }

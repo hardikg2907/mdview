@@ -2,15 +2,34 @@ import { readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { MD_EXT } from '../../shared/tree-utils.js';
 import type { TreeNode } from '../../shared/types.js';
+import { DEFAULT_IGNORED_DIRS, isDirIgnored } from './ignore.js';
 
-export async function walkFolder(root: string, relBase = ''): Promise<TreeNode[]> {
+export interface WalkOptions {
+  /** Directory basenames to skip. Defaults to DEFAULT_IGNORED_DIRS. Dotfiles
+   *  are always skipped regardless of this set. */
+  ignore?: ReadonlySet<string>;
+}
+
+export async function walkFolder(root: string, opts: WalkOptions = {}): Promise<TreeNode[]> {
+  const ignore = opts.ignore ?? DEFAULT_IGNORED_DIRS;
+  return walkInner(root, '', ignore);
+}
+
+async function walkInner(
+  root: string,
+  relBase: string,
+  ignore: ReadonlySet<string>,
+): Promise<TreeNode[]> {
   const absDir = path.join(root, relBase);
   const entries = await readdir(absDir, { withFileTypes: true });
 
   const out: TreeNode[] = [];
   for (const entry of entries) {
-    if (entry.name.startsWith('.')) continue;
-    if (entry.name === 'node_modules') continue;
+    if (entry.isDirectory()) {
+      if (isDirIgnored(entry.name, ignore)) continue;
+    } else if (entry.name.startsWith('.')) {
+      continue;
+    }
 
     // relPaths are URL-shaped (always '/'), not OS-native. resolveSafePath uses
     // path.resolve which accepts '/' on Windows, and the client/links code
@@ -18,7 +37,7 @@ export async function walkFolder(root: string, relBase = ''): Promise<TreeNode[]
     const childRel = relBase ? `${relBase}/${entry.name}` : entry.name;
 
     if (entry.isDirectory()) {
-      const children = await walkFolder(root, childRel);
+      const children = await walkInner(root, childRel, ignore);
       out.push({
         name: entry.name,
         relPath: childRel,

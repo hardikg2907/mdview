@@ -50,7 +50,7 @@ src/
 │   └── math.ts                      ← KaTeX placeholder emission
 ├── server/
 │   ├── index.ts                     ← createServer factory + .mdview.json watcher
-│   ├── config.ts                    ← loadProjectConfig + validateConfig
+│   ├── config.ts                    ← loadEffectiveConfig (global + project), mergeConfigs, validateConfig
 │   ├── routes/
 │   │   ├── api-file.ts              ← GET /api/file
 │   │   ├── api-tree.ts              ← GET /api/tree (incl. project config)
@@ -59,6 +59,7 @@ src/
 │   │   └── sse.ts                   ← GET /api/watch
 │   ├── fs/
 │   │   ├── resolve.ts               ← resolveSafePath (security boundary!)
+│   │   ├── ignore.ts                ← DEFAULT_IGNORED_DIRS + isPathIgnored (shared with watcher + walkFolder)
 │   │   ├── tree.ts                  ← walkFolder
 │   │   └── grep.ts                  ← folder-wide search backend
 │   └── watcher.ts                   ← chokidar wrapper + emitSynthetic for config events
@@ -110,16 +111,17 @@ The renderer lives in `src/render/`, **outside** `src/server/`, because it has n
 ### Filesystem (`src/server/fs/`)
 
 - **`resolve.ts`** — `resolveSafePath(root, rel)` is the security boundary. Rejects absolute paths, normalizes the result, ensures it stays within `root`. Used by every fs read/write.
-- **`tree.ts`** — `walkFolder(root)` recursively walks the directory, skipping dotfiles and `node_modules`, sorts dirs first then alpha. Marks markdown files with `isMarkdown: true`.
+- **`tree.ts`** — `walkFolder(root, { ignore })` recursively walks the directory, skipping dotfiles and any directory whose basename is in the supplied ignore set (defaults to `DEFAULT_IGNORED_DIRS`). Sorts dirs first then alpha. Marks markdown files with `isMarkdown: true`.
 - **`grep.ts`** — `grepFiles(rootAbsPath, query, opts)` for folder-wide search. Reuses `walkFolder` + `flattenMdRelPaths` + the shared `compilePattern`. Caps per-file and global. Strips frontmatter before grepping.
+- **`ignore.ts`** — `DEFAULT_IGNORED_DIRS` (re-exported from `src/shared/ignore.ts` so the client tooltip can list the same names), `buildIgnoreSet(extra)` to union user-supplied basenames into the defaults, and `isPathIgnored(abs, root, set)` for the chokidar `ignored` callback. Plain basename equality — no globs, no regex.
 
-### Project config (`src/server/config.ts`)
+### Config (`src/server/config.ts`)
 
-`loadProjectConfig(rootAbsPath)` reads `.mdview.json` and validates it (palette enum, font-family enum, narrowly-typed `lineWidth`, boolean `defaultCollapsed.{tree,outline}`). Conservative — never throws; bad config falls back to "no config" with a `console.warn`. The validated value flows into the `/api/tree` response and is live-reloaded on file change.
+Two layered files: **global** at `~/.config/mdview/config.json` (or `$XDG_CONFIG_HOME/mdview/config.json` when set) and **per-project** at `<root>/.mdview.json`. Same schema. `loadEffectiveConfig(rootAbsPath)` loads both in parallel and merges via `mergeConfigs` — project wins for scalar fields, `ignore` is unioned and deduped. Validation rejects unknown keys silently, drops invalid values with a `console.warn`, and never throws. `ignore` entries must match `/^[A-Za-z0-9_.\-+]{1,64}$/` and are not allowed to be `.` or `..`. The validated config flows into the `/api/tree` response. Scalar fields hot-reload when the project file changes; the `ignore` set is frozen at startup because chokidar caches its `ignored` callback at construction time.
 
 ### Watcher (`src/server/watcher.ts`)
 
-A thin `chokidar` wrapper. Emits `WatchEvent`s with forward-slash relative paths (regardless of host OS). Awaits write-finish so a single save doesn't fire a flurry of events. Exposes `emitSynthetic(event)` so the dedicated `.mdview.json` watcher can push `config` events through the same SSE stream.
+A thin `chokidar` wrapper. Accepts an `ignore` set wired through to chokidar's `ignored` callback via `isPathIgnored`. Emits `WatchEvent`s with forward-slash relative paths (regardless of host OS). Awaits write-finish so a single save doesn't fire a flurry of events. Catches `EMFILE`/`ENOSPC` on the chokidar error channel and prints a hint pointing at the global config file. Exposes `emitSynthetic(event)` so the dedicated `.mdview.json` watcher can push `config` events through the same SSE stream.
 
 ## Client (`src/client/`)
 

@@ -37,6 +37,8 @@ interface GrepOptions extends Partial<SearchOptions> {
   perLineBudgetMs?: number;
   /** Skip lines longer than this in regex mode — defence against ReDoS on pathological lines (defaults 10_000). */
   maxLineLenForRegex?: number;
+  /** Directory basenames to skip while walking. Forwarded to walkFolder. */
+  ignore?: ReadonlySet<string>;
 }
 
 function buildSnippet(line: string, start: number, end: number, radius: number): {
@@ -78,7 +80,7 @@ export async function grepFiles(
   });
   if (!pattern.valid) return { query, results: [], truncated: false };
 
-  const tree = await walkFolder(rootAbsPath);
+  const tree = await walkFolder(rootAbsPath, { ignore: opts.ignore });
   const files = flattenMdRelPaths(tree);
 
   const results: FileSearchResult[] = [];

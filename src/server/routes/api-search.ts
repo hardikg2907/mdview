@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { grepFiles } from '../fs/grep.js';
+import type { ConfigState } from '../index.js';
 import type { RootInfo } from '../../shared/types.js';
 
 const MAX_QUERY_LEN = 200;
@@ -19,6 +20,7 @@ export function registerApiSearch(
   app: FastifyInstance,
   rootAbsPath: string,
   rootInfo: RootInfo,
+  configState: ConfigState,
 ): void {
   app.get<{ Querystring: SearchQS }>('/api/search', async (req, reply) => {
     if (rootInfo.rootKind === 'file') {
@@ -35,6 +37,7 @@ export function registerApiSearch(
       caseSensitive: isTrue(req.query.case),
       wholeWord: isTrue(req.query.word),
       regex: isTrue(req.query.regex),
+      ignore: configState.ignoreSet,
     });
     return reply.send(out);
   });

@@ -1,13 +1,26 @@
 import { useEffect, useState } from 'preact/hooks';
 import type { TreeNode } from '../../shared/types.js';
+import { DEFAULT_IGNORED_DIRS } from '../../shared/ignore.js';
 import {
   IconChevronRight,
   IconFolder,
   IconFolderOpen,
   IconFile,
   IconFileMd,
+  IconInfo,
   IconPanelLeftClose,
 } from './Icons.js';
+
+const IGNORE_TOOLTIP = [
+  'Hidden from the tree to keep the watcher under the OS file-watch limit:',
+  '• dotfiles / dotdirs (.git, .next, .venv, …)',
+  `• built-in heavy dirs: ${DEFAULT_IGNORED_DIRS.join(', ')}`,
+  '',
+  'Add your own in ~/.config/mdview/config.json:',
+  '{ "ignore": ["my-build-dir"] }',
+  '',
+  'Restart mdview after editing.',
+].join('\n');
 
 interface Props {
   tree: TreeNode[];
@@ -20,7 +33,20 @@ export function FolderTree({ tree, currentPath, onSelect, onCollapse }: Props) {
   return (
     <div class="pane-content">
       <div class="pane-head">
-        <span class="pane-head-title">Files</span>
+        <span class="pane-head-title">
+          Files
+          <span
+            class="pane-head-info"
+            role="button"
+            tabIndex={0}
+            aria-label="Why some folders aren't shown"
+            data-tooltip={IGNORE_TOOLTIP}
+            data-tooltip-multiline
+            data-tooltip-align="left"
+          >
+            <IconInfo size={11} />
+          </span>
+        </span>
         <button
           class="pane-head-btn"
           aria-label="Hide file tree"

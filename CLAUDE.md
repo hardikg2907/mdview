@@ -40,6 +40,7 @@ Skim these before exploring code. They will answer most "where does X live?" que
 - **`/__asset/*` serves an allow-list of media extensions only.** Adding a new extension means adding a real MIME entry in `src/server/routes/api-asset.ts`. Do NOT restore the `octet-stream` fallback. Refusing dotfiles and source code through this route is the point.
 - **`/api/file` accepts `.md` / `.markdown` / `.mdx` only.** Do not relax this to read other text formats; serve them as assets if they ever need to be exposed.
 - **Folder regex search must remain bounded.** `pattern.matchAllWithBudget` + the per-line-length cap in `src/server/fs/grep.ts` are ReDoS guards. If you replace them, replace with something stronger (e.g. `re2`), not nothing.
+- **User-supplied `ignore` basenames in config are tightly validated** (`/^[A-Za-z0-9_.\-+]{1,64}$/`, with `.` and `..` explicitly rejected) before they reach the watcher or tree walker. The comparison is basename equality only — no globs, no regex, no path joining. Do not loosen this to support patterns without a real glob library and the corresponding ReDoS guard.
 - **Server binds to `127.0.0.1` only.** Don't add a `--host 0.0.0.0` flag without an explicit auth story.
 - Treat every user-supplied input — query params, file contents, watch events — as untrusted. Validate length and shape before passing to a regex, the filesystem, or a rendered template.
 

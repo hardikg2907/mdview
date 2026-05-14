@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **No more `EMFILE: too many open files` crash on a repo root.** The file watcher used to descend into anything that wasn't a dotfile or `node_modules`, which on a polyglot monorepo (Elixir `_build/`, Rust `target/`, Python `__pycache__/venv/`, Go `vendor/`, generic `dist/build/out/coverage/`) blows past macOS's 256 soft FD limit (kqueue) and Linux's `inotify.max_user_watches`. Built-in skip list expanded to cover those names at every depth.
+
+### Added
+- **`ignore: ["my-dir", "_site"]`** field in `.mdview.json` (project) or `~/.config/mdview/config.json` (new global config) extends the built-in skip list with your own basenames. Strings only, no globs — the comparison is plain basename equality. Restart mdview after editing; the watcher freezes its ignore set at startup.
+- **Global config at `~/.config/mdview/config.json`** (honours `XDG_CONFIG_HOME` if set). Same schema as the project `.mdview.json`. Project config wins on scalar fields; `ignore` is unioned across both, so a per-repo extra doesn't drop your global build-dir list.
+- **`mdview config` subcommand** — `mdview config path` prints the global config location; `mdview config ignore list / add <name…> / rm <name…>` reads and edits the ignore list without hand-editing the JSON. Adds validate against the same basename allow-list as the file loader.
+- **Info icon in the file-tree pane head** with a tooltip explaining which folders are hidden and where to extend the list.
+- **Helpful error on `EMFILE`/`ENOSPC`** at watcher startup — points the user at the global config file and shows the built-in defaults instead of crashing the process with a raw `UVException`.
+
 ## [0.4.0] — 2026-05-13
 
 ### Added

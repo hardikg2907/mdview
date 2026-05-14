@@ -90,6 +90,20 @@ node bin/mdview.mjs ./test-fixtures/showcase.md --no-open
 - Pick a different palette manually → user override wins, persists.
 - Edit `.mdview.json` to a different palette and save → if no user override is active, the page palette swaps live.
 
+### 10a. Global config + ignore list + `mdview config` CLI
+- `mdview config path` → prints `~/.config/mdview/config.json` (or `$XDG_CONFIG_HOME/mdview/config.json` if set).
+- `mdview config ignore list` → prints the built-in defaults followed by user-added entries (or `(none)`).
+- `mdview config ignore add deps _site` → file is created if missing; lists `_site, deps` alphabetically; prints "Restart mdview…".
+- `mdview config ignore rm deps` → file is rewritten without `deps`; `ignore` field is removed entirely when the list goes empty.
+- `mdview config ignore add ../escape` → exits with code 2 and a `Invalid ignore entry` message; file is unchanged.
+- `mdview config ignore add` with no name → exits with code 2 and a usage hint.
+- Create `~/.config/mdview/config.json` containing `{ "ignore": ["my-bulk-dir"] }`.
+- Run mdview on a folder that contains `my-bulk-dir/` with files inside → that directory does not appear in the tree.
+- Run mdview on a folder containing `node_modules/`, `dist/`, `_build/`, `target/`, or `__pycache__/` → none appear in the tree by default, and the watcher does **not** crash with `EMFILE: too many open files`.
+- Hover the small `(i)` icon in the "Files" pane head → tooltip explains the defaults and points at `~/.config/mdview/config.json` with the schema.
+- Set both `~/.config/mdview/config.json` and a project `.mdview.json` with different palettes → project wins. Set `ignore` in both → the union takes effect.
+- Run mdview, then add a new entry to the global config's `ignore` while running → not picked up. Restart → now picked up. (Documented behavior.)
+
 ### 11. Anchors
 - Hover any heading → `#` appears on the right.
 - Click it → URL copied to clipboard.

@@ -80,6 +80,8 @@ Comprehensive catalog of what `mdview` does today (post Phase 2, May 2026).
 | **Palette picker — classic / paper / nord / solarized / high-contrast** | `ViewMenu.tsx` in header (consolidated gear menu); `usePalette.ts` resolves user override > project config > default; `data-palette` attribute on `<html>` |
 | **High-contrast palette** | `data-palette="high-contrast"` — near-pure-white / near-pure-black prose, bolder accents, stronger borders; pairs with `github-light-high-contrast` / `github-dark-high-contrast` Shiki themes |
 | **Per-project config (`.mdview.json`)** | `src/server/config.ts` validates & loads; included in `/api/tree` response; live-reloaded |
+| **Global config (`~/.config/mdview/config.json`)** | `loadGlobalConfig` honours `$XDG_CONFIG_HOME`; merged with per-project via `mergeConfigs` (project wins for scalars; `ignore` is unioned) |
+| **`ignore` field — extends built-in skip list of heavy build/dep dirs** | `src/server/fs/ignore.ts` defines `DEFAULT_IGNORED_DIRS` + `isPathIgnored`; consumed by both `walkFolder` and `createWatcher` to prevent `EMFILE`/`ENOSPC` at repo roots; tooltip in tree pane (`FolderTree.tsx`) lists defaults + points at the global config |
 | Synchronous theme/palette/wide-layout bootstrap (no FOUC on reload) | External script `src/client/public/bootstrap.js` referenced from `<head>` of `index.html`; reads `mdview-theme` / `mdview-palette` / `mdview-wide-layout` from `localStorage`, validates against allow-list, and sets `data-theme` / `data-palette` / `data-wide` before first paint. Must stay external — the strict `script-src 'self'` CSP blocks inline scripts (and adding `'unsafe-inline'` or relaxing the policy is explicitly forbidden by CLAUDE.md §3.1) |
 
 ## Keyboard shortcuts

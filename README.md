@@ -137,20 +137,35 @@ Click the keyboard icon in the header anytime to see the full list.
 - Copy button on every code block.
 - Subtle hover tooltips on every header control.
 
-## Per-project config (`.mdview.json`)
+## Config
 
-Drop a `.mdview.json` at the folder root to set defaults:
+Two layered files, both optional, same schema:
+
+- **Global**: `~/.config/mdview/config.json` (honours `$XDG_CONFIG_HOME`) — your machine-wide defaults.
+- **Per-project**: `.mdview.json` at the folder root — overrides global for this folder.
 
 ```json
 {
   "palette": "nord",
   "fontFamily": "serif",
   "lineWidth": "70ch",
-  "defaultCollapsed": { "tree": false, "outline": false }
+  "defaultCollapsed": { "tree": false, "outline": false },
+  "ignore": ["deps", "_site"]
 }
 ```
 
-All fields optional. Validated on load — invalid values fall back silently with a warning. Edit the file while the server is running and the SPA picks up the change live.
+All fields optional. Validated on load — invalid values fall back silently with a warning. Edit the per-project file while the server is running and the SPA picks up palette/font/lineWidth changes live; `ignore` is read once at startup (the file watcher's skip list is frozen — restart mdview after editing).
+
+`ignore` extends the built-in skip list (which already covers `node_modules`, `dist`, `build`, `out`, `target`, `coverage`, `vendor`, `__pycache__`, `venv`, `Pods`, `DerivedData`, `_build`, plus every dotfile/dotdir). Add your own basenames here — handy when running mdview at a repo root with non-standard build dirs to avoid `EMFILE: too many open files` from the OS file-watch limit.
+
+You can edit the ignore list from the CLI without opening the JSON:
+
+```bash
+mdview config path                  # print the global config path
+mdview config ignore list           # show built-in + user-added entries
+mdview config ignore add deps _site # add one or more basenames
+mdview config ignore rm  deps       # remove one or more basenames
+```
 
 ## Stack
 

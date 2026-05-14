@@ -2,6 +2,7 @@ import { EventEmitter } from 'node:events';
 import path from 'node:path';
 import chokidar, { type FSWatcher } from 'chokidar';
 import type { WatchEvent } from '../shared/types.js';
+import { DEFAULT_IGNORED_DIRS, isPathIgnored } from './fs/ignore.js';
 
 export interface Watcher {
   on(event: 'event', listener: (e: WatchEvent) => void): void;
@@ -11,14 +12,39 @@ export interface Watcher {
   close(): Promise<void>;
 }
 
-export function createWatcher(rootAbsPath: string): Watcher {
+export interface CreateWatcherOptions {
+  /** Directory basenames to skip recursively. Defaults to DEFAULT_IGNORED_DIRS. */
+  ignore?: ReadonlySet<string>;
+}
+
+export function createWatcher(rootAbsPath: string, opts: CreateWatcherOptions = {}): Watcher {
   const emitter = new EventEmitter();
+  const ignore = opts.ignore ?? DEFAULT_IGNORED_DIRS;
 
   const watcher: FSWatcher = chokidar.watch(rootAbsPath, {
     ignoreInitial: true,
-    ignored: (p: string) => /(^|[\/\\])\../.test(path.basename(p)) || /node_modules/.test(p),
+    ignored: (p: string) => isPathIgnored(p, rootAbsPath, ignore),
     persistent: true,
     awaitWriteFinish: { stabilityThreshold: 60, pollInterval: 30 },
+  });
+
+  // EMFILE / ENOSPC at startup is the common failure when running mdview at a
+  // repo root with heavy build dirs that slipped past `ignored`. Surface a
+  // helpful hint instead of an uncaught error that crashes the process.
+  watcher.on('error', (err: unknown) => {
+    const e = err as NodeJS.ErrnoException;
+    if (e?.code === 'EMFILE' || e?.code === 'ENOSPC') {
+      console.error(
+        `[mdview] file watcher hit ${e.code} while watching ${rootAbsPath}\n` +
+          `  Path: ${e.path ?? '(unknown)'}\n` +
+          `  Likely cause: a heavy directory (build output, deps) wasn't ignored.\n` +
+          `  Fix: add the directory name to "ignore" in ~/.config/mdview/config.json, e.g.\n` +
+          `    { "ignore": ["deps", "_site"] }\n` +
+          `  Built-in skips already cover ${[...DEFAULT_IGNORED_DIRS].join(', ')}.`,
+      );
+    } else {
+      console.error(`[mdview] watcher error: ${e?.message ?? String(err)}`);
+    }
   });
 
   function emit(kind: 'change' | 'add' | 'unlink', abs: string) {

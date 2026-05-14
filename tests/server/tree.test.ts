@@ -49,6 +49,34 @@ describe('walkFolder', () => {
     expect(tree.find((n) => n.name === '.git')).toBeUndefined();
   });
 
+  it('skips built-in heavy dirs (node_modules, _build, dist, …) at every depth', async () => {
+    mkdirSync(path.join(root, 'node_modules', 'foo'), { recursive: true });
+    writeFileSync(path.join(root, 'node_modules', 'foo', 'index.js'), '');
+    mkdirSync(path.join(root, '_build', 'dev'), { recursive: true });
+    writeFileSync(path.join(root, '_build', 'dev', 'app.beam'), '');
+    mkdirSync(path.join(root, 'guides', 'dist'), { recursive: true });
+    writeFileSync(path.join(root, 'guides', 'dist', 'leak.md'), '# l');
+
+    const tree = await walkFolder(root);
+    expect(tree.find((n) => n.name === 'node_modules')).toBeUndefined();
+    expect(tree.find((n) => n.name === '_build')).toBeUndefined();
+    const guides = tree.find((n) => n.name === 'guides')!;
+    expect(guides.children!.find((n) => n.name === 'dist')).toBeUndefined();
+  });
+
+  it('respects a custom ignore set instead of the defaults', async () => {
+    mkdirSync(path.join(root, 'node_modules'), { recursive: true });
+    writeFileSync(path.join(root, 'node_modules', 'a.md'), '# a');
+    mkdirSync(path.join(root, 'custom-bulk'), { recursive: true });
+    writeFileSync(path.join(root, 'custom-bulk', 'b.md'), '# b');
+
+    const tree = await walkFolder(root, { ignore: new Set(['custom-bulk']) });
+    // Defaults are NOT applied when a custom set is passed — so node_modules
+    // shows up but custom-bulk is skipped.
+    expect(tree.find((n) => n.name === 'node_modules')).toBeDefined();
+    expect(tree.find((n) => n.name === 'custom-bulk')).toBeUndefined();
+  });
+
   it('returns relPath using forward slashes', async () => {
     const tree = await walkFolder(root);
     const intro = tree

@@ -51,4 +51,5 @@ export interface ProjectConfig {
     tree?: boolean;
     outline?: boolean;
   };
+  ignore?: string[];
 }
