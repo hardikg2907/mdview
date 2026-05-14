@@ -5,9 +5,15 @@ import { wireCopyButtons } from './copy-buttons.js';
 import { wirePermalinks } from './permalinks.js';
 import { markExternalLinks } from './external-links.js';
 import { wireImageLightbox } from './image-lightbox.js';
+import { wireCollapsibleSections } from './collapsible-sections.js';
 import type { Wire } from './wire-pipeline.js';
 
 export const defaultWires: Wire[] = [
+  // First so the synchronous body sets `activeRoot` and restores collapsed
+  // state before any async wire (mermaid / math import) suspends the pipeline
+  // — `App.tsx` schedules a rAF for hash-restore expansion that would
+  // otherwise fire while the collapsible-sections wire is still queued.
+  wireCollapsibleSections,
   { name: 'mermaid', run: (root) => renderMermaidIn(root) },
   { name: 'math', run: (root) => renderMathIn(root) },
   { name: 'internal-links', run: (root, ctx) => wireInternalLinks(root, ctx.onInternalNavigate) },

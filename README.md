@@ -86,6 +86,7 @@ Closes when you `Ctrl-C` or `kill` the process. Set `MDVIEW_DEBUG=1` for full st
 | `Ctrl+D` / `Ctrl+U` | Half-page down / up |
 | `Alt` / `⌥` + scroll | Fast scroll (~4×) in the main pane |
 | `f` / `m` | Toggle focus mode / minimap |
+| `e` / `⇧E` | Expand all / collapse all sections |
 | `Tab` (in search) | Cycle Doc ↔ Folder scope |
 | `Enter` / `Shift+Enter` | Next / previous match in search |
 | `Esc` | Close search / lightbox / panel |
@@ -110,6 +111,7 @@ Click the keyboard icon in the header anytime to see the full list.
 - Outline sidebar with scroll-spy and collapsible nesting. Six toggle pills (`H1`–`H6`) filter which levels show.
 - Breadcrumbs in the header reflecting your current viewport heading; click any segment to jump.
 - Stable per-heading anchors. Hover any heading to reveal a `#` link that copies a deep-link URL.
+- Collapsible sections — every heading has a hover-revealed chevron that folds the section's content; anchor links auto-expand their target. `e` / `⇧E` expand or collapse the whole doc.
 - `⌘P` quick file switcher with fuzzy matching across the whole tree.
 
 **Rendering**

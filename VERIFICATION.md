@@ -115,6 +115,7 @@ node bin/mdview.mjs ./test-fixtures/showcase.md --no-open
 - Press `Enter` → next match (smooth scrolls into view).
 - Toggle `Aa` (case-sensitive), `ab` (whole-word), `.*` (regex) → result count updates accordingly.
 - Press `Esc` → search closes, highlights cleared.
+- Collapse one or more sections, then open search and type a query that matches text inside a collapsed section → match counter reflects the total. Pressing `Enter` to cycle into a hidden match expands its containing section first, then scroll-into-view lands on the highlighted word.
 
 ### 13. Folder-wide search
 - Press `⇧⌘F` (or click the `Folder` pill in the search bar) → scope switches to `Folder`.
@@ -191,7 +192,21 @@ node bin/mdview.mjs ./test-fixtures/showcase.md --no-open
 - Press `?` (or click the keyboard icon in the header) → modal lists all shortcuts in three groups (Navigation / Find / View).
 - Esc or click-outside closes.
 
-### 26. Errors & shutdown
+### 26. Collapsible sections
+- Open a doc with multiple H2/H3 headings. Hover any heading → a small `▾` chevron fades in to the left of the title (alongside the existing `#` permalink on the right).
+- Click the chevron → that heading's trailing content (everything until the next equal-or-shallower heading) collapses; the chevron rotates to `▸` and stays visible while the section is folded. Click again → expands.
+- Collapse an H2 that has H3 children → the H3s and their content also fold (they're inside the H2's range).
+- Collapse an H3 that's nested inside an H2 → only the H3's own content folds; the surrounding H2 content stays.
+- Click the outline entry for a heading that's currently inside a collapsed section → the containing section auto-expands, then the smooth-scroll lands on the heading.
+- Same for clicking a `#anchor` link in the doc body whose target is inside a collapsed section.
+- Same for refreshing on a `#anchor` URL — auto-expand happens before the initial scroll-into-view.
+- Press `e` → every section expands. Press `⇧E` → every section collapses. Doc becomes a stack of headings only.
+- Edit the open file in another editor and save (live reload) → previously-collapsed sections stay collapsed; new headings appear expanded by default. Headings that were renamed or deleted gracefully fall out of the collapsed set (no errors).
+- Switch to a different file in the tree → the new file opens with everything expanded (state doesn't leak across files).
+- Print preview (Cmd/Ctrl+P) while some sections are collapsed → preview shows every section expanded. After closing print → the previously-collapsed sections are collapsed again.
+- Keyboard: focus a chevron via Tab and press Space/Enter → toggles. `aria-expanded` reflects state on the button.
+
+### 27. Errors & shutdown
 - Run `mdview ./does-not-exist` → friendly `mdview: path not found: ...` error, exit code 1.
 - Run two `mdview` instances at the same explicit `--port 7331` → second one prints port-already-in-use guidance, exit code 1. Without `--port`, second instance auto-falls-back to 7332 and prints `port 7331 in use, using 7332 instead`.
 - `Ctrl+C` once → graceful shutdown ("mdview: shutting down…", clean exit). `Ctrl+C` twice → force-exit (130).
@@ -200,7 +215,7 @@ node bin/mdview.mjs ./test-fixtures/showcase.md --no-open
 ## Tests
 
 ```bash
-npm test            # 216 vitest unit tests
+npm test            # 289 vitest unit tests
 npm run typecheck   # both tsconfigs clean
 ```
 

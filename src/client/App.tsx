@@ -39,6 +39,7 @@ import { SearchBar } from './components/SearchBar.js';
 import { searchOpenSignal, closeSearch } from './hooks/useSearch.js';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts.js';
 import { useAltWheelScroll } from './hooks/useAltWheelScroll.js';
+import { expandSectionContaining } from './lib/collapsible-sections.js';
 import { IconPanelLeftOpen, IconPanelRightOpen } from './components/Icons.js';
 import type { TreeNode } from '../shared/types.js';
 
@@ -104,6 +105,7 @@ export function App() {
     const hash = window.location.hash.slice(1);
     if (hash) {
       requestAnimationFrame(() => {
+        expandSectionContaining(hash);
         const el = document.getElementById(hash);
         el?.scrollIntoView({ behavior: 'auto', block: 'start' });
       });
@@ -134,14 +136,17 @@ export function App() {
   const handleInternalNav = (relPath: string, hash: string) => {
     navigate(relPath, hash);
     if (hash) {
+      const id = hash.slice(1);
       requestAnimationFrame(() => {
-        document.getElementById(hash.slice(1))?.scrollIntoView({ behavior: 'smooth' });
+        expandSectionContaining(id);
+        document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
       });
     }
   };
   const handleJump = (id: string) => {
     history.replaceState(history.state, '', `#${id}`);
     lockScrollSpy(id);
+    expandSectionContaining(id);
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
   };
   const handleJumpHeading = (id: string | null) => {

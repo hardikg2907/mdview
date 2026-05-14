@@ -24,6 +24,7 @@ import {
   toggleSearchRegex,
   type SearchScope,
 } from '../hooks/useSearch.js';
+import { expandSectionContainingElement } from '../lib/collapsible-sections.js';
 
 interface Props {
   scroller: HTMLElement | null;
@@ -75,8 +76,11 @@ export function SearchBar({ scroller, fileTrigger: _fileTrigger, onOpenFile }: P
             highlightHits(found, 0);
             domCount.value = el.querySelectorAll('mark.search-hit').length;
             requestAnimationFrame(() => {
-              el.querySelector('mark.search-hit.is-active')
-                ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              const active = el.querySelector<HTMLElement>('mark.search-hit.is-active');
+              if (active) {
+                expandSectionContainingElement(active);
+                active.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }
             });
           } else {
             domCount.value = 0;
@@ -110,7 +114,10 @@ export function SearchBar({ scroller, fileTrigger: _fileTrigger, onOpenFile }: P
     if (scope !== 'doc') return;
     if (!scroller || hits.value.length === 0) return;
     const active = setActiveMark(scroller, activeIdx.value);
-    active?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (active) {
+      expandSectionContainingElement(active);
+      active.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeIdx.value, scope, scroller, hits.value.length]);
 

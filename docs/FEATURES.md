@@ -27,6 +27,7 @@ Comprehensive catalog of what `mdview` does today (post Phase 2, May 2026).
 |---------|----------------|
 | **Focus mode — dims everything except the section under your eyes** | `lib/focus-mode.ts` (`applyFocus` / `clearFocus`) driven by `focusedHeadingId` from `useScrollSpy`. Distinct from `activeHeadingId` (used by breadcrumb/outline/minimap): focus uses a **top-third reading band** (`FOCUS_BAND_FRACTION = 0.35`) so the highlight rolls forward to a new section the moment its title enters the natural reading zone, instead of clinging to a heading that scrolled off-screen pages ago. Navigation indicators still answer "where am I in the doc?" (top edge); focus answers "what am I reading right now?" (reading zone). Toggled by `f` or the View menu. |
 | **Minimap rail with viewport indicator** | `Minimap.tsx`; bars per heading, click/drag to scroll; toggled by `m` or header button |
+| **Collapsible sections** — every heading folds its trailing content | `lib/collapsible-sections.ts` wire. For each top-level heading in `.markdown-content`, a chevron `<button class="section-toggle">` is prepended; clicking it toggles `hidden` on every trailing sibling up to the next heading of equal-or-shallower level. State is per-tab, kept in a module-scoped `Set<string>`; survives same-file live-reload, resets on path change via `currentPathSignal`. `expandSectionContaining(id)` is called from `App.tsx` `handleJump` / `handleInternalNav` / hash-restore so anchor links land in visible targets. `beforeprint` snapshots & expands; `afterprint` restores. Keyboard: `e` / `⇧E` (`expandAll` / `collapseAll`). |
 
 ## Rendering
 
@@ -101,6 +102,7 @@ Comprehensive catalog of what `mdview` does today (post Phase 2, May 2026).
 | **`Ctrl+D` / `Ctrl+U`** | Half-page down / up |
 | **`Alt`/`⌥` + scroll** | Fast scroll (~4×) in the main pane (`useAltWheelScroll.ts`) |
 | **`f` / `m` / `w`** | Toggle focus mode / minimap / wide layout |
+| **`e` / `⇧E`** | Expand all / collapse all sections |
 | `Enter` / `Shift+Enter` | Next / previous match in search |
 | `Esc` | Close search / lightbox / panel |
 | `?` | Open shortcuts panel |

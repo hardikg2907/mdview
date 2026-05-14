@@ -148,7 +148,17 @@ export function useScrollSpy(scrollContainer: HTMLElement | null): void {
     // added on first file-load AND its innerHTML being swapped on each
     // file change. Observing `.markdown-content` directly misses the first
     // case because it doesn't exist yet at hook-mount time.
-    mo.observe(scrollContainer, { childList: true, subtree: true });
+    // `hidden` attribute changes get observed too: collapsible-sections toggles
+    // `hidden` on trailing siblings of folded headings, which collapses their
+    // layout boxes without changing childList. Without this, the cached
+    // heading offsets stay stale after a fold and the outline / breadcrumb
+    // pick the wrong active heading.
+    mo.observe(scrollContainer, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['hidden'],
+    });
 
     scrollContainer.addEventListener('scroll', onScroll, { passive: true });
     return () => {

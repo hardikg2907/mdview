@@ -193,6 +193,7 @@ After `Content.tsx` injects the server-rendered HTML, it runs `runWires(root, ct
 | `permalinks` | `permalinks.ts` | Appends a `#` anchor to each heading; click copies a deep-link URL. |
 | `external-links` | `external-links.ts` | Detects `http(s)` links not tagged as internal; adds `target="_blank"`, `rel="noopener noreferrer"`, and an inline SVG `↗` icon. |
 | `image-lightbox` | `image-lightbox.ts` | Wires click handlers on `<img>` elements to open the lightbox. |
+| `collapsible-sections` | `collapsible-sections.ts` | Prepends a chevron `<button>` inside every top-level heading-with-id; clicking toggles `hidden` on its trailing siblings up to the next heading of equal-or-shallower level. State is module-scoped (`Set<string>` of collapsed ids), keyed on `currentPathSignal` so same-file live-reload preserves it and a file switch resets it. Exports `expandSectionContaining(id)` for anchor jumps and `expandAll` / `collapseAll` for the `e` / `⇧E` shortcuts. |
 
 Each helper is **idempotent** (uses a marker class or dataset flag to skip already-processed nodes) and takes the root element. Don't add behavior to JSX components if it requires walking the rendered HTML — keep that in lib helpers.
 
@@ -204,6 +205,8 @@ There are **two** "active heading" trackers, deliberately:
 - **`useFocusedSection` → `focusedSectionId`**: the *heading whose section contains the viewport center*. Drives focus mode. Independent of where the heading itself is visually.
 
 Both use **bounding-rect deltas** (not `offsetTop`, which is relative to the nearest positioned ancestor and was misaligned with `scrollContainer.scrollTop`), cache the heading list, refresh via `ResizeObserver` on the scroller, and use `MutationObserver` on the **scroller (subtree)** — observing `.markdown-content` directly missed initial mount because `<Content>` is gated on file-loaded. Both apply a no-op-write guard to avoid notifying downstream effects when the result didn't change.
+
+The MutationObserver also watches `attributes` with `attributeFilter: ['hidden']`. Collapsing a section toggles the `hidden` attribute on every trailing sibling of the folded heading — that collapses their layout boxes without producing any `childList` mutation, so without this extension the cached heading offsets would go stale after a fold and `pickActiveId` would highlight the wrong heading.
 
 ### Live reload (`useLiveReload.ts`)
 

@@ -16,6 +16,7 @@ import { currentPathSignal } from './hooks/usePathRouting.js';
 import { treeSignal } from './hooks/useTree.js';
 import { flattenMdFiles } from './lib/file-search.js';
 import { flattenHeadings, nextSameLevelHeading } from './lib/outline-nav.js';
+import { expandAll, collapseAll } from './lib/collapsible-sections.js';
 
 export interface ShortcutContext {
   outline: OutlineNode[];
@@ -188,6 +189,24 @@ export const shortcuts: Shortcut[] = [
     whenTyping: 'block',
     match: (ev) => !meta(ev) && !ev.shiftKey && ev.key === 'w',
     run: () => toggleWideLayout(),
+  },
+  {
+    id: 'expand-all-sections',
+    group: 'View',
+    label: 'Expand all sections',
+    displayKeys: ['e'],
+    whenTyping: 'block',
+    match: (ev) => !meta(ev) && !ev.shiftKey && ev.key === 'e',
+    run: () => expandAll(),
+  },
+  {
+    id: 'collapse-all-sections',
+    group: 'View',
+    label: 'Collapse all sections',
+    displayKeys: ['⇧', 'E'],
+    whenTyping: 'block',
+    match: (ev) => !meta(ev) && ev.shiftKey && ev.key === 'E',
+    run: () => collapseAll(),
   },
 
   // ===== Navigation =====

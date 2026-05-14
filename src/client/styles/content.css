@@ -416,6 +416,49 @@
 }
 .mermaid-block svg { max-width: 100%; height: auto; }
 
+/* ===== Collapsible sections ===== */
+.markdown-content .section-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1em;
+  height: 1em;
+  margin-right: .35em;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--fg-subtle);
+  opacity: 0;
+  vertical-align: baseline;
+  flex-shrink: 0;
+  font: inherit;
+  line-height: 1;
+  transition: opacity var(--transition), color var(--transition);
+}
+.markdown-content .section-toggle::before {
+  content: "▾";
+  font-size: .85em;
+  display: inline-block;
+  transition: transform var(--transition);
+}
+.markdown-content .section-toggle[aria-expanded="false"]::before {
+  transform: rotate(-90deg);
+}
+.markdown-content :is(h1, h2, h3, h4, h5, h6):hover > .section-toggle,
+.markdown-content .section-toggle:focus-visible,
+.markdown-content .section-heading-collapsed > .section-toggle {
+  opacity: 1;
+}
+.markdown-content .section-toggle:hover {
+  color: var(--accent);
+}
+.markdown-content .section-heading-collapsed {
+  /* Subtle hint that the section is folded — borrow the muted feel of doc-stats. */
+  color: var(--fg-muted);
+}
+
 /* ===== Heading permalinks ===== */
 .markdown-content .heading-anchor {
   display: inline-block;
