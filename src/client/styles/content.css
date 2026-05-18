@@ -260,6 +260,14 @@
 .markdown-content tbody tr:hover {
   background: var(--accent-tint);
 }
+/* Long identifiers in inline <code> have no natural break opportunities
+   (dots, underscores, '='), so in table cells they force the column to
+   demand huge minimum width and starve siblings. Allow breaks here only. */
+.markdown-content td code,
+.markdown-content th code {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
 
 /* ===== Horizontal rule ===== */
 .markdown-content hr {
@@ -338,7 +346,16 @@
 }
 
 /* ===== Code copy button ===== */
-.markdown-content pre .copy-btn {
+/* Wrapper hosts the absolutely-positioned copy button so it stays put
+   while <pre> scrolls horizontally underneath it. */
+.markdown-content .pre-wrap {
+  position: relative;
+  margin: 1.3em 0;
+}
+.markdown-content .pre-wrap > pre {
+  margin: 0;
+}
+.markdown-content .pre-wrap .copy-btn {
   position: absolute;
   top: 8px;
   right: 8px;
@@ -359,16 +376,16 @@
               border-color var(--transition), background var(--transition),
               transform var(--transition);
 }
-.markdown-content pre:hover .copy-btn,
-.markdown-content pre .copy-btn:focus-visible {
+.markdown-content .pre-wrap:hover .copy-btn,
+.markdown-content .pre-wrap .copy-btn:focus-visible {
   opacity: 1;
   transform: translateY(0);
 }
-.markdown-content pre .copy-btn:hover {
+.markdown-content .pre-wrap .copy-btn:hover {
   color: var(--accent);
   border-color: var(--accent);
 }
-.markdown-content pre .copy-btn.is-copied {
+.markdown-content .pre-wrap .copy-btn.is-copied {
   opacity: 1;
   color: var(--accent);
   border-color: var(--accent);

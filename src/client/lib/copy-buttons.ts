@@ -1,8 +1,13 @@
 export function wireCopyButtons(root: HTMLElement): void {
   const pres = root.querySelectorAll<HTMLPreElement>('pre');
   pres.forEach((pre) => {
-    if (pre.querySelector('.copy-btn')) return;
     if (pre.closest('.mermaid-block')) return;
+    if (pre.parentElement?.classList.contains('pre-wrap')) return;
+
+    const wrap = document.createElement('div');
+    wrap.className = 'pre-wrap';
+    pre.replaceWith(wrap);
+    wrap.appendChild(pre);
 
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -27,6 +32,6 @@ export function wireCopyButtons(root: HTMLElement): void {
       }, 1600);
     });
 
-    pre.appendChild(btn);
+    wrap.appendChild(btn);
   });
 }
