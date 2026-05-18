@@ -52,7 +52,7 @@ Bigger architectural shift: one long-running server hosts multiple "workspaces" 
 
 ## Bugs / Polish (open)
 
-- [ ] **Pre-commit hooks** — wire husky + lint-staged (or simple-git-hooks) to run `npm run typecheck` and `npm test` (or at least vitest --related on staged files) before each commit. Goal: catch the obvious type/test regression before it lands. Keep the hook fast — full build/audit stay in the manual release checklist.
+- [x] **Pre-commit hooks** (landed 0.6.1) — husky v9 with `pre-commit` (`typecheck && lint && test && audit`, ~7s) and `pre-push` (`build`, ~25s). Linter is biome (single binary, no plugin chain), a11y off because the custom widgets are intentionally non-standard. Audit was added to the commit hook too, with an offline-bypass note in CONTRIBUTING.
 
 ---
 
