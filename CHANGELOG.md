@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] — 2026-05-18
+
 ### Fixed
 - **Inline `<code>` inside table cells now wraps on overflow** instead of forcing the column to demand huge minimum width. Previously, a cell containing a long unbroken identifier (e.g. `debezium.source.column.exclude.list=public.data_processors.completion_pct,…`) would dominate the table layout and starve sibling columns, causing short labels like `houston-debezium-server` to wrap into three lines. Scoped to `td code` / `th code` so prose-with-inline-code elsewhere is unaffected.
 - **Copy button stays put while a code block is scrolled horizontally.** Previously the button was an absolutely-positioned child of `<pre>` (the scroll container), so it drifted off-screen with the content. The button now lives on a `position: relative` wrapper sibling of `<pre>`, so the wrapper holds its position while only the code scrolls underneath.

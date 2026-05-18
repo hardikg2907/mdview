@@ -1,6 +1,6 @@
 {
   "name": "mdview",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Local CLI markdown viewer with live reload, outline navigation, and folder browsing",
   "license": "MIT",
   "author": "Hardik Garg <hardikg2907@gmail.com>",
