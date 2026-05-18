@@ -1,8 +1,8 @@
 import { useCallback } from 'preact/hooks';
-import { useSSE } from './useSSE.js';
-import { loadFile } from './useFile.js';
-import { fetchTree } from './useTree.js';
 import type { WatchEvent } from '../../shared/types.js';
+import { loadFile } from './useFile.js';
+import { useSSE } from './useSSE.js';
+import { fetchTree } from './useTree.js';
 
 interface ScrollerRef {
   current: HTMLElement | null;

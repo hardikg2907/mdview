@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import {
-  createPersistedSignal,
   createPersistedBool,
   createPersistedNumber,
+  createPersistedSignal,
   createPersistedString,
 } from '../../src/client/lib/persisted-signal.js';
 

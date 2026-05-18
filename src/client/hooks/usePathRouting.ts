@@ -1,5 +1,5 @@
-import { useCallback, useEffect } from 'preact/hooks';
 import { signal } from '@preact/signals';
+import { useCallback, useEffect } from 'preact/hooks';
 
 function readPathFromUrl(): string | null {
   const sp = new URLSearchParams(window.location.search);

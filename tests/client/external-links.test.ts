@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { markExternalLinks } from '../../src/client/lib/external-links.js';
 
 function setup(html: string): HTMLElement {

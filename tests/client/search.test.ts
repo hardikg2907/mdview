@@ -1,10 +1,10 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import {
+  clearHighlights,
   findHits,
   highlightHits,
-  clearHighlights,
-  setActiveMark,
   type SearchHit,
+  setActiveMark,
 } from '../../src/client/lib/search.js';
 
 function setup(contentHtml: string): HTMLElement {

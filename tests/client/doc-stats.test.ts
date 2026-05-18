@@ -1,8 +1,8 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
+  computeDocStats,
   countHeadings,
   formatStats,
-  computeDocStats,
 } from '../../src/client/lib/doc-stats.js';
 import type { OutlineNode } from '../../src/shared/types.js';
 

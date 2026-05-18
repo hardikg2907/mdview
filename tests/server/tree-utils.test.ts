@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { flattenMdRelPaths, MD_EXT } from '../../src/shared/tree-utils.js';
 import type { TreeNode } from '../../src/shared/types.js';
 

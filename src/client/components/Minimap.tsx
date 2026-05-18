@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { OutlineNode } from '../../shared/types.js';
-import { activeHeadingId } from '../hooks/useScrollSpy.js';
 import { mainScrollerSignal } from '../hooks/useScroller.js';
+import { activeHeadingId } from '../hooks/useScrollSpy.js';
 import { flattenHeadings } from '../lib/outline-nav.js';
 
 interface Props {

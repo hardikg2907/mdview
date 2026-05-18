@@ -1,30 +1,30 @@
-import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { useSignal } from '@preact/signals';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import {
+  closeSearch,
+  type SearchScope,
+  searchCaseSensitiveSignal,
+  searchRegexSignal,
+  searchScopeSignal,
+  searchWholeWordSignal,
+  setSearchScope,
+  toggleSearchCase,
+  toggleSearchRegex,
+  toggleSearchWord,
+} from '../hooks/useSearch.js';
+import { expandSectionContainingElement } from '../lib/collapsible-sections.js';
+import { debounce } from '../lib/debounce.js';
+import {
+  type FolderSearchResults,
+  fetchFolderSearch,
+} from '../lib/folder-search.js';
 import {
   clearHighlights,
   findHits,
   highlightHits,
-  setActiveMark,
   type SearchHit,
+  setActiveMark,
 } from '../lib/search.js';
-import {
-  fetchFolderSearch,
-  type FolderSearchResults,
-} from '../lib/folder-search.js';
-import { debounce } from '../lib/debounce.js';
-import {
-  closeSearch,
-  searchScopeSignal,
-  setSearchScope,
-  searchCaseSensitiveSignal,
-  searchWholeWordSignal,
-  searchRegexSignal,
-  toggleSearchCase,
-  toggleSearchWord,
-  toggleSearchRegex,
-  type SearchScope,
-} from '../hooks/useSearch.js';
-import { expandSectionContainingElement } from '../lib/collapsible-sections.js';
 
 interface Props {
   scroller: HTMLElement | null;

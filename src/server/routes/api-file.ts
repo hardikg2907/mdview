@@ -1,11 +1,11 @@
-import type { FastifyInstance } from 'fastify';
 import { readFile, stat } from 'node:fs/promises';
-import { resolveSafePath } from '../fs/resolve.js';
+import type { FastifyInstance } from 'fastify';
+import { parseFrontmatter } from '../../render/frontmatter.js';
+import { rewriteImageSrc, tagInternalLinks } from '../../render/links.js';
 import { renderMarkdown } from '../../render/markdown.js';
 import { extractOutline } from '../../render/outline.js';
-import { parseFrontmatter } from '../../render/frontmatter.js';
-import { tagInternalLinks, rewriteImageSrc } from '../../render/links.js';
 import type { RenderedFile, RootInfo } from '../../shared/types.js';
+import { resolveSafePath } from '../fs/resolve.js';
 
 export function registerApiFile(
   app: FastifyInstance,

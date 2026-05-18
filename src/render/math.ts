@@ -7,7 +7,7 @@ const BLOCK_RE = /^\$\$([\s\S]+?)\$\$$/;
  * This rules out prices like `$5.99 plus $1` (split across two `$` runs with
  * whitespace adjacent to the closing `$`). Newlines are not allowed inside.
  */
-const INLINE_RE = /\$(?!\s)([^\$\n]+?)(?<!\s)\$/g;
+const INLINE_RE = /\$(?!\s)([^$\n]+?)(?<!\s)\$/g;
 
 function blockMathHtml(latex: string): string {
   const encoded = encodeURIComponent(latex.trim());

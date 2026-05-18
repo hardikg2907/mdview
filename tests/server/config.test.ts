@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from 'vitest';
-import { validateConfig, mergeConfigs } from '../../src/server/config.js';
+import { describe, expect, it, vi } from 'vitest';
+import { mergeConfigs, validateConfig } from '../../src/server/config.js';
 
 describe('validateConfig', () => {
   it('returns null for non-object input', () => {

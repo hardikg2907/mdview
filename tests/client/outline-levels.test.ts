@@ -1,14 +1,14 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import type { HeadingLevel } from '../../src/shared/types.js';
+import { beforeEach, describe, expect, it } from 'vitest';
 import {
-  outlineMinLevelSignal,
-  outlineMaxLevelSignal,
-  outlineLevelsSignal,
-  setOutlineMinLevel,
-  setOutlineMaxLevel,
-  OUTLINE_LEVEL_MIN,
   OUTLINE_LEVEL_MAX,
+  OUTLINE_LEVEL_MIN,
+  outlineLevelsSignal,
+  outlineMaxLevelSignal,
+  outlineMinLevelSignal,
+  setOutlineMaxLevel,
+  setOutlineMinLevel,
 } from '../../src/client/hooks/useOutlineLevels.js';
+import type { HeadingLevel } from '../../src/shared/types.js';
 
 function reset(): void {
   // Restore defaults between tests via the public setters so persistence

@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
-import type { Watcher } from '../watcher.js';
 import type { WatchEvent } from '../../shared/types.js';
+import type { Watcher } from '../watcher.js';
 
 export function registerSse(app: FastifyInstance, watcher: Watcher): void {
   app.get('/api/watch', (req, reply) => {

@@ -1,4 +1,4 @@
-import type { OutlineNode, HeadingLevel } from '../../shared/types.js';
+import type { HeadingLevel, OutlineNode } from '../../shared/types.js';
 
 export interface FlatHeading {
   id: string;

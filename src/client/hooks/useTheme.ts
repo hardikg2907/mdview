@@ -1,5 +1,5 @@
-import { useEffect } from 'preact/hooks';
 import { signal } from '@preact/signals';
+import { useEffect } from 'preact/hooks';
 import { createPersistedString } from '../lib/persisted-signal.js';
 
 export type Theme = 'light' | 'dark';

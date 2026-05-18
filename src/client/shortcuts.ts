@@ -1,22 +1,22 @@
 import type { OutlineNode } from '../shared/types.js';
-import {
-  toggleTreeCollapsed,
-  toggleOutlineCollapsed,
-  toggleFocusMode,
-  toggleMinimap,
-  toggleWideLayout,
-} from './hooks/useUiState.js';
-import { toggleTheme } from './hooks/useTheme.js';
+import { openPalette } from './hooks/useCommandPalette.js';
+import { currentPathSignal } from './hooks/usePathRouting.js';
+import { mainScrollerSignal } from './hooks/useScroller.js';
+import { activeHeadingId } from './hooks/useScrollSpy.js';
 import { openSearch } from './hooks/useSearch.js';
 import { openShortcutsPanel } from './hooks/useShortcutsPanel.js';
-import { openPalette } from './hooks/useCommandPalette.js';
-import { activeHeadingId } from './hooks/useScrollSpy.js';
-import { mainScrollerSignal } from './hooks/useScroller.js';
-import { currentPathSignal } from './hooks/usePathRouting.js';
+import { toggleTheme } from './hooks/useTheme.js';
 import { treeSignal } from './hooks/useTree.js';
+import {
+  toggleFocusMode,
+  toggleMinimap,
+  toggleOutlineCollapsed,
+  toggleTreeCollapsed,
+  toggleWideLayout,
+} from './hooks/useUiState.js';
+import { collapseAll, expandAll } from './lib/collapsible-sections.js';
 import { flattenMdFiles } from './lib/file-search.js';
 import { flattenHeadings, nextSameLevelHeading } from './lib/outline-nav.js';
-import { expandAll, collapseAll } from './lib/collapsible-sections.js';
 
 export interface ShortcutContext {
   outline: OutlineNode[];

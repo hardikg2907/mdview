@@ -1,15 +1,15 @@
-import Fastify, { type FastifyInstance } from 'fastify';
 import path from 'node:path';
 import chokidar, { type FSWatcher } from 'chokidar';
-import { registerApiFile } from './routes/api-file.js';
-import { registerApiTree } from './routes/api-tree.js';
-import { registerApiAsset } from './routes/api-asset.js';
-import { registerApiSearch } from './routes/api-search.js';
-import { registerSse } from './routes/sse.js';
-import { createWatcher } from './watcher.js';
+import Fastify, { type FastifyInstance } from 'fastify';
+import type { ProjectConfig, RootInfo, WatchEvent } from '../shared/types.js';
 import { CONFIG_FILENAME, loadEffectiveConfig } from './config.js';
 import { buildIgnoreSet } from './fs/ignore.js';
-import type { ProjectConfig, RootInfo, WatchEvent } from '../shared/types.js';
+import { registerApiAsset } from './routes/api-asset.js';
+import { registerApiFile } from './routes/api-file.js';
+import { registerApiSearch } from './routes/api-search.js';
+import { registerApiTree } from './routes/api-tree.js';
+import { registerSse } from './routes/sse.js';
+import { createWatcher } from './watcher.js';
 
 export interface ServerOptions {
   rootAbsPath: string;

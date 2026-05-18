@@ -1,5 +1,5 @@
-import { useEffect } from 'preact/hooks';
 import { signal } from '@preact/signals';
+import { useEffect } from 'preact/hooks';
 
 export interface HeadingPos { id: string; top: number; }
 

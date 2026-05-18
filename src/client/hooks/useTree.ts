@@ -1,5 +1,5 @@
-import { useEffect } from 'preact/hooks';
 import { signal } from '@preact/signals';
+import { useEffect } from 'preact/hooks';
 import type { ProjectConfig, RootInfo, TreeNode } from '../../shared/types.js';
 
 interface TreeResponse {

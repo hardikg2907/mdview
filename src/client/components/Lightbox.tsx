@@ -1,5 +1,5 @@
 import { useEffect } from 'preact/hooks';
-import { lightboxSignal, closeLightbox } from '../hooks/useLightbox.js';
+import { closeLightbox, lightboxSignal } from '../hooks/useLightbox.js';
 
 export function Lightbox() {
   const state = lightboxSignal.value;

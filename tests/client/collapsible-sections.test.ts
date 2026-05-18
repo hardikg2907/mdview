@@ -1,14 +1,14 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
+import { currentPathSignal } from '../../src/client/hooks/usePathRouting.js';
 import {
-  computeSectionEnd,
+  __resetCollapsibleStateForTests,
   collapseAll,
+  computeSectionEnd,
   expandAll,
   expandSectionContaining,
   expandSectionContainingElement,
   wireCollapsibleSections,
-  __resetCollapsibleStateForTests,
 } from '../../src/client/lib/collapsible-sections.js';
-import { currentPathSignal } from '../../src/client/hooks/usePathRouting.js';
 import type { WireContext } from '../../src/client/lib/wire-pipeline.js';
 
 const ctx: WireContext = { onInternalNavigate: () => {} };
@@ -31,10 +31,6 @@ function clickToggle(root: HTMLElement, headingId: string): void {
   const h = root.querySelector<HTMLHeadingElement>(`#${CSS.escape(headingId)}`)!;
   const btn = h.querySelector<HTMLButtonElement>('button.section-toggle')!;
   btn.click();
-}
-
-function blocksOf(root: HTMLElement): HTMLElement[] {
-  return Array.from(root.children) as HTMLElement[];
 }
 
 beforeEach(() => {

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { applyFocus, clearFocus } from '../../src/client/lib/focus-mode.js';
 
 function setup(html: string): HTMLElement {

@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'preact/hooks';
-import type { TreeNode } from '../../shared/types.js';
 import { DEFAULT_IGNORED_DIRS } from '../../shared/ignore.js';
+import type { TreeNode } from '../../shared/types.js';
 import {
   IconChevronRight,
-  IconFolder,
-  IconFolderOpen,
   IconFile,
   IconFileMd,
+  IconFolder,
+  IconFolderOpen,
   IconInfo,
   IconPanelLeftClose,
 } from './Icons.js';
@@ -80,7 +80,7 @@ interface ItemProps {
 }
 
 function TreeItem({ node, currentPath, onSelect, depth }: ItemProps) {
-  const isAncestor = currentPath !== null && currentPath.startsWith(node.relPath + '/');
+  const isAncestor = currentPath?.startsWith(node.relPath + '/') ?? false;
   const [open, setOpen] = useState(isAncestor);
   useEffect(() => {
     if (isAncestor) setOpen(true);

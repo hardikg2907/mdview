@@ -1,4 +1,4 @@
-import { compilePattern, type SearchOptions, DEFAULT_OPTIONS } from '../../shared/search-pattern.js';
+import { compilePattern, DEFAULT_OPTIONS, type SearchOptions } from '../../shared/search-pattern.js';
 
 export interface SearchHit {
   node: Text;
@@ -81,7 +81,9 @@ export function highlightHits(hits: SearchHit[], activeIndex: number): HTMLEleme
 
   // Track which hit-index corresponds to which mark we create.
   const indexOfHit = new Map<SearchHit, number>();
-  hits.forEach((h, i) => indexOfHit.set(h, i));
+  hits.forEach((h, i) => {
+    indexOfHit.set(h, i);
+  });
 
   byNode.forEach((nodeHits, textNode) => {
     nodeHits.sort((a, b) => a.start - b.start);

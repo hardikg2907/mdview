@@ -1,10 +1,10 @@
 import { useEffect, useMemo } from 'preact/hooks';
-import { shortcutsPanelSignal, closeShortcutsPanel } from '../hooks/useShortcutsPanel.js';
+import { closeShortcutsPanel, shortcutsPanelSignal } from '../hooks/useShortcutsPanel.js';
 import {
-  shortcuts,
   displayOnlyShortcuts,
   type Shortcut,
   type ShortcutGroup,
+  shortcuts,
 } from '../shortcuts.js';
 
 const GROUP_ORDER: ShortcutGroup[] = ['Navigation', 'Find', 'View'];

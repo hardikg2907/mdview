@@ -29,13 +29,28 @@ The vite dev server proxies `/api/*` to `localhost:7331`, so HMR works for the c
 
 ## Quality gates
 
-Run all three before sending a change:
+Run all four before sending a change:
 
 ```bash
 npm run typecheck     # tsc --noEmit on both server and client tsconfigs
-npm test              # vitest run — 97 tests
+npm run lint          # biome check (lint only — formatter disabled)
+npm test              # vitest run — 289 tests
 npm run build         # vite + tsup must both succeed
+npm audit             # 0 vulnerabilities required (release blocker, see CLAUDE.md §6)
 ```
+
+`npm run lint:fix` will auto-apply the safe fixes Biome knows about (import order, dead code, optional chains, etc.). Lint config lives in `biome.json`; a11y rules are disabled because the custom keyboard-driven widgets (file tree, command palette, outline) intentionally diverge from generic ARIA patterns.
+
+### Git hooks (husky)
+
+Hooks live in `.husky/` and install automatically the first time you run `npm install` (via the `prepare` script). They run the gates above so you can't ship a broken tree by accident:
+
+| Hook | Runs | Why |
+|---|---|---|
+| `pre-commit` | `npm run typecheck && npm run lint && npm test && npm audit` | Catches type errors, lint regressions, broken tests, and new advisories before the commit lands. ~6–7s on a clean tree. |
+| `pre-push` | `npm run build` | Heavier (~25s). Catches anything that compiles in dev but not through `vite build` / `tsup`. |
+
+`npm audit` requires network — if you're offline (flight, tunneled VPN) it'll fail and block the commit. In that genuine case use `git commit --no-verify` to bypass, then re-run the full gate set the next time you're online and before cutting a release. **Do not habitually `--no-verify`** — the hooks exist because every one of these failure modes has bitten this repo before.
 
 ## Project layout (where things go)
 

@@ -1,8 +1,8 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
+  FOCUS_BAND_FRACTION,
   pickActiveId,
   pickFocusedId,
-  FOCUS_BAND_FRACTION,
 } from '../../src/client/hooks/useScrollSpy.js';
 
 describe('pickActiveId', () => {

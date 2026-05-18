@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { rankFile, rankAll, flattenMdFiles } from '../../src/client/lib/file-search.js';
+import { describe, expect, it } from 'vitest';
+import { flattenMdFiles, rankAll, rankFile } from '../../src/client/lib/file-search.js';
 import type { TreeNode } from '../../src/shared/types.js';
 
 const f = (relPath: string, name = relPath.split('/').pop()!) => ({ relPath, name });

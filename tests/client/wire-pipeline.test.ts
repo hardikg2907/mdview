@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { runWires, type Wire, type WireContext } from '../../src/client/lib/wire-pipeline.js';
 
 const ctx: WireContext = { onInternalNavigate: () => {} };

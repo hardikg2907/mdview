@@ -1,9 +1,9 @@
-import path from 'node:path';
 import { existsSync, readFileSync, statSync } from 'node:fs';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createServer } from './server/index.js';
-import { runConfigSubcommand } from './cli-config.js';
 import openBrowser from 'open';
+import { runConfigSubcommand } from './cli-config.js';
+import { createServer } from './server/index.js';
 import type { RootInfo } from './shared/types.js';
 
 type ParseResult =

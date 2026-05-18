@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef } from 'preact/hooks';
+import { formatAbsoluteTime, formatRelativeTime } from '../../shared/relative-time.js';
 import type { RenderedFile } from '../../shared/types.js';
+import { focusedHeadingId } from '../hooks/useScrollSpy.js';
+import { focusModeSignal } from '../hooks/useUiState.js';
+import { computeDocStats, formatStats } from '../lib/doc-stats.js';
+import { applyFocus, clearFocus } from '../lib/focus-mode.js';
 import { runWires } from '../lib/wire-pipeline.js';
 import { defaultWires } from '../lib/wires.js';
-import { computeDocStats, formatStats } from '../lib/doc-stats.js';
-import { formatRelativeTime, formatAbsoluteTime } from '../../shared/relative-time.js';
-import { applyFocus, clearFocus } from '../lib/focus-mode.js';
-import { focusModeSignal } from '../hooks/useUiState.js';
-import { focusedHeadingId } from '../hooks/useScrollSpy.js';
 
 interface Props {
   file: RenderedFile;

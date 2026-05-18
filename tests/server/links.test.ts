@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { tagInternalLinks, rewriteImageSrc } from '../../src/render/links.js';
+import { describe, expect, it } from 'vitest';
+import { rewriteImageSrc, tagInternalLinks } from '../../src/render/links.js';
 
 describe('tagInternalLinks', () => {
   it('marks relative md links as internal with data attribute', () => {

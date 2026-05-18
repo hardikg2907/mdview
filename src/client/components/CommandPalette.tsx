@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { paletteOpenSignal, closePalette } from '../hooks/useCommandPalette.js';
+import { closePalette, paletteOpenSignal } from '../hooks/useCommandPalette.js';
 import { treeSignal } from '../hooks/useTree.js';
-import { flattenMdFiles, rankAll, type RankedFile } from '../lib/file-search.js';
+import { flattenMdFiles, type RankedFile, rankAll } from '../lib/file-search.js';
 
 interface Props {
   currentPath: string | null;

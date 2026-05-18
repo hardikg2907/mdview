@@ -1,7 +1,7 @@
-import type { FastifyInstance } from 'fastify';
 import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import path from 'node:path';
+import type { FastifyInstance } from 'fastify';
 import { resolveSafePath } from '../fs/resolve.js';
 
 const MIME: Record<string, string> = {
@@ -32,7 +32,7 @@ export function registerApiAsset(app: FastifyInstance, rootAbsPath: string): voi
     } catch (err) {
       return reply.code(400).send({ error: (err as Error).message });
     }
-    let st;
+    let st: Awaited<ReturnType<typeof stat>>;
     try {
       st = await stat(abs);
     } catch {

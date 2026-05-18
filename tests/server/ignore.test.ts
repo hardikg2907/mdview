@@ -1,8 +1,8 @@
-import { describe, it, expect } from 'vitest';
 import path from 'node:path';
+import { describe, expect, it } from 'vitest';
 import {
-  DEFAULT_IGNORED_DIRS,
   buildIgnoreSet,
+  DEFAULT_IGNORED_DIRS,
   isDirIgnored,
   isPathIgnored,
 } from '../../src/server/fs/ignore.js';

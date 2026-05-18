@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { filterOutline, ALL_LEVELS } from '../../src/client/lib/outline-filter.js';
+import { describe, expect, it } from 'vitest';
+import { ALL_LEVELS, filterOutline } from '../../src/client/lib/outline-filter.js';
 import type { HeadingLevel, OutlineNode } from '../../src/shared/types.js';
 
 function leaf(id: string, level: HeadingLevel, children: OutlineNode[] = []): OutlineNode {

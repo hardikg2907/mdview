@@ -1,22 +1,22 @@
 import type { VNode } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
-import {
-  IconSettings,
-  IconCheck,
-  IconFocus,
-  IconMinimap,
-  IconMaximize,
-} from './Icons.js';
+import { PALETTES, type Palette } from '../../shared/types.js';
+import { paletteSignal, setPalette } from '../hooks/usePalette.js';
 import {
   focusModeSignal,
   minimapSignal,
-  wideLayoutSignal,
   toggleFocusMode,
   toggleMinimap,
   toggleWideLayout,
+  wideLayoutSignal,
 } from '../hooks/useUiState.js';
-import { paletteSignal, setPalette } from '../hooks/usePalette.js';
-import { PALETTES, type Palette } from '../../shared/types.js';
+import {
+  IconCheck,
+  IconFocus,
+  IconMaximize,
+  IconMinimap,
+  IconSettings,
+} from './Icons.js';
 
 const PALETTE_LABELS: Record<Palette, string> = {
   classic: 'Classic',

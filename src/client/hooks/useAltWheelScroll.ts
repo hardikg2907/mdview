@@ -1,5 +1,5 @@
-import { useEffect } from 'preact/hooks';
 import type { RefObject } from 'preact';
+import { useEffect } from 'preact/hooks';
 
 /**
  * Default multiplier applied to the wheel delta when Option/Alt is held.

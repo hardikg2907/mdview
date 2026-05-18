@@ -1,8 +1,8 @@
-import type { FastifyInstance } from 'fastify';
 import path from 'node:path';
+import type { FastifyInstance } from 'fastify';
+import type { RootInfo, TreeNode } from '../../shared/types.js';
 import { walkFolder } from '../fs/tree.js';
 import type { ConfigState } from '../index.js';
-import type { RootInfo, TreeNode } from '../../shared/types.js';
 
 export function registerApiTree(
   app: FastifyInstance,

@@ -1,15 +1,15 @@
 import { useMemo, useState } from 'preact/hooks';
 import type { HeadingLevel, OutlineNode } from '../../shared/types.js';
-import { activeHeadingId } from '../hooks/useScrollSpy.js';
 import {
-  outlineLevelsSignal,
-  outlineMinLevelSignal,
-  outlineMaxLevelSignal,
-  setOutlineMinLevel,
-  setOutlineMaxLevel,
-  OUTLINE_LEVEL_MIN,
   OUTLINE_LEVEL_MAX,
+  OUTLINE_LEVEL_MIN,
+  outlineLevelsSignal,
+  outlineMaxLevelSignal,
+  outlineMinLevelSignal,
+  setOutlineMaxLevel,
+  setOutlineMinLevel,
 } from '../hooks/useOutlineLevels.js';
+import { activeHeadingId } from '../hooks/useScrollSpy.js';
 import { filterOutline } from '../lib/outline-filter.js';
 import { IconChevronRight, IconPanelRightClose } from './Icons.js';
 

@@ -1,9 +1,9 @@
 import { readFile } from 'node:fs/promises';
-import { walkFolder } from './tree.js';
-import { resolveSafePath } from './resolve.js';
 import { parseFrontmatter } from '../../render/frontmatter.js';
 import { compilePattern, type SearchOptions } from '../../shared/search-pattern.js';
 import { flattenMdRelPaths } from '../../shared/tree-utils.js';
+import { resolveSafePath } from './resolve.js';
+import { walkFolder } from './tree.js';
 
 export interface SearchHit {
   /** 1-indexed line number in the markdown body (after frontmatter strip). */

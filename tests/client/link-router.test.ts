@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { wireInternalLinks } from '../../src/client/lib/link-router.js';
 
 function setup(html: string): HTMLElement {

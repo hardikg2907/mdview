@@ -1,8 +1,8 @@
 import MarkdownIt from 'markdown-it';
 import anchor from 'markdown-it-anchor';
 import taskLists from 'markdown-it-task-lists';
-import { highlightCode } from './shiki.js';
 import { mathPlugin } from './math.js';
+import { highlightCode } from './shiki.js';
 
 export interface RenderResult {
   html: string;

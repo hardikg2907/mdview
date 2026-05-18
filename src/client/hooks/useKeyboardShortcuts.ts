@@ -1,14 +1,14 @@
 import { useEffect } from 'preact/hooks';
 import type { OutlineNode } from '../../shared/types.js';
-import { closeSearch, searchOpenSignal } from './useSearch.js';
-import { closeLightbox, lightboxSignal } from './useLightbox.js';
-import { closeShortcutsPanel, shortcutsPanelSignal } from './useShortcutsPanel.js';
-import { closePalette, paletteOpenSignal } from './useCommandPalette.js';
 import {
-  shortcuts,
   resetPendingSequences,
   type ShortcutContext,
+  shortcuts,
 } from '../shortcuts.js';
+import { closePalette, paletteOpenSignal } from './useCommandPalette.js';
+import { closeLightbox, lightboxSignal } from './useLightbox.js';
+import { closeSearch, searchOpenSignal } from './useSearch.js';
+import { closeShortcutsPanel, shortcutsPanelSignal } from './useShortcutsPanel.js';
 
 function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;

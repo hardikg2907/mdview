@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
+import type { RootInfo } from '../../shared/types.js';
 import { grepFiles } from '../fs/grep.js';
 import type { ConfigState } from '../index.js';
-import type { RootInfo } from '../../shared/types.js';
 
 const MAX_QUERY_LEN = 200;
 

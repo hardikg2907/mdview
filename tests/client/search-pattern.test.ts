@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { compilePattern, DEFAULT_OPTIONS } from '../../src/shared/search-pattern.js';
 
 describe('compilePattern', () => {

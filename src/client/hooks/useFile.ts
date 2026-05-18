@@ -1,5 +1,5 @@
-import { useEffect } from 'preact/hooks';
 import { signal } from '@preact/signals';
+import { useEffect } from 'preact/hooks';
 import type { RenderedFile } from '../../shared/types.js';
 
 export const fileSignal = signal<RenderedFile | null>(null);

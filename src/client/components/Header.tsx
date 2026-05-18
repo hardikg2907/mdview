@@ -1,9 +1,9 @@
-import { Breadcrumbs } from './Breadcrumbs.js';
-import { IconSun, IconMoon, IconKeyboard } from './Icons.js';
-import { ViewMenu } from './ViewMenu.js';
 import type { OutlineNode } from '../../shared/types.js';
-import { themeSignal, toggleTheme } from '../hooks/useTheme.js';
 import { openShortcutsPanel } from '../hooks/useShortcutsPanel.js';
+import { themeSignal, toggleTheme } from '../hooks/useTheme.js';
+import { Breadcrumbs } from './Breadcrumbs.js';
+import { IconKeyboard, IconMoon, IconSun } from './Icons.js';
+import { ViewMenu } from './ViewMenu.js';
 
 interface Props {
   outline: OutlineNode[];

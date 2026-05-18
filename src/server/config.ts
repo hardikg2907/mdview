@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { PALETTES, type ProjectConfig, type Palette, type FontFamily } from '../shared/types.js';
+import { type FontFamily, PALETTES, type Palette, type ProjectConfig } from '../shared/types.js';
 
 export const CONFIG_FILENAME = '.mdview.json';
 export const GLOBAL_CONFIG_FILENAME = 'config.json';
@@ -61,7 +61,7 @@ export function validateConfig(raw: unknown, source = CONFIG_FILENAME): ProjectC
     const w = raw.lineWidth;
     // Accept short strings only — passed straight to CSS, so reject anything
     // longer than 32 chars to limit the trust surface for inline style.
-    if (typeof w === 'string' && w.length > 0 && w.length <= 32 && /^[\w%.\-]+$/.test(w)) {
+    if (typeof w === 'string' && w.length > 0 && w.length <= 32 && /^[\w%.-]+$/.test(w)) {
       out.lineWidth = w;
     } else {
       console.warn(`[mdview] ${source}: ignoring invalid lineWidth: ${String(w)}`);

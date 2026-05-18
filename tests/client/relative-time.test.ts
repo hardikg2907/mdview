@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { formatRelativeTime } from '../../src/shared/relative-time.js';
 
 const NOW = new Date('2026-05-07T12:00:00Z').getTime();

@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, h } from 'preact';
+import { h, render } from 'preact';
 import { useRef } from 'preact/hooks';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAltWheelScroll } from '../../src/client/hooks/useAltWheelScroll.js';
 
 /** Flush preact's effect queue (which is scheduled via rAF + setTimeout). */

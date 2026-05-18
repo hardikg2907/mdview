@@ -1,47 +1,47 @@
 import { useEffect, useRef } from 'preact/hooks';
-import { setMainScroller } from './hooks/useScroller.js';
-import { useTheme } from './hooks/useTheme.js';
-import { usePalette } from './hooks/usePalette.js';
-import { useTree, treeSignal } from './hooks/useTree.js';
-import { fileSignal, fileLoading, fileError, loadFile } from './hooks/useFile.js';
-import { useScrollSpy, activeHeadingId, lockScrollSpy } from './hooks/useScrollSpy.js';
-import { useLiveReload } from './hooks/useLiveReload.js';
-import { usePathRouting } from './hooks/usePathRouting.js';
-import {
-  treeCollapsedSignal,
-  outlineCollapsedSignal,
-  treeWidthSignal,
-  outlineWidthSignal,
-  minimapSignal,
-  wideLayoutSignal,
-  toggleTreeCollapsed,
-  toggleOutlineCollapsed,
-  setTreeWidth,
-  setOutlineWidth,
-  resetTreeWidth,
-  resetOutlineWidth,
-  SIDEBAR_WIDTH_MIN,
-  SIDEBAR_WIDTH_MAX,
-  SIDEBAR_COLLAPSE_THRESHOLD,
-} from './hooks/useUiState.js';
-import { Resizer } from './components/Resizer.js';
-import { Minimap } from './components/Minimap.js';
-import { FolderTree } from './components/FolderTree.js';
-import { Content } from './components/Content.js';
-import { Outline } from './components/Outline.js';
-import { Header } from './components/Header.js';
-import { ReadingProgress } from './components/ReadingProgress.js';
-import { Lightbox } from './components/Lightbox.js';
-import { ShortcutsPanel } from './components/ShortcutsPanel.js';
-import { CommandPalette } from './components/CommandPalette.js';
-import { ContentSkeleton } from './components/ContentSkeleton.js';
-import { SearchBar } from './components/SearchBar.js';
-import { searchOpenSignal, closeSearch } from './hooks/useSearch.js';
-import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts.js';
-import { useAltWheelScroll } from './hooks/useAltWheelScroll.js';
-import { expandSectionContaining } from './lib/collapsible-sections.js';
-import { IconPanelLeftOpen, IconPanelRightOpen } from './components/Icons.js';
 import type { TreeNode } from '../shared/types.js';
+import { CommandPalette } from './components/CommandPalette.js';
+import { Content } from './components/Content.js';
+import { ContentSkeleton } from './components/ContentSkeleton.js';
+import { FolderTree } from './components/FolderTree.js';
+import { Header } from './components/Header.js';
+import { IconPanelLeftOpen, IconPanelRightOpen } from './components/Icons.js';
+import { Lightbox } from './components/Lightbox.js';
+import { Minimap } from './components/Minimap.js';
+import { Outline } from './components/Outline.js';
+import { ReadingProgress } from './components/ReadingProgress.js';
+import { Resizer } from './components/Resizer.js';
+import { SearchBar } from './components/SearchBar.js';
+import { ShortcutsPanel } from './components/ShortcutsPanel.js';
+import { useAltWheelScroll } from './hooks/useAltWheelScroll.js';
+import { fileError, fileLoading, fileSignal, loadFile } from './hooks/useFile.js';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts.js';
+import { useLiveReload } from './hooks/useLiveReload.js';
+import { usePalette } from './hooks/usePalette.js';
+import { usePathRouting } from './hooks/usePathRouting.js';
+import { setMainScroller } from './hooks/useScroller.js';
+import { activeHeadingId, lockScrollSpy, useScrollSpy } from './hooks/useScrollSpy.js';
+import { closeSearch, searchOpenSignal } from './hooks/useSearch.js';
+import { useTheme } from './hooks/useTheme.js';
+import { treeSignal, useTree } from './hooks/useTree.js';
+import {
+  minimapSignal,
+  outlineCollapsedSignal,
+  outlineWidthSignal,
+  resetOutlineWidth,
+  resetTreeWidth,
+  SIDEBAR_COLLAPSE_THRESHOLD,
+  SIDEBAR_WIDTH_MAX,
+  SIDEBAR_WIDTH_MIN,
+  setOutlineWidth,
+  setTreeWidth,
+  toggleOutlineCollapsed,
+  toggleTreeCollapsed,
+  treeCollapsedSignal,
+  treeWidthSignal,
+  wideLayoutSignal,
+} from './hooks/useUiState.js';
+import { expandSectionContaining } from './lib/collapsible-sections.js';
 
 function findFirstMd(nodes: TreeNode[]): string | null {
   for (const n of nodes) {

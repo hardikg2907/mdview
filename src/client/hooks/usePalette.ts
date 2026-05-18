@@ -1,8 +1,8 @@
-import { useEffect } from 'preact/hooks';
 import { signal } from '@preact/signals';
+import { useEffect } from 'preact/hooks';
+import { PALETTES, type Palette } from '../../shared/types.js';
 import { createPersistedString } from '../lib/persisted-signal.js';
 import { configSignal } from './useTree.js';
-import { PALETTES, type Palette } from '../../shared/types.js';
 
 const STORAGE_KEY = 'mdview-palette';
 
