@@ -19,6 +19,11 @@ export interface CreateWatcherOptions {
 
 export function createWatcher(rootAbsPath: string, opts: CreateWatcherOptions = {}): Watcher {
   const emitter = new EventEmitter();
+  // SSE clients each register one listener; the count is bounded by real
+  // browser tabs, not by Node's default warning threshold of 10. Without this,
+  // opening a few tabs (or a flaky reconnect loop) triggers
+  // MaxListenersExceededWarning and looks like a leak when it isn't.
+  emitter.setMaxListeners(0);
   const ignore = opts.ignore ?? DEFAULT_IGNORED_DIRS;
 
   const watcher: FSWatcher = chokidar.watch(rootAbsPath, {

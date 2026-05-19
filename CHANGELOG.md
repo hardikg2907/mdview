@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Live-reload SSE stops working after long sessions or many tab reloads.** A suspended browser tab or dropped network could leave the OS socket in a state where Node never fired `close`, so the per-connection listener on the watcher emitter was never removed. Every subsequent file save then fanned out into a dead pipe, and Node's default `MaxListenersExceededWarning` triggered at 10. The server process kept running (CLI still showed it up), but no new file change reached the browser and reloads appeared to hang. SSE writes now treat any failure as a hard disconnect and run a single cleanup path; the watcher emitter no longer caps its listener count at Node's default of 10.
+
 ## [0.6.1] — 2026-05-18
 
 ### Fixed
