@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Mermaid diagrams now follow the active theme.** They were locked to the light palette (`theme: 'default'`), so on dark mode the text and edges were rendered as dark ink on the dark page background and were unreadable. The loader now reads `themeSignal`, re-initializes mermaid with `dark` / `default` to match, and re-renders existing diagrams on theme toggle (clearing the per-block render guard).
+- **Mermaid syntax errors no longer dump a giant "Syntax error in text" diagram into the page.** On a bad diagram, mermaid's built-in fallback SVG (with the bomb-on-cream-background motif) could leak out of the block onto the page and break the layout when scrolling. Diagrams are now `parse`'d with `suppressErrors: true` first; failures render a compact `<pre class="mermaid-error">` inside the block, and any temp DOM nodes mermaid appended to `document.body` are cleaned up.
 - **Live-reload SSE stops working after long sessions or many tab reloads.** A suspended browser tab or dropped network could leave the OS socket in a state where Node never fired `close`, so the per-connection listener on the watcher emitter was never removed. Every subsequent file save then fanned out into a dead pipe, and Node's default `MaxListenersExceededWarning` triggered at 10. The server process kept running (CLI still showed it up), but no new file change reached the browser and reloads appeared to hang. SSE writes now treat any failure as a hard disconnect and run a single cleanup path; the watcher emitter no longer caps its listener count at Node's default of 10.
 
 ## [0.6.1] — 2026-05-18
