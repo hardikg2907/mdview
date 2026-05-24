@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import openBrowser from 'open';
 import { runConfigSubcommand } from './cli-config.js';
 import { createServer } from './server/index.js';
@@ -251,18 +251,23 @@ function formatError(err: unknown): { message: string; code: number } | null {
   return null;
 }
 
-main().catch((err) => {
-  const known = formatError(err);
-  if (known) {
-    console.error(known.message);
-    process.exit(known.code);
-  }
-  const message = err instanceof Error ? err.message : String(err);
-  console.error(`mdview: unexpected error: ${message}`);
-  if (process.env.MDVIEW_DEBUG === '1' && err instanceof Error && err.stack) {
-    console.error(err.stack);
-  } else {
-    console.error('(set MDVIEW_DEBUG=1 for full stack)');
-  }
-  process.exit(1);
-});
+// Only run when invoked as the entry point (e.g. via the bundled bin/mdview.mjs).
+// Guards against side effects when this module is imported by tests or other consumers.
+const isEntryPoint = import.meta.url === pathToFileURL(process.argv[1] ?? '').href;
+if (isEntryPoint) {
+  main().catch((err) => {
+    const known = formatError(err);
+    if (known) {
+      console.error(known.message);
+      process.exit(known.code);
+    }
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`mdview: unexpected error: ${message}`);
+    if (process.env.MDVIEW_DEBUG === '1' && err instanceof Error && err.stack) {
+      console.error(err.stack);
+    } else {
+      console.error('(set MDVIEW_DEBUG=1 for full stack)');
+    }
+    process.exit(1);
+  });
+}
