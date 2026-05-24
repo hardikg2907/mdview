@@ -11,27 +11,41 @@ beforeAll(() => {
   execSync('npm run build:server', { cwd: REPO_ROOT, stdio: 'inherit' });
 }, 60_000);
 
-function spawnCli(args: string[]): Promise<{ child: ChildProcess; firstLine: string; allStdout: string }> {
+function spawnCli(args: string[]): Promise<{ child: ChildProcess; firstLine: string }> {
   return new Promise((resolveResult, reject) => {
     const child = spawn(process.execPath, [BIN, ...args], { cwd: REPO_ROOT });
-    let buf = '';
+    let stdoutBuf = '';
+    let stderrBuf = '';
     let resolved = false;
+    const finalize = (err: Error) => {
+      if (resolved) return;
+      resolved = true;
+      child.kill();
+      reject(err);
+    };
     child.stdout.on('data', (chunk: Buffer) => {
-      buf += chunk.toString();
-      const nl = buf.indexOf('\n');
+      stdoutBuf += chunk.toString();
+      const nl = stdoutBuf.indexOf('\n');
       if (nl >= 0 && !resolved) {
         resolved = true;
-        resolveResult({ child, firstLine: buf.slice(0, nl), allStdout: buf });
+        resolveResult({ child, firstLine: stdoutBuf.slice(0, nl) });
       }
     });
-    child.on('error', reject);
-    setTimeout(() => { if (!resolved) reject(new Error('no stdout within 5s')); }, 5000);
+    child.stderr.on('data', (chunk: Buffer) => { stderrBuf += chunk.toString(); });
+    child.on('error', finalize);
+    // Surface non-zero exits with the real stderr so failures aren't silent timeouts.
+    child.on('exit', (code) => {
+      if (!resolved && code !== 0) {
+        finalize(new Error(`mdview exited with code ${code}: ${stderrBuf.trim() || '(no stderr)'}`));
+      }
+    });
+    setTimeout(() => finalize(new Error(`no stdout within 5s; stderr: ${stderrBuf.trim() || '(empty)'}`)), 5000);
   });
 }
 
 describe('--vscode embed mode: stdout', () => {
   it('emits a JSON ready line as the first stdout line', async () => {
-    const { child, firstLine } = await spawnCli(['--vscode', '--port', '0', FIXTURE_ROOT]);
+    const { child, firstLine } = await spawnCli(['--vscode', '--port', '0', '--no-open', FIXTURE_ROOT]);
     try {
       const parsed = JSON.parse(firstLine);
       expect(parsed.event).toBe('ready');
