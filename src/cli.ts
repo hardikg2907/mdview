@@ -6,7 +6,7 @@ import { runConfigSubcommand } from './cli-config.js';
 import { createServer } from './server/index.js';
 import type { RootInfo } from './shared/types.js';
 
-type ParseResult =
+export type ParseResult =
   | { kind: 'run'; args: Args }
   | { kind: 'help' }
   | { kind: 'version' };
@@ -34,7 +34,7 @@ Examples:
 `.trim());
 }
 
-interface Args {
+export interface Args {
   target: string;
   port: number;
   portExplicit: boolean;
@@ -59,7 +59,7 @@ function readVersion(): string {
   return 'unknown';
 }
 
-function parseArgs(argv: string[]): ParseResult {
+export function parseArgs(argv: string[]): ParseResult {
   const args: Args = { target: '.', port: 7331, portExplicit: false, open: true };
   let targetSet = false;
   for (let i = 0; i < argv.length; i++) {
@@ -71,7 +71,7 @@ function parseArgs(argv: string[]): ParseResult {
       const v = argv[++i];
       if (!v) throw new Error('--port requires a number');
       args.port = Number(v);
-      if (!Number.isInteger(args.port) || args.port <= 0) throw new Error('Invalid --port');
+      if (!Number.isInteger(args.port) || args.port < 0) throw new Error('Invalid --port');
       args.portExplicit = true;
       continue;
     }
@@ -124,10 +124,14 @@ async function listen(
   port: number,
   explicit: boolean,
 ): Promise<number> {
+  // Fastify assigns the actual port when 0 is passed; we read it from
+  // app.server.address() so callers see the real port for ready signals
+  // and URL construction.
   if (explicit) {
     try {
       await app.listen({ host: '127.0.0.1', port });
-      return port;
+      const addr = app.server.address();
+      return typeof addr === 'object' && addr !== null ? addr.port : port;
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code === 'EADDRINUSE') {
         throw new Error(
@@ -146,7 +150,8 @@ async function listen(
       if (attempt > 0) {
         console.log(`port ${port} in use, using ${tryPort} instead`);
       }
-      return tryPort;
+      const addr = app.server.address();
+      return typeof addr === 'object' && addr !== null ? addr.port : tryPort;
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code !== 'EADDRINUSE') throw err;
     }
