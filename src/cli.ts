@@ -39,6 +39,7 @@ export interface Args {
   port: number;
   portExplicit: boolean;
   open: boolean;
+  embedMode: boolean;
 }
 
 function readVersion(): string {
@@ -60,13 +61,14 @@ function readVersion(): string {
 }
 
 export function parseArgs(argv: string[]): ParseResult {
-  const args: Args = { target: '.', port: 7331, portExplicit: false, open: true };
+  const args: Args = { target: '.', port: 7331, portExplicit: false, open: true, embedMode: false };
   let targetSet = false;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]!;
     if (a === '-h' || a === '--help') return { kind: 'help' };
     if (a === '-v' || a === '--version') return { kind: 'version' };
     if (a === '--no-open') { args.open = false; continue; }
+    if (a === '--vscode') { args.embedMode = true; continue; }
     if (a === '--port') {
       const v = argv[++i];
       if (!v) throw new Error('--port requires a number');
@@ -200,8 +202,14 @@ async function main(): Promise<void> {
     rootInfo.rootKind === 'file'
       ? `http://127.0.0.1:${boundPort}/?file=${encodeURIComponent(rootInfo.rootRelPath)}`
       : `http://127.0.0.1:${boundPort}/`;
-  console.log(`mdview → ${url}`);
-  console.log(`watching: ${rootAbsPath}`);
+  if (args.embedMode) {
+    // Why: under --vscode the extension parses this JSON to discover the
+    // ephemeral port and ready state. Single-line, machine-parseable contract.
+    process.stdout.write(JSON.stringify({ event: 'ready', url, port: boundPort }) + '\n');
+  } else {
+    console.log(`mdview → ${url}`);
+    console.log(`watching: ${rootAbsPath}`);
+  }
 
   if (args.open) await openBrowser(url);
 
