@@ -22,6 +22,14 @@ Reading long markdown docs is hard:
 
 `mdview` is built for that. It's a single-machine, single-user, read-only viewer with editorial typography, persistent navigation, and live reload.
 
+## Install
+
+```bash
+npm install -g @hardikg/mdview
+```
+
+Requires Node >= 20. The `mdview` binary lands on your `PATH`.
+
 ## Install from source
 
 ```bash
@@ -50,16 +58,6 @@ Send them the `.tgz` (Slack/Drive/AirDrop). They install with:
 ```bash
 npm install -g ./mdview-0.6.0.tgz
 ```
-
-Or skip the tarball entirely:
-
-```bash
-npm install -g github:hardikg2907/mdview
-# or one-shot
-npx github:hardikg2907/mdview ./docs
-```
-
-The `prepare` script auto-builds on their machine if `bin/` is absent.
 
 ## Usage
 

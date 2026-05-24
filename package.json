@@ -1,5 +1,5 @@
 {
-  "name": "mdview",
+  "name": "@hardikg/mdview",
   "version": "0.6.2",
   "description": "Local CLI markdown viewer with live reload, outline navigation, and folder browsing",
   "license": "MIT",
