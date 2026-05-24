@@ -2,7 +2,7 @@ import { render } from 'preact';
 import { PALETTES, type Palette } from '../shared/types.js';
 import { App } from './App.js';
 import { setPalette } from './hooks/usePalette.js';
-import { setCurrentPath } from './hooks/usePathRouting.js';
+import { pushPath, setCurrentPath } from './hooks/usePathRouting.js';
 import { type IncomingMessage, isEmbedded, onIncoming, postToParent } from './lib/embed.js';
 import '@fontsource/jetbrains-mono/400.css';
 import '@fontsource/jetbrains-mono/600.css';
@@ -21,6 +21,15 @@ const KNOWN_INCOMING = new Set([
   'mdview/palette-changed',
 ]);
 
+// Defense-in-depth at the client boundary. The server's resolveSafePath is the
+// authoritative gate, but we also refuse obvious escape attempts here so a
+// malformed inbound never reaches the file loader.
+function isSafeRelPath(s: string): boolean {
+  if (s.length === 0) return false;
+  if (s.startsWith('/')) return false;
+  return !s.split('/').some((part) => part === '..');
+}
+
 function handleIncoming(msg: IncomingMessage): void {
   if (!KNOWN_INCOMING.has(msg.type)) return;
 
@@ -32,8 +41,13 @@ function handleIncoming(msg: IncomingMessage): void {
     }
     case 'mdview/set-file': {
       const relPath = msg.relPath;
-      if (typeof relPath === 'string' && relPath.length > 0) {
+      if (typeof relPath === 'string' && isSafeRelPath(relPath)) {
+        // Why: extension-driven file changes must also push the URL so a hard
+        // reload keeps the same file and so pushPath's ?embed=vscode
+        // preservation applies. Otherwise the SPA re-reads the URL on reload
+        // and loses the extension's chosen file.
         setCurrentPath(relPath);
+        pushPath(relPath);
       }
       break;
     }

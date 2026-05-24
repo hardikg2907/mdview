@@ -6,7 +6,7 @@ function readPathFromUrl(): string | null {
   return sp.get('file');
 }
 
-function pushPath(relPath: string, hash = ''): void {
+export function pushPath(relPath: string, hash = ''): void {
   // Why: the ?embed=vscode query must survive SPA-internal navigation so that a
   // hard reload (or any new history entry the extension intercepts) keeps the
   // page in embed mode. The extension contract requires this param to be

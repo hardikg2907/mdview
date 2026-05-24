@@ -77,8 +77,12 @@ export function onIncoming(h: (msg: IncomingMessage) => void): void {
 
   const listener = (e: MessageEvent): void => {
     if (parentOrigin === null) {
-      // Before handshake: only accept the init message.
+      // Before handshake: only accept an mdview/init message coming from the
+      // immediate parent window. The e.source check defends against a third
+      // party that races a postMessage into the iframe before VS Code does —
+      // without it the first arriver would permanently capture parentOrigin.
       if (
+        e.source === window.parent &&
         e.data !== null &&
         typeof e.data === 'object' &&
         (e.data as Record<string, unknown>).type === 'mdview/init'

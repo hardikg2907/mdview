@@ -10,8 +10,12 @@ import {
 // happy-dom provides window, window.parent, location, etc.
 // We augment / mock as needed per test.
 
-function dispatchMessage(data: unknown, origin = 'https://vscode-webview.net'): void {
-  const ev = new MessageEvent('message', { data, origin });
+function dispatchMessage(
+  data: unknown,
+  origin = 'https://vscode-webview.net',
+  source: Window | null = window.parent,
+): void {
+  const ev = new MessageEvent('message', { data, origin, source });
   window.dispatchEvent(ev);
 }
 
@@ -157,6 +161,52 @@ describe('onIncoming — handshake', () => {
     // Subsequent postToParent uses the captured origin
     postToParent({ type: 'mdview/ready' });
     expect(postMessageMock).toHaveBeenCalledWith({ type: 'mdview/ready' }, origin);
+  });
+
+  it('drops a pre-handshake mdview/init from a source other than window.parent', () => {
+    const received: IncomingMessage[] = [];
+    const postMessageMock = vi.fn();
+    const fakeParent = { postMessage: postMessageMock } as unknown as Window;
+    Object.defineProperty(window, 'parent', { value: fakeParent, configurable: true });
+
+    onIncoming((m) => received.push(m));
+    // A different window object posing as the parent — first arriver attack.
+    const imposter = { postMessage: vi.fn() } as unknown as Window;
+    dispatchMessage({ type: 'mdview/init', webviewPort: 7331 }, 'https://evil.com', imposter);
+
+    expect(received).toHaveLength(0);
+    // parentOrigin should still be null — confirm by buffering behavior.
+    postToParent({ type: 'mdview/ready' });
+    expect(postMessageMock).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// onIncoming — post-handshake one-shot invariant
+// ---------------------------------------------------------------------------
+describe('onIncoming — parentOrigin is one-shot', () => {
+  it('does not switch parentOrigin if a second mdview/init arrives from a different origin', () => {
+    const received: IncomingMessage[] = [];
+    const postMessageMock = vi.fn();
+    const fakeParent = { postMessage: postMessageMock } as unknown as Window;
+    Object.defineProperty(window, 'parent', { value: fakeParent, configurable: true });
+
+    onIncoming((m) => received.push(m));
+    const goodOrigin = 'https://vscode-webview.net';
+    const evilOrigin = 'https://evil.com';
+
+    dispatchMessage({ type: 'mdview/init', webviewPort: 7331 }, goodOrigin);
+    expect(received).toHaveLength(1);
+
+    // A second init from a different origin should be DROPPED (it would only
+    // be delivered to the handler if origin matched the captured one).
+    dispatchMessage({ type: 'mdview/init', webviewPort: 9999 }, evilOrigin);
+    expect(received).toHaveLength(1); // unchanged
+
+    // Outbound still goes to the original origin.
+    postMessageMock.mockClear();
+    postToParent({ type: 'mdview/ready' });
+    expect(postMessageMock).toHaveBeenCalledWith({ type: 'mdview/ready' }, goodOrigin);
   });
 });
 
