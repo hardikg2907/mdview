@@ -9,15 +9,15 @@ import type { RootInfo } from '../../src/shared/types.js';
 const REPO_ROOT = resolve(__dirname, '../../');
 const BIN = resolve(REPO_ROOT, 'bin/mdview.mjs');
 const FIXTURE_ROOT = resolve(REPO_ROOT, 'test-fixtures');
-// dist/client is produced by the full build; the beforeAll at the top of the
-// file already runs build:server. The client bundle (for CSP inject tests)
-// must exist — it is committed/built separately.
+// dist/client is built by the beforeAll below so CSP inject tests
+// (sendFile('index.html')) work on a fresh checkout.
 const CLIENT_DIR = resolve(REPO_ROOT, 'dist/client');
 
 beforeAll(() => {
-  // Build only the server entry to keep the test hermetic without paying for a full client build.
-  execSync('npm run build:server', { cwd: REPO_ROOT, stdio: 'inherit' });
-}, 60_000);
+  // Full build: server bin for the spawn-based stdout tests, client bundle for
+  // the inject-based CSP tests (sendFile('index.html') needs dist/client to exist).
+  execSync('npm run build', { cwd: REPO_ROOT, stdio: 'inherit' });
+}, 120_000);
 
 function spawnCli(args: string[]): Promise<{ child: ChildProcess; firstLine: string }> {
   return new Promise((resolveResult, reject) => {
