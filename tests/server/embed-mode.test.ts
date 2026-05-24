@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path, { resolve } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { parseArgs } from '../../src/cli.js';
 import { createServer } from '../../src/server/index.js';
 import type { RootInfo } from '../../src/shared/types.js';
 
@@ -51,9 +52,35 @@ function spawnCli(args: string[]): Promise<{ child: ChildProcess; firstLine: str
   });
 }
 
+describe('--vscode implies --no-open', () => {
+  it('parseArgs([--vscode, ./]) sets open === false', () => {
+    const result = parseArgs(['--vscode', './']);
+    if (result.kind !== 'run') throw new Error('expected run');
+    expect(result.args.open).toBe(false);
+  });
+
+  it('parseArgs([./]) sets open === true (default)', () => {
+    const result = parseArgs(['./']);
+    if (result.kind !== 'run') throw new Error('expected run');
+    expect(result.args.open).toBe(true);
+  });
+
+  it('parseArgs([--no-open, ./]) sets open === false', () => {
+    const result = parseArgs(['--no-open', './']);
+    if (result.kind !== 'run') throw new Error('expected run');
+    expect(result.args.open).toBe(false);
+  });
+
+  it('parseArgs([--vscode, --no-open, ./]) sets open === false (idempotent)', () => {
+    const result = parseArgs(['--vscode', '--no-open', './']);
+    if (result.kind !== 'run') throw new Error('expected run');
+    expect(result.args.open).toBe(false);
+  });
+});
+
 describe('--vscode embed mode: stdout', () => {
-  it('emits a JSON ready line as the first stdout line', async () => {
-    const { child, firstLine } = await spawnCli(['--vscode', '--port', '0', '--no-open', FIXTURE_ROOT]);
+  it('emits a JSON ready line as the first stdout line (no --no-open needed)', async () => {
+    const { child, firstLine } = await spawnCli(['--vscode', '--port', '0', FIXTURE_ROOT]);
     try {
       const parsed = JSON.parse(firstLine);
       expect(parsed.event).toBe('ready');

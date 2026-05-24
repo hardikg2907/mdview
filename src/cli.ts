@@ -95,6 +95,9 @@ export function parseArgs(argv: string[]): ParseResult {
     args.target = a;
     targetSet = true;
   }
+  // Why: --vscode means the extension owns the URL; the CLI must not also
+  // launch a browser tab. Implication makes the contract single-sourced.
+  if (args.embedMode) args.open = false;
   return { kind: 'run', args };
 }
 
