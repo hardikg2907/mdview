@@ -1,12 +1,12 @@
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import openBrowser from 'open';
 import { runConfigSubcommand } from './cli-config.js';
 import { createServer } from './server/index.js';
-import type { RootInfo } from './shared/types.js';
+import { PALETTES, type Palette, type RootInfo } from './shared/types.js';
 
-type ParseResult =
+export type ParseResult =
   | { kind: 'run'; args: Args }
   | { kind: 'help' }
   | { kind: 'version' };
@@ -22,6 +22,7 @@ Usage:
 Options:
   --port <n>               Port to listen on (default: 7331; auto-fallback)
   --no-open                Don't auto-launch the browser
+  --palette <name>         Override the palette for this run (one of: ${PALETTES.join(', ')})
   --version, -v            Print version and exit
   --help, -h               Show this help
 
@@ -34,11 +35,13 @@ Examples:
 `.trim());
 }
 
-interface Args {
+export interface Args {
   target: string;
   port: number;
   portExplicit: boolean;
   open: boolean;
+  embedMode: boolean;
+  palette?: Palette;
 }
 
 function readVersion(): string {
@@ -59,20 +62,32 @@ function readVersion(): string {
   return 'unknown';
 }
 
-function parseArgs(argv: string[]): ParseResult {
-  const args: Args = { target: '.', port: 7331, portExplicit: false, open: true };
+export function parseArgs(argv: string[]): ParseResult {
+  const args: Args = { target: '.', port: 7331, portExplicit: false, open: true, embedMode: false };
   let targetSet = false;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]!;
     if (a === '-h' || a === '--help') return { kind: 'help' };
     if (a === '-v' || a === '--version') return { kind: 'version' };
     if (a === '--no-open') { args.open = false; continue; }
+    if (a === '--vscode') { args.embedMode = true; continue; }
     if (a === '--port') {
       const v = argv[++i];
       if (!v) throw new Error('--port requires a number');
       args.port = Number(v);
-      if (!Number.isInteger(args.port) || args.port <= 0) throw new Error('Invalid --port');
+      if (!Number.isInteger(args.port) || args.port < 0) throw new Error('Invalid --port');
       args.portExplicit = true;
+      continue;
+    }
+    if (a === '--palette') {
+      const v = argv[++i];
+      if (!v) throw new Error('--palette requires a value');
+      // Why: --palette is user input fed straight into the API response. Lock
+      // it to the exhaustive allow-list — never accept free-form values.
+      if (!(PALETTES as readonly string[]).includes(v)) {
+        throw new Error(`Invalid --palette '${v}'. Valid: ${PALETTES.join(', ')}`);
+      }
+      args.palette = v as Palette;
       continue;
     }
     if (a.startsWith('-')) throw new Error(`Unknown flag: ${a}`);
@@ -80,6 +95,9 @@ function parseArgs(argv: string[]): ParseResult {
     args.target = a;
     targetSet = true;
   }
+  // Why: --vscode means the extension owns the URL; the CLI must not also
+  // launch a browser tab. Implication makes the contract single-sourced.
+  if (args.embedMode) args.open = false;
   return { kind: 'run', args };
 }
 
@@ -124,10 +142,14 @@ async function listen(
   port: number,
   explicit: boolean,
 ): Promise<number> {
+  // Fastify assigns the actual port when 0 is passed; we read it from
+  // app.server.address() so callers see the real port for ready signals
+  // and URL construction.
   if (explicit) {
     try {
       await app.listen({ host: '127.0.0.1', port });
-      return port;
+      const addr = app.server.address();
+      return typeof addr === 'object' && addr !== null ? addr.port : port;
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code === 'EADDRINUSE') {
         throw new Error(
@@ -146,7 +168,8 @@ async function listen(
       if (attempt > 0) {
         console.log(`port ${port} in use, using ${tryPort} instead`);
       }
-      return tryPort;
+      const addr = app.server.address();
+      return typeof addr === 'object' && addr !== null ? addr.port : tryPort;
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code !== 'EADDRINUSE') throw err;
     }
@@ -188,15 +211,21 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  const app = await createServer({ rootAbsPath, rootInfo, clientDir });
+  const app = await createServer({ rootAbsPath, rootInfo, clientDir, paletteOverride: args.palette, embedMode: args.embedMode });
   const boundPort = await listen(app, args.port, args.portExplicit);
 
   const url =
     rootInfo.rootKind === 'file'
       ? `http://127.0.0.1:${boundPort}/?file=${encodeURIComponent(rootInfo.rootRelPath)}`
       : `http://127.0.0.1:${boundPort}/`;
-  console.log(`mdview → ${url}`);
-  console.log(`watching: ${rootAbsPath}`);
+  if (args.embedMode) {
+    // Why: under --vscode the extension parses this JSON to discover the
+    // ephemeral port and ready state. Single-line, machine-parseable contract.
+    process.stdout.write(JSON.stringify({ event: 'ready', url, port: boundPort }) + '\n');
+  } else {
+    console.log(`mdview → ${url}`);
+    console.log(`watching: ${rootAbsPath}`);
+  }
 
   if (args.open) await openBrowser(url);
 
@@ -221,6 +250,18 @@ async function main(): Promise<void> {
   // Ctrl+C (SIGINT) is the supported way to stop the server on Windows.
   process.on('SIGTERM', shutdown);
   if (process.platform !== 'win32') process.on('SIGHUP', shutdown);
+
+  if (args.embedMode) {
+    // Why: under --vscode the extension owns this child's stdin pipe. If the
+    // extension host crashes the pipe closes (EOF). Shut down cleanly instead
+    // of orphaning. Browser-mode invocations leave stdin attached to a terminal
+    // and must not touch it. .resume() is necessary because Node otherwise
+    // keeps stdin paused and `end`/`error` may not fire until something tries
+    // to read.
+    process.stdin.on('end', () => { void shutdown(); });
+    process.stdin.on('error', () => { void shutdown(); });
+    process.stdin.resume();
+  }
 }
 
 function formatError(err: unknown): { message: string; code: number } | null {
@@ -246,18 +287,33 @@ function formatError(err: unknown): { message: string; code: number } | null {
   return null;
 }
 
-main().catch((err) => {
-  const known = formatError(err);
-  if (known) {
-    console.error(known.message);
-    process.exit(known.code);
+// Only run when invoked as the entry point (e.g. via the bundled bin/mdview.mjs).
+// Guards against side effects when this module is imported by tests or other consumers.
+// realpathSync resolves the symlink npm install -g creates in /usr/local/bin, so a
+// globally-installed mdview still passes the entry-point check.
+const isEntryPoint = ((): boolean => {
+  const argv1 = process.argv[1];
+  if (!argv1) return false;
+  try {
+    return realpathSync(fileURLToPath(import.meta.url)) === realpathSync(argv1);
+  } catch {
+    return false;
   }
-  const message = err instanceof Error ? err.message : String(err);
-  console.error(`mdview: unexpected error: ${message}`);
-  if (process.env.MDVIEW_DEBUG === '1' && err instanceof Error && err.stack) {
-    console.error(err.stack);
-  } else {
-    console.error('(set MDVIEW_DEBUG=1 for full stack)');
-  }
-  process.exit(1);
-});
+})();
+if (isEntryPoint) {
+  main().catch((err) => {
+    const known = formatError(err);
+    if (known) {
+      console.error(known.message);
+      process.exit(known.code);
+    }
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`mdview: unexpected error: ${message}`);
+    if (process.env.MDVIEW_DEBUG === '1' && err instanceof Error && err.stack) {
+      console.error(err.stack);
+    } else {
+      console.error('(set MDVIEW_DEBUG=1 for full stack)');
+    }
+    process.exit(1);
+  });
+}

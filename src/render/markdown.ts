@@ -29,9 +29,17 @@ md.use(anchor, {
 md.use(taskLists, { enabled: false, label: false });
 md.use(mathPlugin);
 
-export async function renderMarkdown(source: string): Promise<RenderResult> {
+export async function renderMarkdown(
+  source: string,
+  bodyStartLine = 0,
+): Promise<RenderResult> {
   const tokens = md.parse(source, {});
   for (const token of tokens) {
+    // Tag headings with their FILE line (0-based) so the editor↔preview sync
+    // can map a DOM heading back to the source cursor position.
+    if (token.type === 'heading_open' && token.map) {
+      token.attrSet('data-source-line', String(token.map[0] + bodyStartLine));
+    }
     if (token.type === 'fence') {
       const lang = token.info.trim().split(/\s+/)[0] || 'text';
       if (lang === 'mermaid') {
