@@ -1,6 +1,6 @@
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import openBrowser from 'open';
 import { runConfigSubcommand } from './cli-config.js';
 import { createServer } from './server/index.js';
@@ -274,7 +274,17 @@ function formatError(err: unknown): { message: string; code: number } | null {
 
 // Only run when invoked as the entry point (e.g. via the bundled bin/mdview.mjs).
 // Guards against side effects when this module is imported by tests or other consumers.
-const isEntryPoint = import.meta.url === pathToFileURL(process.argv[1] ?? '').href;
+// realpathSync resolves the symlink npm install -g creates in /usr/local/bin, so a
+// globally-installed mdview still passes the entry-point check.
+const isEntryPoint = ((): boolean => {
+  const argv1 = process.argv[1];
+  if (!argv1) return false;
+  try {
+    return realpathSync(fileURLToPath(import.meta.url)) === realpathSync(argv1);
+  } catch {
+    return false;
+  }
+})();
 if (isEntryPoint) {
   main().catch((err) => {
     const known = formatError(err);
