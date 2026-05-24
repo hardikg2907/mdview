@@ -1,10 +1,18 @@
 import { type ChildProcess, execSync, spawn } from 'node:child_process';
-import { resolve } from 'node:path';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path, { resolve } from 'node:path';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { createServer } from '../../src/server/index.js';
+import type { RootInfo } from '../../src/shared/types.js';
 
 const REPO_ROOT = resolve(__dirname, '../../');
 const BIN = resolve(REPO_ROOT, 'bin/mdview.mjs');
 const FIXTURE_ROOT = resolve(REPO_ROOT, 'test-fixtures');
+// dist/client is produced by the full build; the beforeAll at the top of the
+// file already runs build:server. The client bundle (for CSP inject tests)
+// must exist — it is committed/built separately.
+const CLIENT_DIR = resolve(REPO_ROOT, 'dist/client');
 
 beforeAll(() => {
   // Build only the server entry to keep the test hermetic without paying for a full client build.
@@ -67,6 +75,109 @@ describe('--vscode embed mode: stdout', () => {
       expect(() => JSON.parse(firstLine)).toThrow();
     } finally {
       child.kill();
+    }
+  });
+});
+
+// The directives that must be byte-for-byte identical in both branches.
+// Only frame-ancestors is allowed to differ between embed and non-embed mode.
+const SHARED_DIRECTIVES = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob:",
+  "font-src 'self' data:",
+  "connect-src 'self'",
+  "base-uri 'none'",
+  "form-action 'none'",
+] as const;
+
+describe('--vscode embed mode: CSP', () => {
+  let tmpRoot: string;
+  const rootInfo: RootInfo = { rootKind: 'dir', rootRelPath: '', rootName: 'tmp' };
+
+  beforeAll(() => {
+    tmpRoot = mkdtempSync(path.join(tmpdir(), 'mdview-csp-'));
+    writeFileSync(path.join(tmpRoot, 'README.md'), '# Test\n');
+  });
+
+  afterAll(() => {
+    if (tmpRoot) rmSync(tmpRoot, { recursive: true, force: true });
+  });
+
+  it('embed mode: frame-ancestors is * (not "none")', async () => {
+    const app = await createServer({
+      rootAbsPath: tmpRoot,
+      rootInfo,
+      clientDir: CLIENT_DIR,
+      embedMode: true,
+    });
+    try {
+      const res = await app.inject({ method: 'GET', url: '/' });
+      expect(res.statusCode).toBe(200);
+      const csp = res.headers['content-security-policy'] as string;
+      expect(csp).toContain("frame-ancestors *");
+      expect(csp).not.toContain("frame-ancestors 'none'");
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('default (no embed): frame-ancestors is "none" (not *)', async () => {
+    const app = await createServer({
+      rootAbsPath: tmpRoot,
+      rootInfo,
+      clientDir: CLIENT_DIR,
+      embedMode: false,
+    });
+    try {
+      const res = await app.inject({ method: 'GET', url: '/' });
+      expect(res.statusCode).toBe(200);
+      const csp = res.headers['content-security-policy'] as string;
+      expect(csp).toContain("frame-ancestors 'none'");
+      expect(csp).not.toContain("frame-ancestors *");
+    } finally {
+      await app.close();
+    }
+  });
+
+  it('regression: all non-frame-ancestors directives are identical in both modes', async () => {
+    const embedApp = await createServer({
+      rootAbsPath: tmpRoot,
+      rootInfo,
+      clientDir: CLIENT_DIR,
+      embedMode: true,
+    });
+    const defaultApp = await createServer({
+      rootAbsPath: tmpRoot,
+      rootInfo,
+      clientDir: CLIENT_DIR,
+      embedMode: false,
+    });
+    try {
+      const embedRes = await embedApp.inject({ method: 'GET', url: '/' });
+      const defaultRes = await defaultApp.inject({ method: 'GET', url: '/' });
+      const embedCsp = embedRes.headers['content-security-policy'] as string;
+      const defaultCsp = defaultRes.headers['content-security-policy'] as string;
+
+      // Verify that every shared directive is present in both CSP strings.
+      for (const directive of SHARED_DIRECTIVES) {
+        expect(embedCsp, `embed CSP missing: ${directive}`).toContain(directive);
+        expect(defaultCsp, `default CSP missing: ${directive}`).toContain(directive);
+      }
+
+      // The only difference between the two must be in frame-ancestors.
+      const normalise = (csp: string) =>
+        csp
+          .split(';')
+          .map((d) => d.trim())
+          .filter((d) => !d.startsWith('frame-ancestors'))
+          .sort()
+          .join('; ');
+
+      expect(normalise(embedCsp)).toBe(normalise(defaultCsp));
+    } finally {
+      await Promise.all([embedApp.close(), defaultApp.close()]);
     }
   });
 });

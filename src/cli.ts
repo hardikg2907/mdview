@@ -208,7 +208,7 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  const app = await createServer({ rootAbsPath, rootInfo, clientDir, paletteOverride: args.palette });
+  const app = await createServer({ rootAbsPath, rootInfo, clientDir, paletteOverride: args.palette, embedMode: args.embedMode });
   const boundPort = await listen(app, args.port, args.portExplicit);
 
   const url =

@@ -21,6 +21,12 @@ export interface ServerOptions {
    * time so `.mdview.json` on disk is never modified.
    */
   paletteOverride?: Palette;
+  /**
+   * When true, the server is running inside a VS Code webview iframe (spawned
+   * via --vscode). Relaxes frame-ancestors to '*' — see the comment at the
+   * CSP assembly site below for the full security argument.
+   */
+  embedMode?: boolean;
 }
 
 export interface ConfigState {
@@ -31,22 +37,33 @@ export interface ConfigState {
   paletteOverride?: Palette;
 }
 
-const CSP_HTML = [
-  "default-src 'self'",
-  "script-src 'self'",
-  // KaTeX + mermaid inject inline styles into rendered output; the rest of
-  // the policy is strict.
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
-  "font-src 'self' data:",
-  "connect-src 'self'",
-  "frame-ancestors 'none'",
-  "base-uri 'none'",
-  "form-action 'none'",
-].join('; ');
+// Why: under --vscode the page is loaded inside a VS Code webview iframe.
+// VS Code's webview origin varies (desktop / web / Codespaces); enumerating
+// them is brittle. Loopback bind (127.0.0.1) is the real network boundary;
+// frame-ancestors is defense-in-depth. The relaxation is gated by an explicit
+// flag, so default browser users keep `frame-ancestors 'none'`. This is a
+// deliberate, audited exception to CLAUDE.md §3.1; the constant has two values
+// for that reason. See docs/superpowers/specs/2026-05-24-vscode-extension-design.md §18.1.
+function buildCspHtml(embedMode: boolean): string {
+  const frameAncestors = embedMode ? '*' : "'none'";
+  return [
+    "default-src 'self'",
+    "script-src 'self'",
+    // KaTeX + mermaid inject inline styles into rendered output; the rest of
+    // the policy is strict.
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob:",
+    "font-src 'self' data:",
+    "connect-src 'self'",
+    `frame-ancestors ${frameAncestors}`,
+    "base-uri 'none'",
+    "form-action 'none'",
+  ].join('; ');
+}
 
 export async function createServer(opts: ServerOptions): Promise<FastifyInstance> {
   const app = Fastify({ logger: false });
+  const cspHtml = buildCspHtml(opts.embedMode ?? false);
 
   // Threat model: a user opens an untrusted .md file. markdown-it is configured
   // with html: true so raw <script> in source would otherwise execute and could
@@ -56,7 +73,7 @@ export async function createServer(opts: ServerOptions): Promise<FastifyInstance
   app.addHook('onSend', async (_req, reply, payload) => {
     const ct = String(reply.getHeader('content-type') ?? '');
     if (ct.startsWith('text/html')) {
-      reply.header('content-security-policy', CSP_HTML);
+      reply.header('content-security-policy', cspHtml);
       reply.header('x-content-type-options', 'nosniff');
       reply.header('referrer-policy', 'no-referrer');
     }
