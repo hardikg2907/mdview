@@ -250,6 +250,18 @@ async function main(): Promise<void> {
   // Ctrl+C (SIGINT) is the supported way to stop the server on Windows.
   process.on('SIGTERM', shutdown);
   if (process.platform !== 'win32') process.on('SIGHUP', shutdown);
+
+  if (args.embedMode) {
+    // Why: under --vscode the extension owns this child's stdin pipe. If the
+    // extension host crashes the pipe closes (EOF). Shut down cleanly instead
+    // of orphaning. Browser-mode invocations leave stdin attached to a terminal
+    // and must not touch it. .resume() is necessary because Node otherwise
+    // keeps stdin paused and `end`/`error` may not fire until something tries
+    // to read.
+    process.stdin.on('end', () => { void shutdown(); });
+    process.stdin.on('error', () => { void shutdown(); });
+    process.stdin.resume();
+  }
 }
 
 function formatError(err: unknown): { message: string; code: number } | null {

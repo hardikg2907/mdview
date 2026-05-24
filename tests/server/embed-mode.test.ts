@@ -106,6 +106,29 @@ describe('--vscode embed mode: stdout', () => {
   });
 });
 
+describe('--vscode: stdin EOF shutdown', () => {
+  it('closes cleanly when stdin pipe is closed (exit code 0 within 3s)', async () => {
+    const { child } = await spawnCli(['--vscode', '--port', '0', FIXTURE_ROOT]);
+    try {
+      const exitCode = await new Promise<number | null>((resolve, reject) => {
+        const timer = setTimeout(
+          () => reject(new Error('CLI did not exit within 3s after stdin.end()')),
+          3000,
+        );
+        child.on('exit', (code) => {
+          clearTimeout(timer);
+          resolve(code);
+        });
+        child.stdin!.end();
+      });
+      expect(exitCode).toBe(0);
+    } finally {
+      // Safety: kill if the promise somehow resolved but the child is still running.
+      try { child.kill(); } catch { /* already gone */ }
+    }
+  });
+});
+
 // The directives that must be byte-for-byte identical in both branches.
 // Only frame-ancestors is allowed to differ between embed and non-embed mode.
 const SHARED_DIRECTIVES = [
