@@ -7,7 +7,15 @@ function readPathFromUrl(): string | null {
 }
 
 function pushPath(relPath: string, hash = ''): void {
-  const url = `?file=${encodeURIComponent(relPath)}${hash}`;
+  // Why: the ?embed=vscode query must survive SPA-internal navigation so that a
+  // hard reload (or any new history entry the extension intercepts) keeps the
+  // page in embed mode. The extension contract requires this param to be
+  // present whenever the SPA is running inside the VS Code webview.
+  const current = new URLSearchParams(window.location.search);
+  const embed = current.get('embed');
+  const params = new URLSearchParams({ file: relPath });
+  if (embed !== null) params.set('embed', embed);
+  const url = `?${params.toString()}${hash}`;
   history.pushState({ file: relPath }, '', url);
 }
 

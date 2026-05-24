@@ -42,6 +42,7 @@ import {
   wideLayoutSignal,
 } from './hooks/useUiState.js';
 import { expandSectionContaining } from './lib/collapsible-sections.js';
+import { isEmbedded, postToParent } from './lib/embed.js';
 
 function findFirstMd(nodes: TreeNode[]): string | null {
   for (const n of nodes) {
@@ -59,6 +60,9 @@ export function App() {
   usePalette();
   const tree = useTree();
   const { currentPath, setCurrentPath, navigate } = usePathRouting();
+  // Why: in embed mode (VS Code webview) the extension's Explorer pane
+  // provides file navigation; showing our own tree would be redundant.
+  const embedMode = isEmbedded();
   const mainRef = useRef<HTMLElement | null>(null);
 
   const treeCollapsed = treeCollapsedSignal.value;
@@ -134,6 +138,14 @@ export function App() {
 
   const handleSelect = (relPath: string) => navigate(relPath);
   const handleInternalNav = (relPath: string, hash: string) => {
+    if (embedMode && relPath) {
+      // Why: in embed mode, internal-link clicks are routed to the extension
+      // (which opens the file in a VS Code editor tab) instead of navigating
+      // within the SPA. Anchor-only links (#heading) still scroll within the
+      // preview because they have an empty relPath.
+      postToParent({ type: 'mdview/internal-link-clicked', relPath, fromFile: currentPath ?? '' });
+      return;
+    }
     navigate(relPath, hash);
     if (hash) {
       const id = hash.slice(1);
@@ -147,7 +159,20 @@ export function App() {
     history.replaceState(history.state, '', `#${id}`);
     lockScrollSpy(id);
     expandSectionContaining(id);
-    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+    const el = document.getElementById(id);
+    el?.scrollIntoView({ behavior: 'smooth' });
+    if (embedMode && el) {
+      // Why: in embed mode, heading clicks are also relayed to the extension so
+      // it can move the VS Code editor cursor to the corresponding line.
+      // We read `data-source-line` from the rendered heading element (added in
+      // commit d8708d6) rather than the outline node, because OutlineNode has
+      // no `line` field and the DOM is the authoritative source for that value.
+      const rawLine = el.getAttribute('data-source-line');
+      const line = rawLine !== null ? parseInt(rawLine, 10) : null;
+      if (line !== null && !Number.isNaN(line)) {
+        postToParent({ type: 'mdview/heading-clicked', line, file: currentPath ?? '' });
+      }
+    }
   };
   const handleJumpHeading = (id: string | null) => {
     if (id === null) {
@@ -184,30 +209,32 @@ export function App() {
 
   return (
     <div class={shellClasses} style={shellStyle}>
-      <aside class="pane-tree" aria-label="File tree">
-        {treeCollapsed ? (
-          <button
-            class="rail-btn"
-            aria-label="Expand file tree"
-            title="Expand file tree"
-            onClick={toggleTreeCollapsed}
-          >
-            <IconPanelLeftOpen size={15} />
-            <span class="rail-label">FILES</span>
-          </button>
-        ) : (
-          treeData && (
-            <FolderTree
-              tree={treeData.tree}
-              currentPath={currentPath}
-              onSelect={handleSelect}
-              onCollapse={toggleTreeCollapsed}
-            />
-          )
-        )}
-      </aside>
+      {!embedMode && (
+        <aside class="pane-tree" aria-label="File tree">
+          {treeCollapsed ? (
+            <button
+              class="rail-btn"
+              aria-label="Expand file tree"
+              title="Expand file tree"
+              onClick={toggleTreeCollapsed}
+            >
+              <IconPanelLeftOpen size={15} />
+              <span class="rail-label">FILES</span>
+            </button>
+          ) : (
+            treeData && (
+              <FolderTree
+                tree={treeData.tree}
+                currentPath={currentPath}
+                onSelect={handleSelect}
+                onCollapse={toggleTreeCollapsed}
+              />
+            )
+          )}
+        </aside>
+      )}
 
-      {!treeCollapsed && (
+      {!embedMode && !treeCollapsed && (
         <Resizer
           side="left"
           ariaLabel="Resize file tree"
