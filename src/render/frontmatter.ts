@@ -17,8 +17,10 @@ export function parseFrontmatter(raw: string): FrontmatterResult {
   }
   try {
     const parsed = matter(raw);
-    const body = parsed.content.replace(/^\n+/, '');
-    const bodyStartLine = computeBodyStartLine(raw, body);
+    // CRLF-safe strip so the body and the bodyStartLine offset stay aligned for
+    // both LF- and CRLF-authored sources.
+    const body = parsed.content.replace(/^(?:\r?\n)+/, '');
+    const bodyStartLine = computeBodyStartLine(raw);
     return {
       data: parsed.data ?? null,
       body,
@@ -29,21 +31,24 @@ export function parseFrontmatter(raw: string): FrontmatterResult {
   }
 }
 
-function computeBodyStartLine(raw: string, body: string): number {
-  if (body.length === 0) {
-    return countNewlines(raw);
+// Computed directly from `raw` so it does not depend on gray-matter's internal
+// byte representation (avoids string-equality coincidences and CRLF normalization
+// surprises). Locates the closing '---' delimiter and skips any blank lines we
+// remove from `body` above, so file-line and body-line stay consistent.
+function computeBodyStartLine(raw: string): number {
+  const lines = raw.split(/\r?\n/);
+  if (lines[0] !== '---') return 0;
+  let closingIdx = -1;
+  for (let i = 1; i < lines.length; i++) {
+    if (lines[i] === '---') {
+      closingIdx = i;
+      break;
+    }
   }
-  const idx = raw.lastIndexOf(body);
-  if (idx < 0) {
-    return 0;
+  if (closingIdx < 0) return 0;
+  let bodyLine = closingIdx + 1;
+  while (bodyLine < lines.length && lines[bodyLine] === '') {
+    bodyLine++;
   }
-  return countNewlines(raw.slice(0, idx));
-}
-
-function countNewlines(s: string): number {
-  let count = 0;
-  for (let i = 0; i < s.length; i++) {
-    if (s.charCodeAt(i) === 10) count++;
-  }
-  return count;
+  return bodyLine;
 }

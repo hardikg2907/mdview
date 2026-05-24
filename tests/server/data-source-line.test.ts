@@ -50,4 +50,20 @@ describe('renderMarkdown — data-source-line', () => {
       { tag: 'h6', line: '5' },
     ]);
   });
+
+  it('handles CRLF-authored source (Windows line endings) correctly', async () => {
+    const source = '---\r\ntitle: x\r\n---\r\n\r\n# H1\r\n';
+    const { body, bodyStartLine } = parseFrontmatter(source);
+    expect(bodyStartLine).toBe(4);
+    const { html } = await renderMarkdown(body, bodyStartLine);
+    expect(html).toMatch(/<h1\b[^>]*\bdata-source-line="4"/);
+  });
+
+  it('handles multiple blank lines between closing --- and the first heading', async () => {
+    const source = '---\ntitle: x\n---\n\n\n\n# H1\n';
+    const { body, bodyStartLine } = parseFrontmatter(source);
+    expect(bodyStartLine).toBe(6);
+    const { html } = await renderMarkdown(body, bodyStartLine);
+    expect(html).toMatch(/<h1\b[^>]*\bdata-source-line="6"/);
+  });
 });
