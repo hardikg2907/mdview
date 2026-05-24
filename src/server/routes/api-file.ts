@@ -55,8 +55,8 @@ export function registerApiFile(
       return reply.code(404).send({ error: 'File not found' });
     }
 
-    const { data, body } = parseFrontmatter(raw);
-    const { html: rawHtml, tokens } = await renderMarkdown(body);
+    const { data, body, bodyStartLine } = parseFrontmatter(raw);
+    const { html: rawHtml, tokens } = await renderMarkdown(body, bodyStartLine);
     const html = rewriteImageSrc(tagInternalLinks(rawHtml, relPath), relPath);
     const outline = extractOutline(tokens);
     const title =
