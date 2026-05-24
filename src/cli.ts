@@ -4,7 +4,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import openBrowser from 'open';
 import { runConfigSubcommand } from './cli-config.js';
 import { createServer } from './server/index.js';
-import type { RootInfo } from './shared/types.js';
+import { PALETTES, type Palette, type RootInfo } from './shared/types.js';
 
 export type ParseResult =
   | { kind: 'run'; args: Args }
@@ -22,6 +22,7 @@ Usage:
 Options:
   --port <n>               Port to listen on (default: 7331; auto-fallback)
   --no-open                Don't auto-launch the browser
+  --palette <name>         Override the palette for this run (one of: ${PALETTES.join(', ')})
   --version, -v            Print version and exit
   --help, -h               Show this help
 
@@ -40,6 +41,7 @@ export interface Args {
   portExplicit: boolean;
   open: boolean;
   embedMode: boolean;
+  palette?: Palette;
 }
 
 function readVersion(): string {
@@ -75,6 +77,17 @@ export function parseArgs(argv: string[]): ParseResult {
       args.port = Number(v);
       if (!Number.isInteger(args.port) || args.port < 0) throw new Error('Invalid --port');
       args.portExplicit = true;
+      continue;
+    }
+    if (a === '--palette') {
+      const v = argv[++i];
+      if (!v) throw new Error('--palette requires a value');
+      // Why: --palette is user input fed straight into the API response. Lock
+      // it to the exhaustive allow-list — never accept free-form values.
+      if (!(PALETTES as readonly string[]).includes(v)) {
+        throw new Error(`Invalid --palette '${v}'. Valid: ${PALETTES.join(', ')}`);
+      }
+      args.palette = v as Palette;
       continue;
     }
     if (a.startsWith('-')) throw new Error(`Unknown flag: ${a}`);
@@ -195,7 +208,7 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  const app = await createServer({ rootAbsPath, rootInfo, clientDir });
+  const app = await createServer({ rootAbsPath, rootInfo, clientDir, paletteOverride: args.palette });
   const boundPort = await listen(app, args.port, args.portExplicit);
 
   const url =
