@@ -7,3 +7,7 @@ bin/*.map
 .vscode
 .idea
 mdview-*.tgz
+apps/vscode/node_modules
+apps/vscode/dist
+apps/vscode/*.vsix
+apps/vscode/.vscode-test
