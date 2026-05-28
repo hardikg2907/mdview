@@ -3,6 +3,7 @@ import * as crypto from 'node:crypto';
 import { buildHostHtml, WEBVIEW_PORT } from './host.html';
 import { Dispatcher } from '../messages/dispatcher';
 import type { KnownIncomingMessage, OutgoingMessage } from '../messages/types';
+import { log } from '../output';
 
 const VIEW_TYPE = 'mdview.preview';
 
@@ -118,8 +119,9 @@ export class PreviewPanel {
     for (const handler of this.spaHandlers) {
       try {
         handler(msg);
-      } catch {
-        // Individual handler errors must not interrupt other handlers.
+      } catch (err) {
+        const detail = err instanceof Error ? err.stack ?? err.message : String(err);
+        log(`SPA message handler for ${msg.type} threw: ${detail}`);
       }
     }
   }

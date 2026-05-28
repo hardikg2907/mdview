@@ -1,3 +1,4 @@
+import { log } from '../output';
 import { validateIncoming } from './validate';
 import type { KnownIncomingMessage } from './types';
 
@@ -11,8 +12,8 @@ type HandlerMap = {
  * Routes validated incoming messages to registered handlers.
  *
  * Invalid or unknown messages are dropped silently. Missing handlers for
- * valid messages are also silently ignored. This class never throws on
- * bad input.
+ * valid messages are also silently ignored. Handler exceptions are caught,
+ * logged, and never propagated through the message boundary.
  */
 export class Dispatcher {
   constructor(private readonly handlers: HandlerMap) {}
@@ -28,8 +29,9 @@ export class Dispatcher {
 
     try {
       handler(msg);
-    } catch {
-      // Handlers must not propagate exceptions through the message boundary.
+    } catch (err) {
+      const detail = err instanceof Error ? err.stack ?? err.message : String(err);
+      log(`message handler for ${msg.type} threw: ${detail}`);
     }
   }
 }

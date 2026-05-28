@@ -8,9 +8,7 @@ const MAX_REL_PATH = 512;
 const MAX_LINE = 1_000_000;
 const MAX_ERROR_MSG = 4096;
 
-// Control characters U+0000–U+001F, excluding none intentionally.
-// \x00 (NUL) is covered by the range.
-const CONTROL_CHAR_RE = /[\x00-\x1f]/;
+const CONTROL_CHAR_RE = /[\x00-\x1f\x7f]/;
 const DOT_DOT_RE = /(?:^|[/\\])\.\.(?:[/\\]|$)/;
 
 /**
@@ -50,8 +48,8 @@ export function validateLine(v: unknown): number | null {
  */
 export function validateErrorMessage(v: unknown): string | null {
   if (typeof v !== 'string') return null;
-  // Strip control characters (preserve tab/LF/CR which are harmless in logs).
-  const stripped = v.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, '');
+  // Preserve tab/LF/CR — they read sensibly in logs; strip everything else.
+  const stripped = v.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, '');
   // Cap at MAX_ERROR_MSG before further use; log callers should cap to 1 KiB.
   return stripped.slice(0, MAX_ERROR_MSG);
 }
