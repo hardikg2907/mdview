@@ -212,10 +212,58 @@ node bin/mdview.mjs ./test-fixtures/showcase.md --no-open
 - `Ctrl+C` once → graceful shutdown ("mdview: shutting down…", clean exit). `Ctrl+C` twice → force-exit (130).
 - Set `MDVIEW_DEBUG=1` and trigger an error → full stack trace printed.
 
+### 28. `--palette` flag
+- `mdview --palette nord ./test-fixtures` → page renders in the `nord` palette regardless of what `.mdview.json` configures. The on-disk config file is **not** modified.
+- `mdview --palette banana ./test-fixtures` → exits with `Invalid --palette 'banana'. Valid: classic, paper, nord, solarized, high-contrast`, exit code non-zero.
+- Without `--palette` → existing behavior (whatever `.mdview.json` or global config says).
+
+### 29. `--port 0` ephemeral
+- `mdview --port 0 --no-open ./test-fixtures` → server binds on a kernel-assigned port. The actual port appears in the `mdview → http://127.0.0.1:<port>/` line so you can navigate manually.
+
+### 30. `--vscode` embed mode (CLI side)
+- `mdview --vscode --port 0 ./test-fixtures` → **single line** of JSON on stdout: `{"event":"ready","url":"http://127.0.0.1:<port>/","port":<port>}`. No "mdview → …" / "watching: …" human lines. No browser tab opens (`--vscode` implies `--no-open`).
+- `curl -s -D - http://127.0.0.1:<port>/ | grep -i content-security-policy` → response header contains `frame-ancestors *`. Run the same `curl` against a default-mode instance → header contains `frame-ancestors 'none'`.
+- `(echo "" ; sleep 1) | node bin/mdview.mjs --vscode --port 0 ./test-fixtures` → the CLI prints its ready JSON, then exits cleanly on its own (exit code 0) when stdin closes. Default-mode invocations are unaffected by stdin close.
+
+### 31. SPA embed mode (`?embed=vscode`)
+Set up a small iframe harness (the SPA's embed mode requires both the `?embed=vscode` query *and* being framed; opening the URL directly in a browser tab won't activate it):
+
+```bash
+# Terminal 1 — server with --vscode so framing is allowed (frame-ancestors *)
+mdview --vscode --port 7331 ./test-fixtures
+
+# Terminal 2 — serve a one-page harness over HTTP (file:// can't frame http:// in Chrome)
+mkdir -p /tmp/mdview-harness && cd /tmp/mdview-harness
+cat > index.html <<'EOF'
+<!doctype html>
+<html><body style="margin:0">
+<iframe id="f" src="http://127.0.0.1:7331/?file=showcase.md&embed=vscode"
+        style="width:100vw;height:100vh;border:0"></iframe>
+<script>
+document.getElementById('f').addEventListener('load', () => {
+  setTimeout(() => {
+    document.getElementById('f').contentWindow.postMessage(
+      { type: 'mdview/init', webviewPort: 7331 },
+      'http://127.0.0.1:7331'
+    );
+  }, 100);
+});
+</script>
+</body></html>
+EOF
+python3 -m http.server 8000
+# open http://localhost:8000/ in a browser
+```
+
+- The iframe loads `showcase.md` rendered by mdview.
+- **The left-hand file-tree pane is hidden** — only content + outline are visible.
+- DevTools → Console (iframe context): `window.parent === window` → `false`; `new URLSearchParams(location.search).get('embed')` → `'vscode'`.
+- (Stream B will exercise the postMessage routing for internal-link / outline-heading clicks; the harness only sends the `mdview/init` handshake.)
+
 ## Tests
 
 ```bash
-npm test            # 289 vitest unit tests
+npm test            # 331 vitest unit tests
 npm run typecheck   # both tsconfigs clean
 ```
 

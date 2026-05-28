@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-05-28
+
+CLI prereqs for an upcoming VS Code extension. New, additive surface — browser-mode runs are unchanged.
+
+### Added
+- **`--vscode` flag** — opts the CLI into "embedded in VS Code" mode. Bundles four behaviors so the future extension has a single, named entry point: (1) relaxes the HTML response's `frame-ancestors` CSP directive (see **Security** below); (2) emits a structured one-line JSON ready signal on stdout (`{"event":"ready","url":"…","port":…}`) instead of the legacy two human lines; (3) implies `--no-open` (the extension owns the URL); (4) tells the SPA it is embedded so it can swap behaviors via the `?embed=vscode` query. Default browser invocations are unaffected; the flag must be passed explicitly.
+- **`--palette <name>`** — override the palette for a single run without touching `.mdview.json`. Accepts `classic | paper | nord | solarized | high-contrast`. Invalid values are rejected at parse time with an explicit error listing the allowed set.
+- **`--port 0`** — kernel-assigned ephemeral port. Previously the parser refused any port ≤ 0; now `0` is permitted and the actual bound port is read from `app.server.address()` after listen. Under `--vscode` the bound port is reported in the ready-signal JSON. Useful when the parent process (extension, CI) needs a free port without coordinating with mdview about ranges.
+- **`data-source-line` on every rendered heading** (`<h1>` through `<h6>`) — 0-based file-line number including any frontmatter that was stripped. Enables future editor↔preview cursor sync. Additive attribute; harmless if unused.
+- **SPA embed-mode** — when the SPA loads with `?embed=vscode` *and* is running inside an iframe (`window.parent !== window`), it activates a handshake-driven postMessage protocol with its parent (origin-validated, one-shot `parentOrigin` capture, message-type allow-list), hides the left-hand file-tree pane (VS Code's Explorer already provides one), and routes internal-link clicks and outline-heading clicks back to the parent via `mdview/internal-link-clicked` / `mdview/heading-clicked` messages instead of navigating in-page. The `?embed=vscode` query is preserved across all SPA-internal navigation.
+
+### Security
+- **`frame-ancestors` relaxed to `*` *only* when `--vscode` is passed.** Default browser runs still emit `frame-ancestors 'none'` byte-for-byte. All other CSP directives (`default-src 'self'`, `script-src 'self'`, `style-src 'self' 'unsafe-inline'`, `img-src 'self' data: blob:`, `font-src 'self' data:`, `connect-src 'self'`, `base-uri 'none'`, `form-action 'none'`) are unchanged in both modes — a regression test in `tests/server/embed-mode.test.ts` enforces this. Justification: the loopback bind (`127.0.0.1`) is the real network-layer boundary; `frame-ancestors` is defense-in-depth on top. Enumerating VS Code webview origins (which vary across desktop, web, and Codespaces) is brittle and not portable; `frame-ancestors *` gated by the explicit `--vscode` flag is the conservative middle ground.
+
+### Changed
+- Under `--vscode`, stdout emits a single line of JSON (`{"event":"ready",…}`) rather than the legacy `mdview → <url>` and `watching: <root>` human lines. Default mode is unchanged.
+
+### Fixed
+- `npm install -g` no longer silently no-ops on certain platforms. The new "only run `main()` when invoked as the entry point" guard now resolves symlinks (via `realpathSync`) on both sides of the comparison, so a globally-installed mdview (which lives behind a symlink in the global bin directory) still runs as expected.
+- `data-source-line` line counts are robust across CRLF-authored sources and frontmatter blocks with trailing blank lines — computed directly from `raw` via a line-walk rather than relying on `gray-matter`'s internal byte representation.
+
 ## [0.6.2] — 2026-05-19
 
 ### Fixed
