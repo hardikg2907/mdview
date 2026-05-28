@@ -1,0 +1,35 @@
+import { validateIncoming } from './validate';
+import type { KnownIncomingMessage } from './types';
+
+type HandlerMap = {
+  [T in KnownIncomingMessage['type']]?: (
+    msg: Extract<KnownIncomingMessage, { type: T }>,
+  ) => void;
+};
+
+/**
+ * Routes validated incoming messages to registered handlers.
+ *
+ * Invalid or unknown messages are dropped silently. Missing handlers for
+ * valid messages are also silently ignored. This class never throws on
+ * bad input.
+ */
+export class Dispatcher {
+  constructor(private readonly handlers: HandlerMap) {}
+
+  dispatch(raw: unknown): void {
+    const msg = validateIncoming(raw);
+    if (msg === null) return;
+
+    const handler = this.handlers[msg.type] as
+      | ((m: KnownIncomingMessage) => void)
+      | undefined;
+    if (!handler) return;
+
+    try {
+      handler(msg);
+    } catch {
+      // Handlers must not propagate exceptions through the message boundary.
+    }
+  }
+}
