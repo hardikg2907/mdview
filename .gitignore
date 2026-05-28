@@ -11,3 +11,5 @@ apps/vscode/node_modules
 apps/vscode/dist
 apps/vscode/*.vsix
 apps/vscode/.vscode-test
+!apps/vscode/.vscode/
+!apps/vscode/.vscode/*
