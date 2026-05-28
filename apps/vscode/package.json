@@ -40,8 +40,15 @@
           "description": "Preferred starting port for the mdview server (0 = ephemeral)."
         },
         "mdview.ignore": {
-          "type": "array", "items": { "type": "string" }, "default": [],
-          "description": "Additional folder/file basenames to ignore (merged with .mdview.json)."
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_.\\-+]{1,64}$",
+            "maxLength": 64
+          },
+          "uniqueItems": true,
+          "default": [],
+          "description": "Additional folder/file basenames to ignore (merged with .mdview.json). Basenames only; pattern: alphanumerics, '_', '.', '-', '+', length 1–64."
         }
       }
     }
