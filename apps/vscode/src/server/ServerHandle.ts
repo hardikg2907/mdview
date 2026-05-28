@@ -21,6 +21,7 @@ export class ServerHandle {
   private info: ServerInfo | undefined;
   private disposed = false;
   private readyResolved = false;
+  private readyTimer: ReturnType<typeof setTimeout> | undefined;
 
   constructor(private readonly opts: ServerHandleOpts) {}
 
@@ -31,8 +32,6 @@ export class ServerHandle {
         child = cp.spawn(process.execPath, [this.opts.cliEntryPath, ...this.opts.args], {
           stdio: ['pipe', 'pipe', 'pipe'],
           shell: false,
-          // Inherit PATH so the CLI can locate system tools if needed; do not
-          // pass the full env explicitly to avoid leaking sensitive vars.
         });
       } catch (err) {
         reject(err instanceof Error ? err : new Error(String(err)));
@@ -40,18 +39,26 @@ export class ServerHandle {
       }
       this.child = child;
 
-      const timer = setTimeout(() => {
+      this.readyTimer = setTimeout(() => {
         if (this.readyResolved) return;
         this.readyResolved = true;
+        this.readyTimer = undefined;
         log('mdview did not signal ready within 10s; killing child');
         try { child.kill('SIGTERM'); } catch { /* ignore */ }
         reject(new Error('mdview ready signal timed out after 10s'));
       }, READY_TIMEOUT_MS);
 
+      const clearReadyTimer = () => {
+        if (this.readyTimer) {
+          clearTimeout(this.readyTimer);
+          this.readyTimer = undefined;
+        }
+      };
+
       child.on('error', (err) => {
         if (this.readyResolved) return;
         this.readyResolved = true;
-        clearTimeout(timer);
+        clearReadyTimer();
         log(`mdview spawn error: ${err.message}`);
         reject(err);
       });
@@ -59,11 +66,14 @@ export class ServerHandle {
       child.on('exit', (code, signal) => {
         if (!this.readyResolved) {
           this.readyResolved = true;
-          clearTimeout(timer);
-          reject(new Error(`mdview exited before ready (code=${code} signal=${signal})`));
+          clearReadyTimer();
+          if (this.disposed) {
+            reject(new Error('mdview was disposed before the ready signal arrived'));
+          } else {
+            reject(new Error(`mdview exited before ready (code=${code} signal=${signal})`));
+          }
           return;
         }
-        // Suppress the crash callback when the caller already triggered disposal.
         if (this.disposed) return;
         log(`mdview child exited unexpectedly (code=${code} signal=${signal})`);
         this.opts.onExit?.(code, signal as NodeJS.Signals | null);
@@ -80,7 +90,7 @@ export class ServerHandle {
         buf += chunk.toString('utf8');
         if (buf.length > READY_BUFFER_CAP) {
           this.readyResolved = true;
-          clearTimeout(timer);
+          clearReadyTimer();
           try { child.kill('SIGTERM'); } catch { /* ignore */ }
           reject(new Error('mdview produced too much output before the ready signal'));
           return;
@@ -93,21 +103,21 @@ export class ServerHandle {
           parsed = JSON.parse(line);
         } catch {
           this.readyResolved = true;
-          clearTimeout(timer);
+          clearReadyTimer();
           try { child.kill('SIGTERM'); } catch { /* ignore */ }
           reject(new Error(`mdview ready line is not valid JSON: ${line}`));
           return;
         }
         if (!isReadyMessage(parsed)) {
           this.readyResolved = true;
-          clearTimeout(timer);
+          clearReadyTimer();
           try { child.kill('SIGTERM'); } catch { /* ignore */ }
           reject(new Error(`mdview emitted unexpected ready payload: ${line}`));
           return;
         }
         this.info = { port: parsed.port, url: parsed.url };
         this.readyResolved = true;
-        clearTimeout(timer);
+        clearReadyTimer();
         resolve(this.info);
       });
     });
@@ -116,12 +126,16 @@ export class ServerHandle {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    if (this.readyTimer) {
+      clearTimeout(this.readyTimer);
+      this.readyTimer = undefined;
+    }
     const c = this.child;
     this.child = undefined;
     if (!c) return;
     try { c.stdin?.end(); } catch { /* ignore */ }
-    // SIGTERM is the graceful signal on POSIX; on Windows kill() sends the
-    // equivalent termination without SIGTERM (which doesn't exist there).
+    // SIGTERM does not exist on Windows; an argument-less kill() terminates the
+    // child via the platform-native mechanism instead.
     try {
       if (process.platform === 'win32') {
         c.kill();
@@ -155,10 +169,8 @@ function isReadyMessage(v: unknown): v is { event: 'ready'; port: number; url: s
   return true;
 }
 
-// In development (NODE_ENV substituted at bundle time to "production" in the
-// shipped extension), MDVIEW_CLI_PATH can point to a local CLI build.
-// The condition dead-strips in production: "production" === "development" → false,
-// so the env var reference is removed from the bundle entirely.
+// process.env.NODE_ENV is substituted at bundle time, so the dev override is
+// dead-stripped from the shipped extension.
 export function bundledCliEntry(extensionPath: string): string {
   if (process.env.NODE_ENV === 'development' && process.env.MDVIEW_CLI_PATH) {
     return process.env.MDVIEW_CLI_PATH;

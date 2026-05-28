@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
+import * as path from 'node:path';
 import type { Writable } from 'node:stream';
 
 // vi.hoisted ensures spawnMock is initialized before the mock factory runs.
@@ -153,6 +154,25 @@ describe('ServerHandle — pre-ready exit', () => {
     fake.emit('exit', 1, null);
     await expect(p).rejects.toThrow(/exited before ready/);
   });
+
+  it('rejects with a disposal message when dispose() runs before ready', async () => {
+    const { handle, fake } = makeHandle();
+    const p = handle.start();
+    handle.dispose();
+    fake.emit('exit', null, 'SIGTERM');
+    await expect(p).rejects.toThrow(/disposed before the ready signal/);
+  });
+
+  it('dispose() clears the ready timer so it does not fire later', async () => {
+    const { handle, fake } = makeHandle();
+    const p = handle.start();
+    handle.dispose();
+    fake.emit('exit', null, 'SIGTERM');
+    await expect(p).rejects.toThrow();
+    // Advance past the 10s timeout — if the timer were still armed it would
+    // attempt to reject the already-settled promise (vitest catches that).
+    expect(() => vi.advanceTimersByTime(15_000)).not.toThrow();
+  });
 });
 
 describe('ServerHandle — post-ready exit', () => {
@@ -201,16 +221,39 @@ describe('ServerHandle — idempotent dispose', () => {
 });
 
 describe('bundledCliEntry', () => {
-  it('returns production path when NODE_ENV is not development', () => {
-    const result = bundledCliEntry('/ext');
-    // In test environment NODE_ENV is typically not 'development', or
-    // MDVIEW_CLI_PATH is not set; either way should return the prod path.
-    // We can at least verify the prod path suffix is present when env var unset.
-    const originalCliPath = process.env['MDVIEW_CLI_PATH'];
+  const savedNodeEnv = process.env['NODE_ENV'];
+  const savedCliPath = process.env['MDVIEW_CLI_PATH'];
+
+  afterEach(() => {
+    if (savedNodeEnv === undefined) delete process.env['NODE_ENV'];
+    else process.env['NODE_ENV'] = savedNodeEnv;
+    if (savedCliPath === undefined) delete process.env['MDVIEW_CLI_PATH'];
+    else process.env['MDVIEW_CLI_PATH'] = savedCliPath;
+  });
+
+  it('returns the bundled path under the extension root in production', () => {
+    delete process.env['NODE_ENV'];
     delete process.env['MDVIEW_CLI_PATH'];
-    const result2 = bundledCliEntry('/ext');
-    expect(result2).toContain('mdview.mjs');
-    if (originalCliPath !== undefined) process.env['MDVIEW_CLI_PATH'] = originalCliPath;
-    void result;
+    const expected = path.join('/ext', 'node_modules', '@hardikg', 'mdview', 'bin', 'mdview.mjs');
+    expect(bundledCliEntry('/ext')).toBe(expected);
+  });
+
+  it('ignores MDVIEW_CLI_PATH outside development', () => {
+    process.env['NODE_ENV'] = 'production';
+    process.env['MDVIEW_CLI_PATH'] = '/tmp/elsewhere/mdview.mjs';
+    expect(bundledCliEntry('/ext')).toContain(path.join('node_modules', '@hardikg', 'mdview'));
+  });
+
+  it('honors MDVIEW_CLI_PATH when NODE_ENV is development', () => {
+    process.env['NODE_ENV'] = 'development';
+    process.env['MDVIEW_CLI_PATH'] = '/tmp/local/mdview.mjs';
+    expect(bundledCliEntry('/ext')).toBe('/tmp/local/mdview.mjs');
+  });
+
+  it('falls back to the bundled path in development when MDVIEW_CLI_PATH is unset', () => {
+    process.env['NODE_ENV'] = 'development';
+    delete process.env['MDVIEW_CLI_PATH'];
+    const expected = path.join('/ext', 'node_modules', '@hardikg', 'mdview', 'bin', 'mdview.mjs');
+    expect(bundledCliEntry('/ext')).toBe(expected);
   });
 });
