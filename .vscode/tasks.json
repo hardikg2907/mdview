@@ -10,7 +10,19 @@
         "env": { "NODE_ENV": "development" }
       },
       "isBackground": true,
-      "problemMatcher": "$tsc-watch"
+      "problemMatcher": {
+        "owner": "esbuild",
+        "fileLocation": ["relative", "${workspaceFolder}/apps/vscode"],
+        "pattern": [
+          { "regexp": "^✘ \\[ERROR\\] (.+)$", "message": 1 },
+          { "regexp": "^\\s+(\\S.*):(\\d+):(\\d+):$", "file": 1, "line": 2, "column": 3 }
+        ],
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "^\\[watch\\] build started$",
+          "endsPattern": "^\\[watch\\] build finished$"
+        }
+      }
     }
   ]
 }
