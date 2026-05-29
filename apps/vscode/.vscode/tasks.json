@@ -5,7 +5,10 @@
       "label": "apps/vscode:watch",
       "type": "shell",
       "command": "npm run watch",
-      "options": { "cwd": "${workspaceFolder}/apps/vscode" },
+      "options": {
+        "cwd": "${workspaceFolder}/apps/vscode",
+        "env": { "NODE_ENV": "development" }
+      },
       "isBackground": true,
       "problemMatcher": "$tsc-watch"
     }

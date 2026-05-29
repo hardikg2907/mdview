@@ -11,14 +11,21 @@ const ctx = await esbuild.context({
   target: 'node20',
   format: 'cjs',
   external: ['vscode', '@hardikg/mdview'],
-  define: {
-    'process.env.NODE_ENV': JSON.stringify(nodeEnv),
-    // Substitute as undefined so esbuild can dead-strip the dev-only branch in bundledCliEntry.
-    'process.env.MDVIEW_CLI_PATH': 'undefined',
-  },
+  define: buildDefine(nodeEnv),
   sourcemap: watch ? 'inline' : false,
   logLevel: 'info',
 });
+
+function buildDefine(env) {
+  const define = { 'process.env.NODE_ENV': JSON.stringify(env) };
+  // Outside development the local CLI override must be unreachable, so the
+  // reference is substituted away and the branch drops out. In development the
+  // real runtime value is read so a local CLI build can be pointed at.
+  if (env !== 'development') {
+    define['process.env.MDVIEW_CLI_PATH'] = 'undefined';
+  }
+  return define;
+}
 
 if (watch) {
   await ctx.watch();
