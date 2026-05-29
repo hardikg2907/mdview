@@ -4,12 +4,12 @@ bin/mdview.mjs
 bin/*.map
 .DS_Store
 *.log
-.vscode
 .idea
 mdview-*.tgz
 apps/vscode/node_modules
 apps/vscode/dist
 apps/vscode/*.vsix
 apps/vscode/.vscode-test
-!apps/vscode/.vscode/
-!apps/vscode/.vscode/*
+.vscode/*
+!.vscode/launch.json
+!.vscode/tasks.json
