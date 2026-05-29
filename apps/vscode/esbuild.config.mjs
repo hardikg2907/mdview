@@ -13,6 +13,8 @@ const ctx = await esbuild.context({
   external: ['vscode', '@hardikg/mdview'],
   define: {
     'process.env.NODE_ENV': JSON.stringify(nodeEnv),
+    // Substitute as undefined so esbuild can dead-strip the dev-only branch in bundledCliEntry.
+    'process.env.MDVIEW_CLI_PATH': 'undefined',
   },
   sourcemap: watch ? 'inline' : false,
   logLevel: 'info',
