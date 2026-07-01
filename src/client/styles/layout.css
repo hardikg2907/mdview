@@ -7,6 +7,8 @@
     "tree  main    outline";
   height: 100%;
   background: var(--bg);
+  /* Anchor for the narrow-width overlay drawers (see the responsive block). */
+  position: relative;
   transition:
     grid-template-columns var(--transition-pane);
 }
@@ -214,13 +216,40 @@
   background: var(--accent);
 }
 
-/* Responsive */
+/* Responsive — narrow widths turn the side panes into overlay drawers.
+   Why: the width vars are set inline on .app-shell (for the resizers), and an
+   inline style beats a stylesheet rule — so these overrides MUST use
+   !important to actually collapse the grid column. Without that the column
+   stays full-width while the pane hides, squeezing the content into a sliver.
+   When expanded, the pane floats over the content (position: absolute) so it
+   stays usable without stealing layout width; its own collapse button closes
+   it. When collapsed, the narrow rail column remains as the toggle. */
+
 @media (max-width: 1100px) {
-  :root { --outline-width: 0px; }
-  .app-shell:not(.outline-collapsed) > .pane-outline { display: none; }
+  .app-shell:not(.outline-collapsed) { --outline-width: 0px !important; }
+  .app-shell:not(.outline-collapsed) > .resizer-right { display: none; }
+  .app-shell:not(.outline-collapsed) > .pane-outline {
+    position: absolute;
+    top: var(--header-height);
+    bottom: 0;
+    right: 0;
+    width: min(320px, 88vw);
+    z-index: 30;
+    box-shadow: 0 8px 32px rgb(0 0 0 / 45%);
+  }
 }
+
 @media (max-width: 800px) {
-  :root { --tree-width: 0px; }
-  .app-shell:not(.tree-collapsed) > .pane-tree { display: none; }
+  .app-shell:not(.tree-collapsed) { --tree-width: 0px !important; }
+  .app-shell:not(.tree-collapsed) > .resizer-left { display: none; }
+  .app-shell:not(.tree-collapsed) > .pane-tree {
+    position: absolute;
+    top: var(--header-height);
+    bottom: 0;
+    left: 0;
+    width: min(280px, 88vw);
+    z-index: 30;
+    box-shadow: 0 8px 32px rgb(0 0 0 / 45%);
+  }
   .pane-main { padding: 32px 20px 80px; }
 }

@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Under `--vscode`, the HTML response now **omits** the `frame-ancestors` CSP directive entirely (previously `frame-ancestors *`). Chromium 142 (shipped in VS Code 1.126) narrowed `frame-ancestors *` to match only network-scheme origins (`http`/`https`/`ws`/`wss`), which excludes the webview's non-network `vscode-webview:` parent — so `*` blocked the extension from framing the preview at all. No CSP value can name the dynamic webview origin, so the directive is dropped in embed mode; the loopback bind (`127.0.0.1`) remains the real network boundary. Default browser runs still emit `frame-ancestors 'none'` byte-for-byte.
+
+### Fixed
+- **Narrow-width layout.** The file-tree and outline panes now collapse into overlay drawers at narrow viewport widths instead of leaving blank, full-width grid columns that squeezed the document into an unreadable vertical sliver. Root cause: the pane-width CSS variables are set inline on `.app-shell` (needed for the drag-resizers), and inline styles overrode the responsive `@media` zeroing; the breakpoints now win via `!important`. Affects the plain browser CLI and the VS Code webview alike.
+- **Embed mode** no longer reserves a blank left column for the (never-rendered) file tree, and the outline now opens correctly in the narrow VS Code preview instead of appearing empty.
+
 ## [0.7.0] — 2026-05-28
 
 CLI prereqs for an upcoming VS Code extension. New, additive surface — browser-mode runs are unchanged.

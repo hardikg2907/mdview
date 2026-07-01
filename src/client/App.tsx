@@ -191,12 +191,16 @@ export function App() {
 
   const shellClasses = [
     'app-shell',
+    embedMode ? 'embed' : '',
     treeCollapsed ? 'tree-collapsed' : '',
     outlineCollapsed ? 'outline-collapsed' : '',
     minimap ? 'has-minimap' : '',
   ].filter(Boolean).join(' ');
 
-  const shellStyle = `--tree-width:${treeWidth}px;--outline-width:${outlineWidth}px`;
+  // In embed mode the file tree pane is never rendered, so its grid column must
+  // be zero — otherwise it reserves a blank strip on the left.
+  const shellStyle =
+    `--tree-width:${embedMode ? 0 : treeWidth}px;--outline-width:${outlineWidth}px`;
 
   const handleCollapseTree = () => {
     resetTreeWidth();

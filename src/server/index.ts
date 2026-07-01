@@ -37,16 +37,19 @@ export interface ConfigState {
   paletteOverride?: Palette;
 }
 
-// Why: under --vscode the page is loaded inside a VS Code webview iframe.
-// VS Code's webview origin varies (desktop / web / Codespaces); enumerating
-// them is brittle. Loopback bind (127.0.0.1) is the real network boundary;
-// frame-ancestors is defense-in-depth. The relaxation is gated by an explicit
-// flag, so default browser users keep `frame-ancestors 'none'`. This is a
-// deliberate, audited exception to CLAUDE.md §3.1; the constant has two values
-// for that reason. See docs/superpowers/specs/2026-05-24-vscode-extension-design.md §18.1.
+// Why: under --vscode the page is loaded inside a VS Code webview iframe whose
+// parent uses the non-network `vscode-webview:` origin scheme. Chromium 142
+// (shipped in VS Code 1.126) narrowed `frame-ancestors *` to match only network
+// schemes (http/https/ws/wss), so no frame-ancestors value short of naming the
+// dynamic `vscode-webview://<uuid>` origin will permit the webview to frame us.
+// We therefore OMIT the directive entirely in embed mode — framing is
+// intentionally unrestricted there. The loopback bind (127.0.0.1) is the real
+// network boundary; frame-ancestors is only defense-in-depth, and the
+// relaxation is gated by the explicit --vscode flag (default browser users keep
+// `frame-ancestors 'none'`). Deliberate, audited exception to CLAUDE.md §3.1.
+// See docs/superpowers/specs/2026-05-24-vscode-extension-design.md §18.1.
 function buildCspHtml(embedMode: boolean): string {
-  const frameAncestors = embedMode ? '*' : "'none'";
-  return [
+  const directives = [
     "default-src 'self'",
     "script-src 'self'",
     // KaTeX + mermaid inject inline styles into rendered output; the rest of
@@ -55,10 +58,11 @@ function buildCspHtml(embedMode: boolean): string {
     "img-src 'self' data: blob:",
     "font-src 'self' data:",
     "connect-src 'self'",
-    `frame-ancestors ${frameAncestors}`,
     "base-uri 'none'",
     "form-action 'none'",
-  ].join('; ');
+  ];
+  if (!embedMode) directives.push("frame-ancestors 'none'");
+  return directives.join('; ');
 }
 
 export async function createServer(opts: ServerOptions): Promise<FastifyInstance> {

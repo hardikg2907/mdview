@@ -73,7 +73,7 @@ Skim these before exploring code. They will answer most "where does X live?" que
 npm run typecheck     # both tsconfigs
 npm test              # all vitest suites
 npm run build         # vite + tsup must both succeed
-npm audit             # must report 0 vulnerabilities; if not, see §6
+npm audit --omit=dev  # 0 vulnerabilities in SHIPPED deps; if not, see §6
 ```
 
 All four must pass. Don't claim a task done before running them. If you skipped one because it's "obviously fine," you didn't do the task.
@@ -131,7 +131,7 @@ These changes still go in commits, but they don't need a `Unreleased` entry unle
 
 ## 6. Dependencies and `npm audit`
 
-- `npm audit` reporting non-zero is a release blocker. Resolve it before bumping the version.
+- **`npm audit --omit=dev` reporting non-zero is a release blocker** — a vulnerability in a dep we ship to users. Resolve it before bumping the version. The gate is scoped to shipped deps on purpose: a `low`/dev-only advisory in a build tool (e.g. `esbuild` reachable only via `tsup`'s dev server, never in the published tarball) does not block, *provided* the only available fix is a `--force`/breaking bump (which §6 forbids). Still fix dev-only advisories when a clean, non-breaking bump exists, and note any knowingly-deferred one in the release PR/notes.
 - Bump runtime deps before dev deps; runtime deps ship to users, dev deps don't.
 - Bump one dep at a time, run the full quality gate (§4) between each. Don't run `npm audit fix --force` — it batches breaking changes and leaves you with no idea which one regressed.
 - Pin via the lockfile (`package-lock.json`); never commit a `package.json` change without the matching lockfile change.
