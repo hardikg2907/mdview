@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- Dependency security bumps applied via `npm audit fix` (lockfile-only, SemVer-compatible — no `package.json` range changes): `markdown-it`, `dompurify`, `linkify-it`, `js-yaml`, `ws`, and dev tooling. Clears all shipped-dep advisories (moderate/high DoS & complexity issues in the render path). One `low`, dev-only `esbuild` advisory (reachable solely through `tsup`'s Windows dev server, never in the published package) has no non-breaking fix and is knowingly deferred; the quality gate now audits shipped deps only (`npm audit --omit=dev`).
+
 ### Changed
 - Under `--vscode`, the HTML response now **omits** the `frame-ancestors` CSP directive entirely (previously `frame-ancestors *`). Chromium 142 (shipped in VS Code 1.126) narrowed `frame-ancestors *` to match only network-scheme origins (`http`/`https`/`ws`/`wss`), which excludes the webview's non-network `vscode-webview:` parent — so `*` blocked the extension from framing the preview at all. No CSP value can name the dynamic webview origin, so the directive is dropped in embed mode; the loopback bind (`127.0.0.1`) remains the real network boundary. Default browser runs still emit `frame-ancestors 'none'` byte-for-byte.
 
