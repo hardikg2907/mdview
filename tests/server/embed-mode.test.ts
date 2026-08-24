@@ -157,7 +157,7 @@ describe('--vscode embed mode: CSP', () => {
     // Chromium 142 (VS Code 1.126) narrowed `frame-ancestors *` to network
     // schemes only, which excludes the webview's vscode-webview: parent. No
     // value can name the dynamic origin, so embed mode drops the directive.
-    const app = await createServer({
+    const { app } = await createServer({
       roots: [{ absPath: tmpRoot, kind: 'dir' }],
       clientDir: CLIENT_DIR,
       embedMode: true,
@@ -173,7 +173,7 @@ describe('--vscode embed mode: CSP', () => {
   });
 
   it('default (no embed): frame-ancestors is "none" (not *)', async () => {
-    const app = await createServer({
+    const { app } = await createServer({
       roots: [{ absPath: tmpRoot, kind: 'dir' }],
       clientDir: CLIENT_DIR,
       embedMode: false,
@@ -190,12 +190,12 @@ describe('--vscode embed mode: CSP', () => {
   });
 
   it('regression: all non-frame-ancestors directives are identical in both modes', async () => {
-    const embedApp = await createServer({
+    const { app: embedApp } = await createServer({
       roots: [{ absPath: tmpRoot, kind: 'dir' }],
       clientDir: CLIENT_DIR,
       embedMode: true,
     });
-    const defaultApp = await createServer({
+    const { app: defaultApp } = await createServer({
       roots: [{ absPath: tmpRoot, kind: 'dir' }],
       clientDir: CLIENT_DIR,
       embedMode: false,

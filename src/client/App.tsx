@@ -1,5 +1,4 @@
 import { useEffect, useRef } from 'preact/hooks';
-import type { TreeNode } from '../shared/types.js';
 import { CommandPalette } from './components/CommandPalette.js';
 import { Content } from './components/Content.js';
 import { ContentSkeleton } from './components/ContentSkeleton.js';
@@ -18,7 +17,7 @@ import { fileError, fileLoading, fileSignal, loadFile } from './hooks/useFile.js
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts.js';
 import { useLiveReload } from './hooks/useLiveReload.js';
 import { usePalette } from './hooks/usePalette.js';
-import { usePathRouting } from './hooks/usePathRouting.js';
+import { readRootFromUrl, usePathRouting } from './hooks/usePathRouting.js';
 import { setMainScroller } from './hooks/useScroller.js';
 import { activeHeadingId, lockScrollSpy, useScrollSpy } from './hooks/useScrollSpy.js';
 import { closeSearch, searchOpenSignal } from './hooks/useSearch.js';
@@ -43,17 +42,7 @@ import {
 } from './hooks/useUiState.js';
 import { expandSectionContaining } from './lib/collapsible-sections.js';
 import { isEmbedded, postToParent } from './lib/embed.js';
-
-function findFirstMd(nodes: TreeNode[]): string | null {
-  for (const n of nodes) {
-    if (n.type === 'file' && n.isMarkdown) return n.relPath;
-    if (n.type === 'dir' && n.children) {
-      const sub = findFirstMd(n.children);
-      if (sub) return sub;
-    }
-  }
-  return null;
-}
+import { findFirstMd, findFirstMdUnder } from './lib/file-search.js';
 
 export function App() {
   useTheme();
@@ -82,7 +71,11 @@ export function App() {
       return;
     }
     if (currentPath === null) {
-      const first = findFirstMd(t.tree);
+      // `?root=` focuses the folder just opened; without it a second folder
+      // would land on whichever root happens to be first.
+      const wantRoot = readRootFromUrl();
+      const scoped = wantRoot ? findFirstMdUnder(t.tree, wantRoot) : null;
+      const first = scoped ?? findFirstMd(t.tree);
       if (first) setCurrentPath(first);
     }
   }, [tree, currentPath]);

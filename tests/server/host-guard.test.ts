@@ -81,7 +81,7 @@ describe('Host guard on a live server', () => {
     // @fastify/static only needs the directory to exist; no real bundle here.
     clientDir = mkdtempSync(path.join(tmpdir(), 'mdview-host-client-'));
     writeFileSync(path.join(clientDir, 'index.html'), '<!doctype html><title>t</title>');
-    app = await createServer({ roots: [{ absPath: root, kind: 'dir' }], clientDir });
+    ({ app } = await createServer({ roots: [{ absPath: root, kind: 'dir' }], clientDir }));
     await app.ready();
   });
 

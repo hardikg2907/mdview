@@ -2,13 +2,17 @@ import type { FastifyInstance } from 'fastify';
 import type { WatchEvent } from '../../shared/types.js';
 import type { Watcher } from '../watcher.js';
 
+export interface SseHooks {
+  /** Called when a client connects and when one goes away, with the new count. */
+  onClientsChanged?: (count: number) => void;
+}
+
 /**
- * One stream carries every root's events. Roots are looked up per connection
- * rather than captured once, so a client that connects later still gets the
- * current set — which is what lets roots be added and removed while tabs stay
- * open.
+ * One stream carries every root's events, via the hub the roots forward into —
+ * so a root opened after a client connected still reaches it.
  */
-export function registerSse(app: FastifyInstance, watchers: () => readonly Watcher[]): void {
+export function registerSse(app: FastifyInstance, hub: Watcher, hooks: SseHooks = {}): void {
+  let clients = 0;
   app.get('/api/watch', (req, reply) => {
     reply.raw.writeHead(200, {
       'Content-Type': 'text/event-stream',
@@ -19,7 +23,8 @@ export function registerSse(app: FastifyInstance, watchers: () => readonly Watch
     reply.raw.write(': connected\n\n');
 
     let closed = false;
-    const subscribed = watchers();
+    clients++;
+    hooks.onClientsChanged?.(clients);
 
     // A suspended tab / dropped network can leave the OS-side socket in a state
     // where 'close' doesn't fire promptly, so each write becomes the actual
@@ -30,7 +35,9 @@ export function registerSse(app: FastifyInstance, watchers: () => readonly Watch
       if (closed) return;
       closed = true;
       clearInterval(heartbeat);
-      for (const w of subscribed) w.off('event', send);
+      hub.off('event', send);
+      clients--;
+      hooks.onClientsChanged?.(clients);
       try { reply.raw.end(); } catch { /* already closed */ }
     };
 
@@ -53,7 +60,7 @@ export function registerSse(app: FastifyInstance, watchers: () => readonly Watch
       }
     }, 15_000);
 
-    for (const w of subscribed) w.on('event', send);
+    hub.on('event', send);
 
     req.raw.on('close', cleanup);
     req.raw.on('error', cleanup);

@@ -1,6 +1,15 @@
 import { signal } from '@preact/signals';
 import { useCallback, useEffect } from 'preact/hooks';
 
+/**
+ * The root to focus when no specific file was requested — `mdview <folder>`
+ * produces `?root=<id>`. Read once at startup; navigating replaces it with the
+ * `?file=` of whatever gets opened.
+ */
+export function readRootFromUrl(): string | null {
+  return new URLSearchParams(window.location.search).get('root');
+}
+
 function readPathFromUrl(): string | null {
   const sp = new URLSearchParams(window.location.search);
   return sp.get('file');

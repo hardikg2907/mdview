@@ -18,11 +18,11 @@ npm install
 # Run the dev SPA against a manually-built server bundle:
 npm run build:server                                  # one-shot
 npm run dev:client                                    # vite dev server on :5173 with HMR
-node bin/mdview.mjs ./test-fixtures --no-open --port 7331  # backend on :7331
+node bin/mdview.mjs ./test-fixtures --foreground --no-open --port 7331  # backend on :7331
 
 # Or full prod build + run:
 npm run build
-node bin/mdview.mjs ./some/folder
+node bin/mdview.mjs --foreground ./some/folder
 ```
 
 The vite dev server proxies `/api/*` to `localhost:7331`, so HMR works for the client while the backend serves files. SSE live-reload works in this mode too.
@@ -34,7 +34,7 @@ Run all five before sending a change:
 ```bash
 npm run typecheck     # tsc --noEmit on both server and client tsconfigs
 npm run lint          # biome check (lint only — formatter disabled)
-npm test              # vitest run — 374 tests
+npm test              # vitest run — 402 tests
 npm run build         # vite + tsup must both succeed
 npm audit --omit=dev  # 0 vulnerabilities in shipped deps (release blocker, see CLAUDE.md §6)
 ```

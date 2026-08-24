@@ -92,6 +92,47 @@ does not cover it.
 - **`src/cli.ts`** — argument parser, port-fallback listener, browser launcher, SIGINT/SIGTERM shutdown with timeout, friendly error messages (port-in-use, ENOENT, EACCES). `MDVIEW_DEBUG=1` enables full stack traces.
 - **`src/server/index.ts`** — `createServer({ roots, clientDir, … })` factory. Opens one `RootState` per root, composes routes over the root list, registers `@fastify/static` for the bundled SPA at `/`, hooks `onClose` to close every watcher. Boots a **second chokidar watcher per root** dedicated to that root's `.mdview.json`, because the main watcher's `ignored` filter excludes dotfiles.
 
+### The background server (`src/daemon/`, `src/cli.ts`)
+
+`mdview <path>` does not run a server. It registers the folder, makes sure a
+detached one is running, opens the browser and exits — so the shell comes back
+immediately and one process serves every folder you ever open.
+
+| Module | Role |
+|---|---|
+| `daemon/state.ts` | Where state lives (`~/.config/mdview/`), and `daemon.json` — pid, port, start time. Atomic writes (temp file + rename), `0600` in a `0700` dir. Also the spawn lock. |
+| `daemon/workspace-file.ts` | `workspace.json`: the open folders, their persisted ids, add/remove, the 8-root cap, and defensive validation on read. |
+| `daemon/client.ts` | The CLI's side: probe `/api/health`, decide whether the recorded daemon is really ours, spawn one under the lock, wait for a root to appear, stop one. |
+| `cli-workspace.ts` | `ls` / `rm` / `stop`, following the `cli-config.ts` subcommand pattern. |
+| `cli.ts` | Three run modes: `runAttach` (default), `runForeground` (`--foreground`, `--port`, `--palette`, `--vscode`), `runDaemon` (`--daemon`, internal). |
+
+**The workspace file is the control plane.** The CLI writes `workspace.json`; the
+daemon chokidar-watches it and calls `setRoots`. This is a security decision as
+much as a simple one: there is no HTTP endpoint that mutates anything, so there
+is no CSRF surface to defend, no shared token to store, and none to leak. A page
+in the user's browser cannot write files; their shell can.
+
+**Identity, not just a pid.** `daemon.json` records the start time alongside the
+pid, and `/api/health` reports both. The CLI treats a daemon as its own only when
+both match. Pids get recycled, so a stale record can name a live process that has
+nothing to do with mdview — and `mdview stop` must never signal that one.
+
+**One daemon, not several.** Two shells running `mdview` at the same moment would
+otherwise both spawn. The spawn is serialised through an `openSync(…, 'wx')` lock
+file, with a staleness window so a crash mid-spawn doesn't wedge later runs.
+
+**Idle shutdown, opt-in.** The SSE route reports its connected-client count; at
+zero the daemon arms a timer and exits when it fires, clearing `daemon.json`.
+`MDVIEW_IDLE_TIMEOUT` (minutes) turns this on; it is off by default, because a
+shared server that stays put is more predictable than one that vanishes on a
+timer, and `mdview stop` already exists. What it guards against is the recursive
+watcher each open folder holds — which the 8-folder cap is the other half of.
+
+**Ordering.** `runAttach` registers the root *before* ensuring the daemon, so a
+daemon it starts already has the folder at boot and a running one picks it up from
+the watcher. It then polls `/api/health` until the root id appears, because
+otherwise the browser can open a deep link before the root it names exists.
+
 ### Workspace (`src/server/workspace.ts`)
 
 The server serves **N folders at once**, not one. Each is a `RootState`: its wire
@@ -136,6 +177,7 @@ applied in that root's own walk and watcher.
 | `GET /api/search?q=...&case=...&word=...&regex=...` | Grep across every folder root; hits come back root-qualified. Caps per-file (20) and global (200) — the global cap is a budget for the whole search, not per root. Single-file roots are skipped. |
 | `GET /api/watch` | One Server-Sent Events stream carrying every root's `WatchEvent`s, with root-scoped `relPath`s. Includes a synthetic `config` event when a root's `.mdview.json` changes, and a `workspace` event when the set of open roots changes. |
 | `GET /__asset/*` | Serve user content assets (images, etc.). The splat is workspace-scoped, so the URL shape is unchanged: `/__asset/<rootId>/<path>`. Resolved via `parseWorkspacePath` then `resolveSafePath`. |
+| `GET /api/health` | Registered only when `createServer` is given an `identity` (i.e. in daemon mode). Reports `{ok, pid, startedAt, roots: [id]}` — ids only, never absolute paths. |
 | `GET /*` | Falls through to the static SPA bundle; SPA fallback for unknown routes (so client routing works on refresh). |
 
 All request paths that touch the filesystem go through `resolveSafePath(rootAbsPath, rel)` — see `src/server/fs/resolve.ts` — which rejects absolute paths and traversal attempts.

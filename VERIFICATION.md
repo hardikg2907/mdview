@@ -281,6 +281,59 @@ node bin/mdview.mjs --no-open --port 7399 ./test-fixtures
   `http://127.0.0.1:<port>/`, **never** the friendly host (the extension
   validates that prefix).
 
+### 33. Background server: the shell comes back
+
+```bash
+mdview stop            # start from nothing
+mdview ./test-fixtures
+```
+
+- The prompt returns **immediately** (well under a second) and the browser opens.
+- `mdview ls` → the folder, marked `●` and `(primary)`, plus a `server:` line with a pid and the `logs:` path.
+- `ps` shows exactly one `mdview.mjs --daemon` process.
+- Close the terminal entirely, open a new one → the page still loads, `mdview ls` still reports the same pid.
+
+### 34. A second, unrelated folder joins the same server
+
+```bash
+cd /some/other/repo && mdview .
+```
+
+- Prints a URL on the **same port** as before, ending `?root=<name>`.
+- `mdview ls` lists both folders and the **same pid** — no second server.
+- In the tab that was already open, the new folder appears in the sidebar **without a reload** (the SSE `workspace` event).
+- Sidebar: each folder is a heading, expanded, in the order they were added. With only one folder open its files sit at the top level with no wrapper — check both states.
+- `⌘P` lists files from both folders, each prefixed with its folder name; typing a folder name narrows to it.
+- `⇧⌘F` for a word present in both → results grouped, each labelled with its folder.
+- Edit a file in the **second** folder → only that file reloads; the first folder's view and scroll position are untouched.
+- Images and internal `[links](x.md)` still resolve inside their own folder.
+
+### 35. Removing folders and stopping
+
+- `mdview rm <name>` → the folder disappears from the open tab on its own. `mdview ls` no longer lists it.
+- `mdview rm` the last folder → sidebar and main pane both show "No folders open", not an endless loading skeleton.
+- `mdview rm nope` → `Not open: nope`, exit code non-zero.
+- `mdview stop` → `mdview: stopped (pid N)`; the port is closed. `mdview stop` again → `mdview: not running`.
+- After `stop`, `mdview ls` still lists the folders (they persist) and says the server is not running.
+
+### 36. Failure and edge paths
+
+- `mdview .` twice in the same folder → second says `open:` not `added:`, and `mdview ls` shows one entry.
+- `mdview ./docs/guide.md` where `.` is already open → reuses that folder (`open:`), URL is `?file=<folder>/docs/guide.md`, **no** duplicate folder appears.
+- `kill -9 <pid>` then `mdview .` → detects the stale `daemon.json`, starts a fresh server, folders all still there.
+- Run `mdview .` in four terminals at once from a cold start → one server, four identical URLs.
+- Open 9 folders → the 9th fails with `Workspace is full (8)`.
+- `mdview --no-open .`, then leave it with no tab open for a few minutes → still running. Idle shutdown is off unless asked for.
+- `MDVIEW_IDLE_TIMEOUT=0.05 mdview --no-open .` with no tab open → gone within ~5s; `daemon.json` removed. Repeat with a tab connected → stays up past the timeout.
+- `PORT=7412 mdview .` → server on 7412.
+- Hand-edit `workspace.json` into invalid JSON → next `mdview ls` reports no folders instead of crashing.
+
+### 37. Regressions the daemon must not cause
+
+- `mdview --foreground --no-open ./test-fixtures` → blocks, prints `watching:`, Ctrl-C stops it. Writes **no** `daemon.json`; `/api/health` 404s.
+- `mdview --port 9000 ./test-fixtures` and `mdview --palette nord ./test-fixtures` → both block in the terminal, exactly as before the daemon existed.
+- `mdview --vscode --port 0 ./test-fixtures` → still one JSON line with a `http://127.0.0.1:<port>/` URL, still exits on stdin close.
+
 ## Tests
 
 ```bash

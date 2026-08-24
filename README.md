@@ -62,13 +62,56 @@ npm install -g ./mdview-0.6.0.tgz
 ## Usage
 
 ```bash
-mdview <path>              # file or folder
+mdview <path>              # open a file or folder; the shell comes straight back
 mdview                     # current directory
-mdview --port 9000         # custom port (default 7331; auto-fallback unless --port is explicit)
+mdview ls                  # what's open, and where the server is
+mdview rm <name>           # stop serving a folder
+mdview stop                # stop the background server
+mdview --foreground        # run in this terminal instead (Ctrl-C to stop)
 mdview --no-open           # don't auto-launch the browser
-mdview --palette nord      # override the configured palette for this run
+mdview --port 9000         # one-off server on a specific port (implies --foreground)
+mdview --palette nord      # palette for this run (implies --foreground)
 mdview --help              # show usage
 ```
+
+### One server, many folders
+
+`mdview` does not hold your terminal. It starts a single background server the
+first time you need one, and every later `mdview <path>` — in any repo — adds
+that folder to the same server and opens it. So you can read
+`~/work/api/docs` and `~/notes` side by side in one window, with one stable
+URL, whether or not the folders are anywhere near each other.
+
+```console
+$ mdview ~/work/api
+mdview → http://mdview.localhost:7331/?root=api
+added: /Users/you/work/api (api)
+$ cd ~/notes && mdview .
+mdview → http://mdview.localhost:7331/?root=notes
+added: /Users/you/notes (notes)
+$ mdview ls
+● api    ~/work/api    (primary)
+● notes  ~/notes
+
+server:  http://mdview.localhost:7331/  (pid 40113)
+logs:    ~/.config/mdview/daemon.log
+```
+
+Folders stay open until you remove them with `mdview rm <name>`, across restarts
+and reboots. Up to 8 at a time — each one holds a live file watcher, so the
+limit is there to keep mdview from quietly watching your whole disk. Opening a
+file or subfolder inside a folder that's already open reuses it rather than
+adding a duplicate.
+
+The server keeps running until you `mdview stop` it, or you reboot. If you'd
+rather it stood down on its own, set `MDVIEW_IDLE_TIMEOUT` to a number of
+minutes and it will exit that long after the last browser tab disconnects; the
+next `mdview` starts it again.
+
+Its state lives in `~/.config/mdview/` (`daemon.json`, `workspace.json`,
+`daemon.log`) and nowhere else. `workspace.json` is also how the CLI talks to
+the server: `mdview <path>` writes the file and the server picks the change up,
+which is why there is no HTTP endpoint that can change what's being served.
 
 The URL is `http://mdview.localhost:7331/` — `*.localhost` always resolves to
 loopback (RFC 6761) with no setup, and the server still listens on `127.0.0.1`
@@ -84,7 +127,15 @@ either. There is also a `--vscode` flag, used by the VS Code extension to run
 mdview as a sidecar; it implies `--no-open` and prints a single JSON ready line
 instead of the human-readable output.
 
-Closes when you `Ctrl-C` or `kill` the process. Set `MDVIEW_DEBUG=1` for full stack traces on unexpected errors.
+`--port` and `--palette` both override a setting that belongs to a whole server,
+and the background one is shared with every other folder you have open — so each
+implies `--foreground`, giving you a server of your own. That also means every
+invocation that worked before still behaves exactly as it did; only the bare
+`mdview [path]` form returns the shell now.
+
+`--foreground` closes when you `Ctrl-C` or `kill` it. The background server is
+stopped with `mdview stop`. Set `MDVIEW_DEBUG=1` for full stack traces on
+unexpected errors.
 
 ## Keyboard shortcuts
 

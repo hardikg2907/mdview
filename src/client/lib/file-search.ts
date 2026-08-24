@@ -88,3 +88,38 @@ export function rankAll(files: FileEntry[], query: string, max = 50): RankedFile
   ranked.sort((a, b) => b.score - a.score);
   return ranked.slice(0, max);
 }
+
+/** First markdown file in tree order, or null if there are none. */
+export function findFirstMd(nodes: TreeNode[]): string | null {
+  for (const n of nodes) {
+    if (n.type === 'file' && n.isMarkdown) return n.relPath;
+    if (n.type === 'dir' && n.children) {
+      const sub = findFirstMd(n.children);
+      if (sub) return sub;
+    }
+  }
+  return null;
+}
+
+/**
+ * First markdown file at or below `prefix` — a workspace path, so either a bare
+ * root id or a folder inside one. Backs `?root=`, which is how `mdview <folder>`
+ * says "focus this one" without knowing what's in it.
+ *
+ * Only the branch leading to the prefix is descended, so this doesn't degrade
+ * into a full walk of every open root.
+ */
+export function findFirstMdUnder(nodes: TreeNode[], prefix: string): string | null {
+  for (const n of nodes) {
+    const inside = n.relPath === prefix || n.relPath.startsWith(`${prefix}/`);
+    if (n.type === 'file') {
+      if (inside && n.isMarkdown) return n.relPath;
+      continue;
+    }
+    if (n.children && (inside || prefix.startsWith(`${n.relPath}/`))) {
+      const sub = findFirstMdUnder(n.children, prefix);
+      if (sub) return sub;
+    }
+  }
+  return null;
+}

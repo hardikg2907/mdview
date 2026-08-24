@@ -22,6 +22,27 @@ export interface CreateWatcherOptions {
   prefix?: string;
 }
 
+/**
+ * A Watcher with no filesystem of its own — every root forwards its events into
+ * one of these and the SSE route subscribes only to it.
+ *
+ * The indirection is what lets roots come and go while tabs stay open: a client
+ * that subscribed to each root's watcher directly would never hear from a root
+ * opened after it connected.
+ */
+export function createEventHub(): Watcher {
+  const emitter = new EventEmitter();
+  emitter.setMaxListeners(0);
+  return {
+    on: (event, listener) => emitter.on(event, listener),
+    off: (event, listener) => emitter.off(event, listener),
+    emitSynthetic: (e) => emitter.emit('event', e),
+    close: async () => {
+      emitter.removeAllListeners();
+    },
+  };
+}
+
 export function createWatcher(rootAbsPath: string, opts: CreateWatcherOptions = {}): Watcher {
   const emitter = new EventEmitter();
   // SSE clients each register one listener; the count is bounded by real

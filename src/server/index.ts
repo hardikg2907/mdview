@@ -9,8 +9,9 @@ import { registerApiAsset } from './routes/api-asset.js';
 import { registerApiFile } from './routes/api-file.js';
 import { registerApiSearch } from './routes/api-search.js';
 import { registerApiTree } from './routes/api-tree.js';
+import { registerHealth } from './routes/health.js';
 import { registerSse } from './routes/sse.js';
-import { createWatcher } from './watcher.js';
+import { createEventHub, createWatcher } from './watcher.js';
 import { describeRoot, type RootSpec, type RootState, resolveRootId } from './workspace.js';
 
 export interface ServerOptions {
@@ -33,6 +34,20 @@ export interface ServerOptions {
    * assembly site below for the full security argument.
    */
   embedMode?: boolean;
+  /** Reported by /api/health so the CLI can tell our daemon from a stranger. */
+  identity?: { pid: number; startedAt: number };
+  /** Called whenever the number of connected SSE clients changes. */
+  onSseClientsChanged?: (count: number) => void;
+}
+
+export interface MdviewServer {
+  app: FastifyInstance;
+  /**
+   * Replace the open root set: opens what's new, closes what's gone, reorders
+   * to match, and tells connected clients to refetch. Order matters — the first
+   * root is the primary one.
+   */
+  setRoots(specs: RootSpec[]): Promise<void>;
 }
 
 // Why: under --vscode the page is loaded inside a VS Code webview iframe whose
@@ -63,7 +78,7 @@ function buildCspHtml(embedMode: boolean): string {
   return directives.join('; ');
 }
 
-export async function createServer(opts: ServerOptions): Promise<FastifyInstance> {
+export async function createServer(opts: ServerOptions): Promise<MdviewServer> {
   const app = Fastify({ logger: false });
   const cspHtml = buildCspHtml(opts.embedMode ?? false);
 
@@ -95,13 +110,13 @@ export async function createServer(opts: ServerOptions): Promise<FastifyInstance
   // mid-flight change would leave the FSWatcher and the tree walker disagreeing
   // about which dirs to surface.
   //
-  // Mutated in place rather than replaced, so the route closures and the SSE
-  // watcher accessor below always see the current set.
+  // `roots` is mutated in place rather than replaced, so the route closures
+  // always see the current set.
   const roots: RootState[] = [];
-  const configWatchers: FSWatcher[] = [];
+  const configWatchers = new Map<string, FSWatcher>();
+  const hub = createEventHub();
 
-  for (const spec of opts.roots) {
-    const id = resolveRootId(spec, new Set(roots.map((r) => r.root.id)));
+  async function openRoot(spec: RootSpec, id: string): Promise<RootState> {
     const config = await loadEffectiveConfig(spec.absPath);
     const ignoreSet = buildIgnoreSet(config?.ignore ?? []);
     const state: RootState = {
@@ -111,7 +126,7 @@ export async function createServer(opts: ServerOptions): Promise<FastifyInstance
       config,
       watcher: createWatcher(spec.absPath, { ignore: ignoreSet, prefix: id }),
     };
-    roots.push(state);
+    state.watcher.on('event', (e) => hub.emitSynthetic(e));
 
     // Dedicated chokidar watch for .mdview.json — the main watcher ignores
     // dotfiles, so we'd never see it otherwise. One per root, because each root
@@ -123,23 +138,70 @@ export async function createServer(opts: ServerOptions): Promise<FastifyInstance
     });
     const reloadConfig = async (): Promise<void> => {
       // Note: only the scalar fields hot-reload. `ignore` is read once at
-      // startup — changing it requires restarting mdview, because the FSWatcher
-      // was constructed against the original set.
+      // startup — changing it requires reopening the root, because the
+      // FSWatcher was constructed against the original set.
       state.config = await loadEffectiveConfig(spec.absPath);
       const event: WatchEvent = { kind: 'config', relPath: `${id}/${CONFIG_FILENAME}` };
-      state.watcher.emitSynthetic?.(event);
+      hub.emitSynthetic(event);
     };
     configWatcher.on('add', () => void reloadConfig());
     configWatcher.on('change', () => void reloadConfig());
     configWatcher.on('unlink', () => void reloadConfig());
-    configWatchers.push(configWatcher);
+    configWatchers.set(id, configWatcher);
+
+    return state;
+  }
+
+  async function closeRoot(state: RootState): Promise<void> {
+    const cw = configWatchers.get(state.root.id);
+    configWatchers.delete(state.root.id);
+    await Promise.all([state.watcher.close(), cw?.close()]);
+  }
+
+  async function setRoots(specs: RootSpec[]): Promise<void> {
+    const taken = new Set<string>();
+    const wanted = specs.map((spec) => {
+      const id = resolveRootId(spec, taken);
+      taken.add(id);
+      return { id, spec };
+    });
+
+    // A root whose path changed under the same id has to be reopened, not
+    // reused — its watcher and ignore set belong to the old directory.
+    const keep = new Map(
+      roots
+        .filter((r) => wanted.some((w) => w.id === r.root.id && w.spec.absPath === r.absPath))
+        .map((r) => [r.root.id, r]),
+    );
+    const dropped = roots.filter((r) => !keep.has(r.root.id));
+
+    const next: RootState[] = [];
+    for (const { id, spec } of wanted) {
+      const existing = keep.get(id);
+      next.push(existing ?? (await openRoot(spec, id)));
+    }
+
+    roots.length = 0;
+    roots.push(...next);
+    await Promise.all(dropped.map(closeRoot));
+    hub.emitSynthetic({ kind: 'workspace' });
+  }
+
+  {
+    const taken = new Set<string>();
+    for (const spec of opts.roots) {
+      const id = resolveRootId(spec, taken);
+      taken.add(id);
+      roots.push(await openRoot(spec, id));
+    }
   }
 
   registerApiFile(app, roots);
   registerApiTree(app, roots, opts.paletteOverride);
   registerApiAsset(app, roots);
   registerApiSearch(app, roots);
-  registerSse(app, () => roots.map((r) => r.watcher));
+  registerSse(app, hub, { ...(opts.onSseClientsChanged ? { onClientsChanged: opts.onSseClientsChanged } : {}) });
+  if (opts.identity) registerHealth(app, opts.identity, roots);
 
   await app.register(import('@fastify/static'), {
     root: opts.clientDir,
@@ -184,9 +246,10 @@ export async function createServer(opts: ServerOptions): Promise<FastifyInstance
   app.addHook('onClose', async () => {
     await Promise.all([
       ...roots.map((r) => r.watcher.close()),
-      ...configWatchers.map((w) => w.close()),
+      ...[...configWatchers.values()].map((w) => w.close()),
     ]);
+    await hub.close();
   });
 
-  return app;
+  return { app, setRoots };
 }

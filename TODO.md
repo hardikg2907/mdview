@@ -1,6 +1,6 @@
 # mdview — TODO
 
-Roadmap of pending work. v1 is shipped and in active use; phases 2 and 3 are the next pushes.
+Roadmap of pending work. v1 and phases 2 and 3 are shipped and in active use; phase 4 (editor extensions) is in progress on a branch.
 
 ---
 
@@ -39,14 +39,18 @@ Distribute the viewer as a native side-panel inside the user's editor instead of
 
 ## Phase 3 — Workspaces
 
-Bigger architectural shift: one long-running server hosts multiple "workspaces" (named projects), switchable from the UI without restarting.
+One background server hosts every folder you open. Shipped, with two differences
+from the original sketch: folders are shown *together* rather than switched
+between, and each is identified by a root id that prefixes every path on the wire
+instead of by a `/<name>/api/...` route prefix.
 
-- [ ] **Workspace registry** — `mdview workspace add <path> --name <name>`, `mdview workspace list`, `mdview workspace remove <name>`; storage at `~/.config/mdview/workspaces.json`.
-- [ ] **Single long-running server** — `mdview` (no args) boots in registry mode with all workspaces watched simultaneously; per-workspace routes `/<name>/api/...`; chokidar instance per workspace.
-- [ ] **Workspace switcher UI** — dropdown / command palette in the header listing registered workspaces; click to switch routes.
-- [ ] **Per-workspace state** — sidebar widths, theme override, recent files, search history scoped to the active workspace.
-- [ ] **Backwards-compat** — `mdview <path>` still works as today (ephemeral one-off workspace).
-- [ ] **Lifecycle decisions** — auto-start at login? tray icon? port persistence? (Decide when we get there — different product trade-offs.)
+- [x] **Workspace registry** — `mdview <path>` adds, `mdview ls` lists, `mdview rm <name|path>` removes; storage at `~/.config/mdview/workspace.json`.
+- [x] **Single long-running server** — detached on first use, all folders watched simultaneously, one chokidar instance per folder, `mdview stop` to end it.
+- [x] **Backwards-compat** — `--foreground` is the old behaviour, and `--port` / `--palette` / `--vscode` imply it, so every pre-daemon invocation is unchanged.
+- [x] **Lifecycle** — port persisted in `daemon.json`; runs until `mdview stop`, with opt-in idle shutdown via `MDVIEW_IDLE_TIMEOUT`. No auto-start at login and no tray icon: neither earns its keep when `mdview <path>` starts the server in under a second.
+- [ ] **No-port URL** — `mdview service install` / `uninstall`: one sudo, a kernel redirect from :80 to the server's port (pfctl / iptables / netsh) plus a launchd or systemd unit to reapply it after reboot, so the URL is just `http://mdview.localhost`. The server stays unprivileged. Deliberately deferred — three platform implementations and a reversible uninstall is a feature of its own.
+- [ ] **Per-workspace state** — sidebar widths, theme override, recent files, search history scoped to the active folder. Currently all window-level and shared, which is right for panes and theme but arguably wrong for recent files.
+- [ ] **Switcher UI** — only worth building if showing every folder at once turns out not to scale past a handful.
 
 ---
 
