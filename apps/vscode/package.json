@@ -56,7 +56,7 @@
   "categories": ["Other"],
   "keywords": ["markdown", "preview", "md", "viewer"],
   "dependencies": {
-    "@hardikg/mdview": "^0.7.0"
+    "@hardikg/mdview": "^0.8.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
