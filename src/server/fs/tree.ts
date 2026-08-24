@@ -8,19 +8,23 @@ export interface WalkOptions {
   /** Directory basenames to skip. Defaults to DEFAULT_IGNORED_DIRS. Dotfiles
    *  are always skipped regardless of this set. */
   ignore?: ReadonlySet<string>;
+  /**
+   * Prefix for every emitted relPath — the root id, so paths come out
+   * workspace-scoped. Affects the wire path only, never which directory is read.
+   */
+  relBase?: string;
 }
 
 export async function walkFolder(root: string, opts: WalkOptions = {}): Promise<TreeNode[]> {
   const ignore = opts.ignore ?? DEFAULT_IGNORED_DIRS;
-  return walkInner(root, '', ignore);
+  return walkInner(root, opts.relBase ?? '', ignore);
 }
 
 async function walkInner(
-  root: string,
+  absDir: string,
   relBase: string,
   ignore: ReadonlySet<string>,
 ): Promise<TreeNode[]> {
-  const absDir = path.join(root, relBase);
   const entries = await readdir(absDir, { withFileTypes: true });
 
   const out: TreeNode[] = [];
@@ -37,7 +41,7 @@ async function walkInner(
     const childRel = relBase ? `${relBase}/${entry.name}` : entry.name;
 
     if (entry.isDirectory()) {
-      const children = await walkInner(root, childRel, ignore);
+      const children = await walkInner(path.join(absDir, entry.name), childRel, ignore);
       out.push({
         name: entry.name,
         relPath: childRel,

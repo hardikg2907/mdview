@@ -90,17 +90,52 @@ does not cover it.
 ### Entry & boot
 
 - **`src/cli.ts`** — argument parser, port-fallback listener, browser launcher, SIGINT/SIGTERM shutdown with timeout, friendly error messages (port-in-use, ENOENT, EACCES). `MDVIEW_DEBUG=1` enables full stack traces.
-- **`src/server/index.ts`** — `createServer(opts)` factory. Composes routes, registers `@fastify/static` for the bundled SPA at `/`, hooks `onClose` to close the chokidar watchers. Boots a **second chokidar watcher** dedicated to `.mdview.json` because the main watcher's `ignored` filter excludes dotfiles.
+- **`src/server/index.ts`** — `createServer({ roots, clientDir, … })` factory. Opens one `RootState` per root, composes routes over the root list, registers `@fastify/static` for the bundled SPA at `/`, hooks `onClose` to close every watcher. Boots a **second chokidar watcher per root** dedicated to that root's `.mdview.json`, because the main watcher's `ignored` filter excludes dotfiles.
+
+### Workspace (`src/server/workspace.ts`)
+
+The server serves **N folders at once**, not one. Each is a `RootState`: its wire
+identity (`WorkspaceRoot`), its absolute path, its own frozen ignore set, its own
+`.mdview.json`, and its own chokidar watcher.
+
+Every path on the wire is **workspace-scoped**: `<rootId>/<path within the root>`.
+That is the whole design decision. A relPath stays a single opaque string, so
+`TreeNode`, `RenderedFile`, `WatchEvent`, `?file=`, `/__asset/*`, permalinks and
+every client hook keep working untouched — the alternative, threading a separate
+`root` parameter through all of them, is the same feature for several times the
+diff.
+
+`parseWorkspacePath(roots, wsPath)` splits the first segment and looks it up in
+the open-root set. It is a **lookup, not a parser**: an id that isn't open cannot
+select anything. When the first segment isn't a known id, the whole string is
+taken as relative to the primary root — which is what keeps pre-workspace
+`?file=` links and the VS Code extension (both of which send bare root-relative
+paths) working. It does no containment checking itself; the remainder is still
+untrusted and every caller hands it to `resolveSafePath` against that root's
+absolute path.
+
+Root ids are assigned once, from the folder basename, disambiguated against ids
+already in use (`docs`, `docs-2`), and then **persisted by the caller** — so
+opening or closing an unrelated root never renumbers an existing one and
+permalinks survive.
+
+`WorkspaceRoot` deliberately carries no absolute path. The SPA has no use for
+one, and anything that can reach the port would otherwise be handed a map of the
+user's disk.
+
+Window-level settings (palette, font, line width) can only have one value, so
+they come from the **primary** (first) root's config. `ignore` is per-root,
+applied in that root's own walk and watcher.
 
 ### Routes (`src/server/routes/`)
 
 | Route | Purpose |
 |-------|---------|
-| `GET /api/file?path=...` | Read the file, parse frontmatter, render to HTML, extract outline, tag internal links, rewrite image src. Returns a `RenderedFile` (incl. `lastModified` mtime). |
-| `GET /api/tree` | Walk the open folder; return a nested `TreeNode[]` with markdown files flagged. Response also carries the validated project `config` (`.mdview.json`). |
-| `GET /api/search?q=...&case=...&word=...&regex=...` | Folder-wide grep. Caps per-file (20) and global (200); returns snippets with highlight ranges. |
-| `GET /api/watch` | Server-Sent Events stream of `WatchEvent`s as files change. Includes a synthetic `config` event when `.mdview.json` changes. |
-| `GET /__asset/*` | Serve user content assets (images, etc.) safely via `resolveSafePath`. |
+| `GET /api/file?path=...` | `path` is workspace-scoped (`<rootId>/<path>`). Read the file, parse frontmatter, render to HTML, extract outline, tag internal links, rewrite image src. Returns a `RenderedFile` (incl. `lastModified` mtime). |
+| `GET /api/tree` | Walk every open root; return `{ roots, tree, config }`. With one root its contents sit at the top level, exactly as before workspaces existed; with several, each root is a top-level folder node whose `relPath` is its bare id. `config` comes from the primary root. |
+| `GET /api/search?q=...&case=...&word=...&regex=...` | Grep across every folder root; hits come back root-qualified. Caps per-file (20) and global (200) — the global cap is a budget for the whole search, not per root. Single-file roots are skipped. |
+| `GET /api/watch` | One Server-Sent Events stream carrying every root's `WatchEvent`s, with root-scoped `relPath`s. Includes a synthetic `config` event when a root's `.mdview.json` changes, and a `workspace` event when the set of open roots changes. |
+| `GET /__asset/*` | Serve user content assets (images, etc.). The splat is workspace-scoped, so the URL shape is unchanged: `/__asset/<rootId>/<path>`. Resolved via `parseWorkspacePath` then `resolveSafePath`. |
 | `GET /*` | Falls through to the static SPA bundle; SPA fallback for unknown routes (so client routing works on refresh). |
 
 All request paths that touch the filesystem go through `resolveSafePath(rootAbsPath, rel)` — see `src/server/fs/resolve.ts` — which rejects absolute paths and traversal attempts.
@@ -119,8 +154,8 @@ The renderer lives in `src/render/`, **outside** `src/server/`, because it has n
 ### Filesystem (`src/server/fs/`)
 
 - **`resolve.ts`** — `resolveSafePath(root, rel)` is the security boundary. Rejects absolute paths, normalizes the result, ensures it stays within `root`. Used by every fs read/write.
-- **`tree.ts`** — `walkFolder(root, { ignore })` recursively walks the directory, skipping dotfiles and any directory whose basename is in the supplied ignore set (defaults to `DEFAULT_IGNORED_DIRS`). Sorts dirs first then alpha. Marks markdown files with `isMarkdown: true`.
-- **`grep.ts`** — `grepFiles(rootAbsPath, query, opts)` for folder-wide search. Reuses `walkFolder` + `flattenMdRelPaths` + the shared `compilePattern`. Caps per-file and global. Strips frontmatter before grepping.
+- **`tree.ts`** — `walkFolder(root, { ignore, relBase })` recursively walks the directory, skipping dotfiles and any directory whose basename is in the supplied ignore set (defaults to `DEFAULT_IGNORED_DIRS`). Sorts dirs first then alpha. Marks markdown files with `isMarkdown: true`. `relBase` prefixes the emitted relPaths with the root id — it affects the wire path only, never which directory is read.
+- **`grep.ts`** — `grepFiles(roots, query, opts)` searches across roots. Reuses `walkFolder` + `flattenMdRelPaths` + the shared `compilePattern`. Walks each root unprefixed so paths stay resolvable against it, then prefixes on the way out. Caps per-file and global. Strips frontmatter before grepping.
 - **`ignore.ts`** — `DEFAULT_IGNORED_DIRS` (re-exported from `src/shared/ignore.ts` so the client tooltip can list the same names), `buildIgnoreSet(extra)` to union user-supplied basenames into the defaults, and `isPathIgnored(abs, root, set)` for the chokidar `ignored` callback. Plain basename equality — no globs, no regex.
 
 ### Config (`src/server/config.ts`)
@@ -262,7 +297,7 @@ Sequence shortcuts (e.g. `gg`) use a module-scoped timestamp + `resetPendingSequ
 ## Security model
 
 - **Trust boundary:** the user owns the markdown content. Server-rendered HTML is injected via `innerHTML` because we trust what we ourselves rendered. Inline HTML inside markdown is also passed through (the user wrote it).
-- **External boundary:** `resolveSafePath` is called on every filesystem read. Absolute paths and traversal are rejected.
+- **External boundary:** `resolveSafePath` is called on every filesystem read. Absolute paths and traversal are rejected. With several roots open, `parseWorkspacePath` chooses *which* root's absolute path is the base — it is a lookup against the open set, so an unknown id can only fall back to the primary root, never widen the boundary. Note that percent-encoded `../` survives Fastify's router and arrives in a route param intact, so `resolveSafePath` is genuinely the only thing standing between it and the file; raw `../` is collapsed by the router first and 404s.
 - **External links:** `target="_blank"` is always paired with `rel="noopener noreferrer"`.
 - **Clipboard:** writes only happen in user-initiated event handlers.
 - **Project config:** `validateConfig` rejects `lineWidth` strings that don't match a tight character class (so untrusted CSS can't slip in via `.mdview.json`).

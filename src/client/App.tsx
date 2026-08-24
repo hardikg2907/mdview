@@ -75,8 +75,10 @@ export function App() {
   useEffect(() => {
     const t = treeSignal.value;
     if (!t) return;
-    if (t.root.rootKind === 'file') {
-      setCurrentPath(t.root.rootRelPath);
+    // A lone single-file root pins the view — there is nothing else to show.
+    const only = t.roots.length === 1 ? t.roots[0] : undefined;
+    if (only?.kind === 'file') {
+      setCurrentPath(`${only.id}/${only.filePath}`);
       return;
     }
     if (currentPath === null) {

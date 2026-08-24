@@ -4,6 +4,7 @@ import path from 'node:path';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { registerApiAsset } from '../../src/server/routes/api-asset.js';
+import { fakeRoot } from '../helpers/roots.js';
 
 describe('GET /__asset/* (extension allow-list)', () => {
   let root: string;
@@ -19,7 +20,7 @@ describe('GET /__asset/* (extension allow-list)', () => {
     writeFileSync(path.join(root, '.git', 'config'), '[core]');
 
     app = Fastify({ logger: false });
-    registerApiAsset(app, root);
+    registerApiAsset(app, [fakeRoot(root, { id: 'w' })]);
     await app.ready();
   });
 

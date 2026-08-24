@@ -2,7 +2,13 @@ import type { FastifyInstance } from 'fastify';
 import type { WatchEvent } from '../../shared/types.js';
 import type { Watcher } from '../watcher.js';
 
-export function registerSse(app: FastifyInstance, watcher: Watcher): void {
+/**
+ * One stream carries every root's events. Roots are looked up per connection
+ * rather than captured once, so a client that connects later still gets the
+ * current set — which is what lets roots be added and removed while tabs stay
+ * open.
+ */
+export function registerSse(app: FastifyInstance, watchers: () => readonly Watcher[]): void {
   app.get('/api/watch', (req, reply) => {
     reply.raw.writeHead(200, {
       'Content-Type': 'text/event-stream',
@@ -13,6 +19,7 @@ export function registerSse(app: FastifyInstance, watcher: Watcher): void {
     reply.raw.write(': connected\n\n');
 
     let closed = false;
+    const subscribed = watchers();
 
     // A suspended tab / dropped network can leave the OS-side socket in a state
     // where 'close' doesn't fire promptly, so each write becomes the actual
@@ -23,7 +30,7 @@ export function registerSse(app: FastifyInstance, watcher: Watcher): void {
       if (closed) return;
       closed = true;
       clearInterval(heartbeat);
-      watcher.off('event', send);
+      for (const w of subscribed) w.off('event', send);
       try { reply.raw.end(); } catch { /* already closed */ }
     };
 
@@ -46,7 +53,7 @@ export function registerSse(app: FastifyInstance, watcher: Watcher): void {
       }
     }, 15_000);
 
-    watcher.on('event', send);
+    for (const w of subscribed) w.on('event', send);
 
     req.raw.on('close', cleanup);
     req.raw.on('error', cleanup);

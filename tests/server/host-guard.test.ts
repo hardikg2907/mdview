@@ -5,7 +5,6 @@ import type { FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { isAllowedHost } from '../../src/server/hosts.js';
 import { createServer } from '../../src/server/index.js';
-import type { RootInfo } from '../../src/shared/types.js';
 
 describe('isAllowedHost', () => {
   it('accepts the loopback names a browser actually sends', () => {
@@ -75,7 +74,6 @@ describe('Host guard on a live server', () => {
   let root: string;
   let clientDir: string;
   let app: FastifyInstance;
-  const rootInfo: RootInfo = { rootKind: 'dir', rootRelPath: '', rootName: 'tmp' };
 
   beforeAll(async () => {
     root = mkdtempSync(path.join(tmpdir(), 'mdview-host-'));
@@ -83,7 +81,7 @@ describe('Host guard on a live server', () => {
     // @fastify/static only needs the directory to exist; no real bundle here.
     clientDir = mkdtempSync(path.join(tmpdir(), 'mdview-host-client-'));
     writeFileSync(path.join(clientDir, 'index.html'), '<!doctype html><title>t</title>');
-    app = await createServer({ rootAbsPath: root, rootInfo, clientDir });
+    app = await createServer({ roots: [{ absPath: root, kind: 'dir' }], clientDir });
     await app.ready();
   });
 

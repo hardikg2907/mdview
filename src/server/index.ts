@@ -1,7 +1,7 @@
 import path from 'node:path';
 import chokidar, { type FSWatcher } from 'chokidar';
 import Fastify, { type FastifyInstance } from 'fastify';
-import type { Palette, ProjectConfig, RootInfo, WatchEvent } from '../shared/types.js';
+import type { Palette, WatchEvent } from '../shared/types.js';
 import { CONFIG_FILENAME, loadEffectiveConfig } from './config.js';
 import { buildIgnoreSet } from './fs/ignore.js';
 import { isAllowedHost } from './hosts.js';
@@ -11,10 +11,15 @@ import { registerApiSearch } from './routes/api-search.js';
 import { registerApiTree } from './routes/api-tree.js';
 import { registerSse } from './routes/sse.js';
 import { createWatcher } from './watcher.js';
+import { describeRoot, type RootSpec, type RootState, resolveRootId } from './workspace.js';
 
 export interface ServerOptions {
-  rootAbsPath: string;
-  rootInfo: RootInfo;
+  /**
+   * The folders to serve, in display order. The first is the primary root: its
+   * `.mdview.json` supplies the window-level settings, and an unprefixed path
+   * resolves against it.
+   */
+  roots: RootSpec[];
   clientDir: string;
   /**
    * Optional CLI override for the palette. Wins over both the project
@@ -28,14 +33,6 @@ export interface ServerOptions {
    * assembly site below for the full security argument.
    */
   embedMode?: boolean;
-}
-
-export interface ConfigState {
-  current: ProjectConfig | null;
-  /** Frozen at startup — see comment on the configWatcher below. */
-  ignoreSet: ReadonlySet<string>;
-  /** CLI override applied to the config returned to the SPA. Never persisted. */
-  paletteOverride?: Palette;
 }
 
 // Why: under --vscode the page is loaded inside a VS Code webview iframe whose
@@ -93,46 +90,56 @@ export async function createServer(opts: ServerOptions): Promise<FastifyInstance
     return payload;
   });
 
-  // Load config (global + project) before starting the watcher so the ignore
+  // Load config (global + project) before starting each watcher so the ignore
   // set is frozen in: chokidar caches `ignored` at construction time, and a
   // mid-flight change would leave the FSWatcher and the tree walker disagreeing
   // about which dirs to surface.
-  const initialConfig = await loadEffectiveConfig(opts.rootAbsPath);
-  const ignoreSet = buildIgnoreSet(initialConfig?.ignore ?? []);
+  //
+  // Mutated in place rather than replaced, so the route closures and the SSE
+  // watcher accessor below always see the current set.
+  const roots: RootState[] = [];
+  const configWatchers: FSWatcher[] = [];
 
-  const configState: ConfigState = {
-    current: initialConfig,
-    ignoreSet,
-    paletteOverride: opts.paletteOverride,
-  };
+  for (const spec of opts.roots) {
+    const id = resolveRootId(spec, new Set(roots.map((r) => r.root.id)));
+    const config = await loadEffectiveConfig(spec.absPath);
+    const ignoreSet = buildIgnoreSet(config?.ignore ?? []);
+    const state: RootState = {
+      root: describeRoot(spec, id),
+      absPath: spec.absPath,
+      ignoreSet,
+      config,
+      watcher: createWatcher(spec.absPath, { ignore: ignoreSet, prefix: id }),
+    };
+    roots.push(state);
 
-  const watcher = createWatcher(opts.rootAbsPath, { ignore: ignoreSet });
+    // Dedicated chokidar watch for .mdview.json — the main watcher ignores
+    // dotfiles, so we'd never see it otherwise. One per root, because each root
+    // carries its own config file.
+    const configWatcher: FSWatcher = chokidar.watch(path.join(spec.absPath, CONFIG_FILENAME), {
+      ignoreInitial: true,
+      persistent: true,
+      awaitWriteFinish: { stabilityThreshold: 60, pollInterval: 30 },
+    });
+    const reloadConfig = async (): Promise<void> => {
+      // Note: only the scalar fields hot-reload. `ignore` is read once at
+      // startup — changing it requires restarting mdview, because the FSWatcher
+      // was constructed against the original set.
+      state.config = await loadEffectiveConfig(spec.absPath);
+      const event: WatchEvent = { kind: 'config', relPath: `${id}/${CONFIG_FILENAME}` };
+      state.watcher.emitSynthetic?.(event);
+    };
+    configWatcher.on('add', () => void reloadConfig());
+    configWatcher.on('change', () => void reloadConfig());
+    configWatcher.on('unlink', () => void reloadConfig());
+    configWatchers.push(configWatcher);
+  }
 
-  // Dedicated chokidar watch for .mdview.json — the main watcher ignores
-  // dotfiles, so we'd never see it otherwise.
-  const configPath = path.join(opts.rootAbsPath, CONFIG_FILENAME);
-  const configWatcher: FSWatcher = chokidar.watch(configPath, {
-    ignoreInitial: true,
-    persistent: true,
-    awaitWriteFinish: { stabilityThreshold: 60, pollInterval: 30 },
-  });
-  const reloadConfig = async (): Promise<void> => {
-    // Note: only the scalar fields hot-reload. `ignore` is read once at startup
-    // — changing it requires restarting mdview, because the FSWatcher was
-    // constructed against the original set.
-    configState.current = await loadEffectiveConfig(opts.rootAbsPath);
-    const event: WatchEvent = { kind: 'config', relPath: CONFIG_FILENAME };
-    watcher.emitSynthetic?.(event);
-  };
-  configWatcher.on('add', () => void reloadConfig());
-  configWatcher.on('change', () => void reloadConfig());
-  configWatcher.on('unlink', () => void reloadConfig());
-
-  registerApiFile(app, opts.rootAbsPath, opts.rootInfo);
-  registerApiTree(app, opts.rootAbsPath, opts.rootInfo, configState);
-  registerApiAsset(app, opts.rootAbsPath);
-  registerApiSearch(app, opts.rootAbsPath, opts.rootInfo, configState);
-  registerSse(app, watcher);
+  registerApiFile(app, roots);
+  registerApiTree(app, roots, opts.paletteOverride);
+  registerApiAsset(app, roots);
+  registerApiSearch(app, roots);
+  registerSse(app, () => roots.map((r) => r.watcher));
 
   await app.register(import('@fastify/static'), {
     root: opts.clientDir,
@@ -175,8 +182,10 @@ export async function createServer(opts: ServerOptions): Promise<FastifyInstance
   });
 
   app.addHook('onClose', async () => {
-    await watcher.close();
-    await configWatcher.close();
+    await Promise.all([
+      ...roots.map((r) => r.watcher.close()),
+      ...configWatchers.map((w) => w.close()),
+    ]);
   });
 
   return app;

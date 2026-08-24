@@ -1,7 +1,6 @@
 import type { FastifyInstance } from 'fastify';
-import type { RootInfo } from '../../shared/types.js';
-import { grepFiles } from '../fs/grep.js';
-import type { ConfigState } from '../index.js';
+import { type GrepRoot, grepFiles } from '../fs/grep.js';
+import type { RootState } from '../workspace.js';
 
 const MAX_QUERY_LEN = 200;
 
@@ -16,16 +15,8 @@ function isTrue(v: string | undefined): boolean {
   return v === '1' || v === 'true';
 }
 
-export function registerApiSearch(
-  app: FastifyInstance,
-  rootAbsPath: string,
-  rootInfo: RootInfo,
-  configState: ConfigState,
-): void {
+export function registerApiSearch(app: FastifyInstance, roots: readonly RootState[]): void {
   app.get<{ Querystring: SearchQS }>('/api/search', async (req, reply) => {
-    if (rootInfo.rootKind === 'file') {
-      return reply.send({ query: req.query.q ?? '', results: [], truncated: false });
-    }
     const q = (req.query.q ?? '').trim();
     if (q.length === 0) {
       return reply.send({ query: '', results: [], truncated: false });
@@ -33,11 +24,15 @@ export function registerApiSearch(
     if (q.length > MAX_QUERY_LEN) {
       return reply.code(400).send({ error: 'Query too long' });
     }
-    const out = await grepFiles(rootAbsPath, q, {
+    // Single-file roots contribute nothing: folder search over a root that is
+    // one file duplicates the in-document search the client already runs.
+    const searchable: GrepRoot[] = roots
+      .filter((r) => r.root.kind === 'dir')
+      .map((r) => ({ absPath: r.absPath, id: r.root.id, ignore: r.ignoreSet }));
+    const out = await grepFiles(searchable, q, {
       caseSensitive: isTrue(req.query.case),
       wholeWord: isTrue(req.query.word),
       regex: isTrue(req.query.regex),
-      ignore: configState.ignoreSet,
     });
     return reply.send(out);
   });

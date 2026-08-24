@@ -15,6 +15,11 @@ export interface Watcher {
 export interface CreateWatcherOptions {
   /** Directory basenames to skip recursively. Defaults to DEFAULT_IGNORED_DIRS. */
   ignore?: ReadonlySet<string>;
+  /**
+   * Root id to prefix emitted relPaths with, so events from several roots stay
+   * distinguishable on the one SSE stream.
+   */
+  prefix?: string;
 }
 
 export function createWatcher(rootAbsPath: string, opts: CreateWatcherOptions = {}): Watcher {
@@ -25,6 +30,7 @@ export function createWatcher(rootAbsPath: string, opts: CreateWatcherOptions = 
   // MaxListenersExceededWarning and looks like a leak when it isn't.
   emitter.setMaxListeners(0);
   const ignore = opts.ignore ?? DEFAULT_IGNORED_DIRS;
+  const prefix = opts.prefix ?? '';
 
   const watcher: FSWatcher = chokidar.watch(rootAbsPath, {
     ignoreInitial: true,
@@ -57,7 +63,8 @@ export function createWatcher(rootAbsPath: string, opts: CreateWatcherOptions = 
     // (`\`) events match the same wire format the rest of the API serves.
     const rel = path.relative(rootAbsPath, abs).split(path.sep).join('/');
     if (!rel) return;
-    emitter.emit('event', { kind, relPath: rel } satisfies WatchEvent);
+    const relPath = prefix ? `${prefix}/${rel}` : rel;
+    emitter.emit('event', { kind, relPath } satisfies WatchEvent);
   }
 
   watcher.on('change', (p) => emit('change', p));

@@ -21,50 +21,50 @@ afterAll(() => {
 
 describe('grepFiles', () => {
   it('returns empty results for empty query', async () => {
-    const out = await grepFiles(dir, '');
+    const out = await grepFiles([{ absPath: dir, id: 'w' }], '');
     expect(out.results).toEqual([]);
   });
 
   it('finds case-insensitive matches across multiple files', async () => {
-    const out = await grepFiles(dir, 'banana');
+    const out = await grepFiles([{ absPath: dir, id: 'w' }], 'banana');
     expect(out.results.length).toBe(2);
-    const aRes = out.results.find((r) => r.relPath === 'a.md');
+    const aRes = out.results.find((r) => r.relPath === 'w/a.md');
     expect(aRes?.hits.length).toBe(2);
-    const cRes = out.results.find((r) => r.relPath === 'sub/c.md');
+    const cRes = out.results.find((r) => r.relPath === 'w/sub/c.md');
     expect(cRes?.hits.length).toBe(3);
   });
 
   it('skips non-markdown files', async () => {
-    const out = await grepFiles(dir, 'banana');
-    expect(out.results.find((r) => r.relPath === 'ignore.txt')).toBeUndefined();
+    const out = await grepFiles([{ absPath: dir, id: 'w' }], 'banana');
+    expect(out.results.find((r) => r.relPath === 'w/ignore.txt')).toBeUndefined();
   });
 
   it('snippet contains the matched substring', async () => {
-    const out = await grepFiles(dir, 'banana');
-    const aRes = out.results.find((r) => r.relPath === 'a.md');
+    const out = await grepFiles([{ absPath: dir, id: 'w' }], 'banana');
+    const aRes = out.results.find((r) => r.relPath === 'w/a.md');
     const firstHit = aRes!.hits[0]!;
     const matched = firstHit.snippet.slice(firstHit.highlight[0], firstHit.highlight[1]);
     expect(matched.toLowerCase()).toBe('banana');
   });
 
   it('respects per-file cap', async () => {
-    const out = await grepFiles(dir, 'banana', { perFileCap: 2 });
-    const cRes = out.results.find((r) => r.relPath === 'sub/c.md');
+    const out = await grepFiles([{ absPath: dir, id: 'w' }], 'banana', { perFileCap: 2 });
+    const cRes = out.results.find((r) => r.relPath === 'w/sub/c.md');
     expect(cRes?.hits.length).toBe(2);
     expect(cRes?.truncated).toBe(true);
     expect(cRes?.total).toBe(3);
   });
 
   it('respects global cap', async () => {
-    const out = await grepFiles(dir, 'banana', { globalCap: 2 });
+    const out = await grepFiles([{ absPath: dir, id: 'w' }], 'banana', { globalCap: 2 });
     const totalHits = out.results.reduce((n, r) => n + r.hits.length, 0);
     expect(totalHits).toBeLessThanOrEqual(2);
     expect(out.truncated).toBe(true);
   });
 
   it('records 1-indexed line numbers', async () => {
-    const out = await grepFiles(dir, 'banana');
-    const aRes = out.results.find((r) => r.relPath === 'a.md');
+    const out = await grepFiles([{ absPath: dir, id: 'w' }], 'banana');
+    const aRes = out.results.find((r) => r.relPath === 'w/a.md');
     // a.md body (after frontmatter strip) is the same source, so:
     // line 1 "# Hello", line 2 blank, line 3 "First paragraph mentions banana."
     expect(aRes?.hits[0]?.line).toBe(3);
@@ -83,7 +83,7 @@ describe('grepFiles — CRLF line endings (B1)', () => {
   });
 
   it('does not leave trailing \\r in snippets', async () => {
-    const out = await grepFiles(crlfDir, 'banana');
+    const out = await grepFiles([{ absPath: crlfDir, id: 'w' }], 'banana');
     const r = out.results[0]!;
     for (const hit of r.hits) {
       expect(hit.snippet).not.toMatch(/\r/);
@@ -92,7 +92,7 @@ describe('grepFiles — CRLF line endings (B1)', () => {
   });
 
   it('whole-word match works at end of CRLF line', async () => {
-    const out = await grepFiles(crlfDir, 'banana', { wholeWord: true });
+    const out = await grepFiles([{ absPath: crlfDir, id: 'w' }], 'banana', { wholeWord: true });
     expect(out.results[0]!.hits.length).toBe(2);
   });
 });
@@ -110,7 +110,7 @@ describe('grepFiles — ReDoS mitigation (C4)', () => {
 
   it('skips ultra-long lines in regex mode and reports truncated', async () => {
     const start = Date.now();
-    const out = await grepFiles(reDir, '(a+)+$', { regex: true, maxLineLenForRegex: 10_000 });
+    const out = await grepFiles([{ absPath: reDir, id: 'w' }], '(a+)+$', { regex: true, maxLineLenForRegex: 10_000 });
     const elapsed = Date.now() - start;
     // Without the line cap, this pattern would hang for many seconds.
     expect(elapsed).toBeLessThan(500);
@@ -122,7 +122,7 @@ describe('grepFiles — ReDoS mitigation (C4)', () => {
 
   it('honors per-line budget when matching many overlapping hits', async () => {
     const start = Date.now();
-    const out = await grepFiles(reDir, 'a', {
+    const out = await grepFiles([{ absPath: reDir, id: 'w' }], 'a', {
       regex: true,
       maxLineLenForRegex: 1_000_000,
       perLineBudgetMs: 5,

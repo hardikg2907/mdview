@@ -3,6 +3,7 @@ import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { resolveSafePath } from '../fs/resolve.js';
+import { parseWorkspacePath, type RootState } from '../workspace.js';
 
 const MIME: Record<string, string> = {
   '.png': 'image/png',
@@ -23,12 +24,16 @@ const MIME: Record<string, string> = {
   '.txt': 'text/plain; charset=utf-8',
 };
 
-export function registerApiAsset(app: FastifyInstance, rootAbsPath: string): void {
+export function registerApiAsset(app: FastifyInstance, roots: readonly RootState[]): void {
   app.get<{ Params: { '*': string } }>('/__asset/*', async (req, reply) => {
-    const rel = (req.params['*'] ?? '').replace(/^\/+/, '');
+    const wsPath = (req.params['*'] ?? '').replace(/^\/+/, '');
+    const resolved = parseWorkspacePath(roots, wsPath);
+    if (!resolved) {
+      return reply.code(404).send({ error: 'Asset not found' });
+    }
     let abs: string;
     try {
-      abs = resolveSafePath(rootAbsPath, rel);
+      abs = resolveSafePath(resolved.state.absPath, resolved.rel);
     } catch (err) {
       return reply.code(400).send({ error: (err as Error).message });
     }

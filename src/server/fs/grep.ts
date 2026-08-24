@@ -58,8 +58,15 @@ function buildSnippet(line: string, start: number, end: number, radius: number):
   };
 }
 
+/** One folder to search, plus the root id its results should be reported under. */
+export interface GrepRoot {
+  absPath: string;
+  id: string;
+  ignore?: ReadonlySet<string>;
+}
+
 export async function grepFiles(
-  rootAbsPath: string,
+  roots: readonly GrepRoot[],
   query: string,
   opts: GrepOptions = {},
 ): Promise<FolderSearchResults> {
@@ -80,71 +87,86 @@ export async function grepFiles(
   });
   if (!pattern.valid) return { query, results: [], truncated: false };
 
-  const tree = await walkFolder(rootAbsPath, { ignore: opts.ignore });
-  const files = flattenMdRelPaths(tree);
-
   const results: FileSearchResult[] = [];
   let totalHits = 0;
   let truncated = false;
 
-  for (const relPath of files) {
+  // globalCap is a budget for the whole search, not per root — it exists to
+  // bound the work and the response, and both are workspace-wide.
+  for (const root of roots) {
     if (totalHits >= globalCap) {
       truncated = true;
       break;
     }
-    let absPath: string;
-    try {
-      absPath = resolveSafePath(rootAbsPath, relPath);
-    } catch {
-      continue;
-    }
+    // Walk unprefixed so paths stay resolvable against this root, then prefix
+    // on the way out.
+    const tree = await walkFolder(root.absPath, { ignore: root.ignore ?? opts.ignore });
+    const files = flattenMdRelPaths(tree);
 
-    let raw: string;
-    try {
-      raw = await readFile(absPath, 'utf8');
-    } catch {
-      continue;
-    }
-    const { body } = parseFrontmatter(raw);
-    // Split on both LF and CRLF — a Windows-authored .md leaves a trailing \r
-    // on every line otherwise, breaking \b end-of-line matches and snippet rendering.
-    const lines = body.split(/\r?\n/);
-
-    const fileHits: SearchHit[] = [];
-    let fileTotal = 0;
-    let fileTruncated = false;
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i]!;
-      // Skip pathologically-long lines in regex mode — single exec() against
-      // an ultra-long line is the main ReDoS shape we can't time-cancel.
-      if (regexMode && line.length > maxLineLenForRegex) {
-        fileTruncated = true;
+    for (const relPath of files) {
+      if (totalHits >= globalCap) {
+        truncated = true;
+        break;
+      }
+      let absPath: string;
+      try {
+        absPath = resolveSafePath(root.absPath, relPath);
+      } catch {
         continue;
       }
-      const { matches, truncated: lineTruncated } = regexMode
-        ? pattern.matchAllWithBudget(line, perLineBudgetMs)
-        : { matches: pattern.matchAll(line), truncated: false };
-      if (lineTruncated) fileTruncated = true;
-      for (const m of matches) {
-        fileTotal++;
-        if (fileHits.length < perFileCap) {
-          const { snippet, highlight } = buildSnippet(
-            line, m.index, m.index + m.length, snippetRadius,
-          );
-          fileHits.push({ line: i + 1, col: m.index, snippet, highlight });
-          totalHits++;
-        } else {
-          fileTruncated = true;
-        }
-        if (totalHits >= globalCap) {
-          truncated = true;
-          break;
-        }
+
+      let raw: string;
+      try {
+        raw = await readFile(absPath, 'utf8');
+      } catch {
+        continue;
       }
-      if (totalHits >= globalCap) break;
-    }
-    if (fileHits.length > 0) {
-      results.push({ relPath, hits: fileHits, total: fileTotal, truncated: fileTruncated });
+      const { body } = parseFrontmatter(raw);
+      // Split on both LF and CRLF — a Windows-authored .md leaves a trailing \r
+      // on every line otherwise, breaking \b end-of-line matches and snippet rendering.
+      const lines = body.split(/\r?\n/);
+
+      const fileHits: SearchHit[] = [];
+      let fileTotal = 0;
+      let fileTruncated = false;
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i]!;
+        // Skip pathologically-long lines in regex mode — single exec() against
+        // an ultra-long line is the main ReDoS shape we can't time-cancel.
+        if (regexMode && line.length > maxLineLenForRegex) {
+          fileTruncated = true;
+          continue;
+        }
+        const { matches, truncated: lineTruncated } = regexMode
+          ? pattern.matchAllWithBudget(line, perLineBudgetMs)
+          : { matches: pattern.matchAll(line), truncated: false };
+        if (lineTruncated) fileTruncated = true;
+        for (const m of matches) {
+          fileTotal++;
+          if (fileHits.length < perFileCap) {
+            const { snippet, highlight } = buildSnippet(
+              line, m.index, m.index + m.length, snippetRadius,
+            );
+            fileHits.push({ line: i + 1, col: m.index, snippet, highlight });
+            totalHits++;
+          } else {
+            fileTruncated = true;
+          }
+          if (totalHits >= globalCap) {
+            truncated = true;
+            break;
+          }
+        }
+        if (totalHits >= globalCap) break;
+      }
+      if (fileHits.length > 0) {
+        results.push({
+          relPath: `${root.id}/${relPath}`,
+          hits: fileHits,
+          total: fileTotal,
+          truncated: fileTruncated,
+        });
+      }
     }
   }
   return { query, results, truncated };

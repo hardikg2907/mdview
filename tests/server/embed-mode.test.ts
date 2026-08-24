@@ -5,7 +5,6 @@ import path, { resolve } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { parseArgs } from '../../src/cli.js';
 import { createServer } from '../../src/server/index.js';
-import type { RootInfo } from '../../src/shared/types.js';
 
 const REPO_ROOT = resolve(__dirname, '../../');
 const BIN = resolve(REPO_ROOT, 'bin/mdview.mjs');
@@ -144,7 +143,6 @@ const SHARED_DIRECTIVES = [
 
 describe('--vscode embed mode: CSP', () => {
   let tmpRoot: string;
-  const rootInfo: RootInfo = { rootKind: 'dir', rootRelPath: '', rootName: 'tmp' };
 
   beforeAll(() => {
     tmpRoot = mkdtempSync(path.join(tmpdir(), 'mdview-csp-'));
@@ -160,8 +158,7 @@ describe('--vscode embed mode: CSP', () => {
     // schemes only, which excludes the webview's vscode-webview: parent. No
     // value can name the dynamic origin, so embed mode drops the directive.
     const app = await createServer({
-      rootAbsPath: tmpRoot,
-      rootInfo,
+      roots: [{ absPath: tmpRoot, kind: 'dir' }],
       clientDir: CLIENT_DIR,
       embedMode: true,
     });
@@ -177,8 +174,7 @@ describe('--vscode embed mode: CSP', () => {
 
   it('default (no embed): frame-ancestors is "none" (not *)', async () => {
     const app = await createServer({
-      rootAbsPath: tmpRoot,
-      rootInfo,
+      roots: [{ absPath: tmpRoot, kind: 'dir' }],
       clientDir: CLIENT_DIR,
       embedMode: false,
     });
@@ -195,14 +191,12 @@ describe('--vscode embed mode: CSP', () => {
 
   it('regression: all non-frame-ancestors directives are identical in both modes', async () => {
     const embedApp = await createServer({
-      rootAbsPath: tmpRoot,
-      rootInfo,
+      roots: [{ absPath: tmpRoot, kind: 'dir' }],
       clientDir: CLIENT_DIR,
       embedMode: true,
     });
     const defaultApp = await createServer({
-      rootAbsPath: tmpRoot,
-      rootInfo,
+      roots: [{ absPath: tmpRoot, kind: 'dir' }],
       clientDir: CLIENT_DIR,
       embedMode: false,
     });

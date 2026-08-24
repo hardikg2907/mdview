@@ -34,7 +34,7 @@ Run all five before sending a change:
 ```bash
 npm run typecheck     # tsc --noEmit on both server and client tsconfigs
 npm run lint          # biome check (lint only — formatter disabled)
-npm test              # vitest run — 344 tests
+npm test              # vitest run — 370 tests
 npm run build         # vite + tsup must both succeed
 npm audit --omit=dev  # 0 vulnerabilities in shipped deps (release blocker, see CLAUDE.md §6)
 ```

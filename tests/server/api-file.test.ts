@@ -4,7 +4,7 @@ import path from 'node:path';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { registerApiFile } from '../../src/server/routes/api-file.js';
-import type { RootInfo } from '../../src/shared/types.js';
+import { fakeRoot } from '../helpers/roots.js';
 
 describe('GET /api/file (markdown-only)', () => {
   let root: string;
@@ -16,9 +16,8 @@ describe('GET /api/file (markdown-only)', () => {
     writeFileSync(path.join(root, '.env'), 'SECRET=hunter2');
     writeFileSync(path.join(root, 'notes.txt'), 'plain text');
 
-    const rootInfo: RootInfo = { rootKind: 'dir', rootRelPath: '', rootName: path.basename(root) };
     app = Fastify({ logger: false });
-    registerApiFile(app, root, rootInfo);
+    registerApiFile(app, [fakeRoot(root, { id: 'w' })]);
     await app.ready();
   });
 
@@ -30,7 +29,15 @@ describe('GET /api/file (markdown-only)', () => {
   it('200s on a real .md file', async () => {
     const res = await app.inject({ method: 'GET', url: '/api/file?path=README.md' });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toMatchObject({ relPath: 'README.md' });
+    // An unprefixed request resolves against the primary root, and the response
+    // comes back workspace-scoped.
+    expect(res.json()).toMatchObject({ relPath: 'w/README.md' });
+  });
+
+  it('200s on an explicitly root-prefixed path', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/file?path=w/README.md' });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ relPath: 'w/README.md' });
   });
 
   it('400s on .env (no markdown extension)', async () => {

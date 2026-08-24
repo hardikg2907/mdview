@@ -5,7 +5,8 @@ import { fileURLToPath } from 'node:url';
 import openBrowser from 'open';
 import { runConfigSubcommand } from './cli-config.js';
 import { createServer } from './server/index.js';
-import { PALETTES, type Palette, type RootInfo } from './shared/types.js';
+import { deriveRootId, type RootSpec } from './server/workspace.js';
+import { PALETTES, type Palette } from './shared/types.js';
 
 export type ParseResult =
   | { kind: 'run'; args: Args }
@@ -156,24 +157,25 @@ export function parseArgs(argv: string[], defaultPort: number = DEFAULT_PORT): P
   return { kind: 'run', args };
 }
 
-function detectRoot(target: string): { rootAbsPath: string; rootInfo: RootInfo } {
+/**
+ * Turn a CLI target into a root spec. The id is assigned here rather than left
+ * to the server because the URL we print and open has to contain it.
+ */
+function detectRoot(target: string): RootSpec {
   const abs = path.resolve(target);
   if (!existsSync(abs)) throw new Error(`Path does not exist: ${abs}`);
   const st = statSync(abs);
   if (st.isDirectory()) {
-    return {
-      rootAbsPath: abs,
-      rootInfo: { rootKind: 'dir', rootRelPath: '', rootName: path.basename(abs) },
-    };
+    return { absPath: abs, id: deriveRootId(abs, new Set()), kind: 'dir' };
   }
   if (st.isFile()) {
+    const dir = path.dirname(abs);
     return {
-      rootAbsPath: path.dirname(abs),
-      rootInfo: {
-        rootKind: 'file',
-        rootRelPath: path.basename(abs),
-        rootName: path.basename(abs),
-      },
+      absPath: dir,
+      id: deriveRootId(dir, new Set()),
+      name: path.basename(abs),
+      kind: 'file',
+      filePath: path.basename(abs),
     };
   }
   throw new Error(`Unsupported path type: ${abs}`);
@@ -253,7 +255,7 @@ async function main(): Promise<void> {
   if (parsed.kind === 'version') { console.log(readVersion()); process.exit(0); }
   const args = parsed.args;
 
-  const { rootAbsPath, rootInfo } = detectRoot(args.target);
+  const root = detectRoot(args.target);
 
   const here = path.dirname(fileURLToPath(import.meta.url));
   const clientDirCandidates = [
@@ -266,7 +268,7 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  const app = await createServer({ rootAbsPath, rootInfo, clientDir, paletteOverride: args.palette, embedMode: args.embedMode });
+  const app = await createServer({ roots: [root], clientDir, paletteOverride: args.palette, embedMode: args.embedMode });
   const boundPort = await listen(app, args.port, args.portExplicit);
 
   // Embed mode stays on the literal address: the extension reconstructs the
@@ -274,8 +276,8 @@ async function main(): Promise<void> {
   // URL doesn't match, so a friendly hostname there would break the contract.
   const host = args.embedMode ? '127.0.0.1' : await resolveDisplayHost();
   const url =
-    rootInfo.rootKind === 'file'
-      ? `http://${host}:${boundPort}/?file=${encodeURIComponent(rootInfo.rootRelPath)}`
+    root.kind === 'file'
+      ? `http://${host}:${boundPort}/?file=${encodeURIComponent(`${root.id}/${root.filePath}`)}`
       : `http://${host}:${boundPort}/`;
   if (args.embedMode) {
     // Why: under --vscode the extension parses this JSON to discover the
@@ -283,7 +285,7 @@ async function main(): Promise<void> {
     process.stdout.write(JSON.stringify({ event: 'ready', url, port: boundPort }) + '\n');
   } else {
     console.log(`mdview → ${url}`);
-    console.log(`watching: ${rootAbsPath}`);
+    console.log(`watching: ${root.absPath}`);
   }
 
   if (args.open) await openBrowser(url);
