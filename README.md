@@ -70,6 +70,14 @@ mdview --palette nord      # override the configured palette for this run
 mdview --help              # show usage
 ```
 
+The URL is `http://mdview.localhost:7331/` — `*.localhost` always resolves to
+loopback (RFC 6761) with no setup, and the server still listens on `127.0.0.1`
+only. If your resolver doesn't answer the name, mdview falls back to printing
+`http://127.0.0.1:<port>/`. Setting `PORT` changes the default port, so mdview
+works as-is behind a local proxy like
+[portless](https://github.com/vercel-labs/portless) if you want the port gone
+entirely.
+
 `--palette` takes `classic`, `paper`, `nord`, `solarized`, or `high-contrast`.
 It wins over both `.mdview.json` and the global config, and never writes to
 either. There is also a `--vscode` flag, used by the VS Code extension to run
@@ -193,7 +201,7 @@ Node 20+, TypeScript, Fastify 5, markdown-it 14, Shiki 1, gray-matter, chokidar 
 ## Tests
 
 ```bash
-npm test            # vitest, server + client (331 tests)
+npm test            # vitest, server + client
 npm run typecheck   # both tsconfigs
 npm run build       # vite (client) + tsup (server CLI)
 ```

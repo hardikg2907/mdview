@@ -256,7 +256,7 @@ Sequence shortcuts (e.g. `gg`) use a module-scoped timestamp + `resetPendingSequ
 
 - **`tests/server/`** — vitest unit tests for every logic-heavy module (markdown, math, shiki, frontmatter, outline, resolve, tree, links, grep, config). Node env.
 - **`tests/client/`** — persisted-signal, scroll-spy, outline-nav, outline-filter, search-pattern, relative-time. happy-dom env.
-- 331 tests total (149 server, 182 client). The VS Code extension carries a further 157 in `apps/vscode/tests/unit/` under its own vitest config — those are **not** run by the root `npm test`.
+- Current test count lives in `docs/CONTRIBUTING.md` (one place, so it can't drift). The VS Code extension carries its own suite in `apps/vscode/tests/unit/` under a separate vitest config — **not** run by the root `npm test`.
 - UI components have **no automated tests** — verified via manual walks of `test-fixtures/` (`showcase.md`, `math.md`, `linked-doc.md`).
 
 ## Security model
@@ -267,6 +267,7 @@ Sequence shortcuts (e.g. `gg`) use a module-scoped timestamp + `resetPendingSequ
 - **Clipboard:** writes only happen in user-initiated event handlers.
 - **Project config:** `validateConfig` rejects `lineWidth` strings that don't match a tight character class (so untrusted CSS can't slip in via `.mdview.json`).
 - The server binds to `127.0.0.1` only (never 0.0.0.0). Single-machine, single-user.
+- **Host allow-list:** `isAllowedHost` (`src/server/hosts.ts`) runs in an `onRequest` hook and 403s anything whose `Host` isn't a loopback name. The bind address keeps other machines out; this keeps out the user's own browser acting for someone else. In a DNS-rebinding attack `evil.com` re-resolves to 127.0.0.1 and the attacker's page — still same-origin with `evil.com` — can read everything mdview serves; the `Host` header is what distinguishes that request from a real one. The port is intentionally not part of the check: a name on the list cannot resolve off this machine, so the port adds nothing, and requiring it would break a local proxy that forwards the original `Host`.
 
 ### Content-Security-Policy
 

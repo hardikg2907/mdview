@@ -4,6 +4,7 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import type { Palette, ProjectConfig, RootInfo, WatchEvent } from '../shared/types.js';
 import { CONFIG_FILENAME, loadEffectiveConfig } from './config.js';
 import { buildIgnoreSet } from './fs/ignore.js';
+import { isAllowedHost } from './hosts.js';
 import { registerApiAsset } from './routes/api-asset.js';
 import { registerApiFile } from './routes/api-file.js';
 import { registerApiSearch } from './routes/api-search.js';
@@ -23,8 +24,8 @@ export interface ServerOptions {
   paletteOverride?: Palette;
   /**
    * When true, the server is running inside a VS Code webview iframe (spawned
-   * via --vscode). Relaxes frame-ancestors to '*' — see the comment at the
-   * CSP assembly site below for the full security argument.
+   * via --vscode). Omits frame-ancestors entirely — see the comment at the CSP
+   * assembly site below for the full security argument.
    */
   embedMode?: boolean;
 }
@@ -68,6 +69,14 @@ function buildCspHtml(embedMode: boolean): string {
 export async function createServer(opts: ServerOptions): Promise<FastifyInstance> {
   const app = Fastify({ logger: false });
   const cspHtml = buildCspHtml(opts.embedMode ?? false);
+
+  // Rejected before routing, so it covers the API, /__asset/*, the SSE stream
+  // and the SPA shell alike. See src/server/hosts.ts for why the hostname is
+  // the whole check and the port is not part of it.
+  app.addHook('onRequest', async (req, reply) => {
+    if (isAllowedHost(req.headers.host)) return;
+    return reply.code(403).type('text/plain; charset=utf-8').send('Forbidden');
+  });
 
   // Threat model: a user opens an untrusted .md file. markdown-it is configured
   // with html: true so raw <script> in source would otherwise execute and could

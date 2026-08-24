@@ -7,7 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- The printed and opened URL is now `http://mdview.localhost:7331/` instead of `http://127.0.0.1:7331/`. `*.localhost` is reserved to loopback by RFC 6761 and resolves with no setup, no `/etc/hosts` entry and no privileges; the server still binds `127.0.0.1` only. If the local resolver doesn't answer the name with a loopback address the CLI falls back to the literal address rather than printing a URL that could leave the machine. `--vscode` keeps `127.0.0.1` unconditionally, because the extension validates that exact prefix.
+- `PORT` is honoured as the default port when `--port` is omitted, so mdview runs unchanged under a local reverse proxy such as [portless](https://github.com/vercel-labs/portless) for a port-free URL. Invalid values are ignored rather than fatal.
+
 ### Security
+- Every request's `Host` header is now checked against a loopback allow-list (`localhost`, `*.localhost`, the loopback literals) in an `onRequest` hook, and anything else gets a bare `403`. Closes a DNS-rebinding hole: binding `127.0.0.1` never stopped a page the user was already browsing from re-resolving its own domain to loopback and reading every file mdview serves. Verified against a running server — `Host: evil.com` returned `200` before this change.
 - `@fastify/static` 9 → 10 (major). Closes two high-severity advisories in the component that serves the SPA: authorization bypass via non-canonical URL paths (GHSA-8pvw-jcv7-9cmj) and route-guard bypass via path traversal (GHSA-83w8-p2f5-377r). The plugin is registered at a single call site with a `root` + `prefix` only, and v10 changes nothing we use — its diff against v9 is `fastify-plugin` ^5 → ^6 and `content-disposition` ^1 → ^2.
 - Lockfile-only bumps clearing five further high-severity shipped-dep advisories: `brace-expansion` (DoS via unbounded expansion), `fast-uri` (host confusion via backslash authority delimiter), `find-my-way` (HTTP/2 DoS), `js-yaml` (quadratic CPU in `!!omap`), `linkify-it` (quadratic `mailto:` scan). `npm audit --omit=dev` is back to zero.
 - The one remaining advisory is the `low`, dev-only `esbuild` one already deferred in 0.7.1: it is reachable only through `tsup`/`vite`, is absent from shipped deps, and never enters the published tarball. `npm audit fix` still cannot resolve it without a breaking parent bump.

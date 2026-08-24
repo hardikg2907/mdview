@@ -260,10 +260,31 @@ python3 -m http.server 8000
 - DevTools → Console (iframe context): `window.parent === window` → `false`; `new URLSearchParams(location.search).get('embed')` → `'vscode'`.
 - (Stream B will exercise the postMessage routing for internal-link / outline-heading clicks; the harness only sends the `mdview/init` handshake.)
 
+### 32. Friendly hostname + Host guard
+
+```bash
+node bin/mdview.mjs --no-open --port 7399 ./test-fixtures
+```
+
+- Startup line reads `mdview → http://mdview.localhost:7399/` (not `127.0.0.1`).
+- Open that URL in **Chrome** *and* in **Safari** → both load the SPA. This is the
+  one that needs a real browser: the name resolves to `::1` before `127.0.0.1`
+  and mdview binds IPv4 only, so the browser must fall back. A visible stall
+  before content appears means the fallback is costing real time — say so.
+- Sub-domains work too: `http://docs.mdview.localhost:7399/` loads the same page.
+- `curl -s -o /dev/null -w '%{http_code}' -H 'Host: not-loopback.test' http://127.0.0.1:7399/`
+  → `403`, body exactly `Forbidden`. Repeat against `/api/tree`,
+  `/api/file?path=showcase.md`, `/__asset/assets/star.svg` and `/api/watch` → all `403`.
+- `PORT=7412 node bin/mdview.mjs --no-open ./test-fixtures` → binds 7412.
+  `PORT=nonsense …` → falls back to 7331, no error.
+- `mdview --vscode --port 0 ./test-fixtures` → ready JSON still says
+  `http://127.0.0.1:<port>/`, **never** the friendly host (the extension
+  validates that prefix).
+
 ## Tests
 
 ```bash
-npm test            # 331 vitest unit tests
+npm test            # vitest unit tests (count in docs/CONTRIBUTING.md)
 npm run typecheck   # both tsconfigs clean
 ```
 

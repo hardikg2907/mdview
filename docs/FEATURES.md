@@ -129,6 +129,10 @@ Implementation: shortcuts live in a single registry at `src/client/shortcuts.ts`
 | `--vscode` | Sidecar mode for the VS Code extension: implies `--no-open`, emits one JSON ready line (`{"event":"ready","url":…,"port":…}`) instead of human output, drops `frame-ancestors` so a webview can frame the SPA, and shuts down when stdin closes. |
 | `--help` / `--version` | Usage and version. |
 
+The URL printed and opened is `http://mdview.localhost:7331/`. `*.localhost` is reserved to loopback by RFC 6761 and resolves with no setup and no `/etc/hosts` entry; the server still binds `127.0.0.1` only. If the local resolver doesn't answer the name with a loopback address, the CLI falls back to `http://127.0.0.1:<port>/` rather than printing a URL that might leave the machine.
+
+`PORT` sets the default port when `--port` is omitted, so mdview runs unchanged under a local reverse proxy such as [portless](https://github.com/vercel-labs/portless) — which gives it a port-free `https://mdview.localhost` of its own. Invalid values are ignored rather than fatal.
+
 Subcommand: `mdview config path`, `mdview config ignore list|add|rm` — see
 Themes & palettes.
 
@@ -139,6 +143,7 @@ Errors are mapped to a one-line `mdview: …` message with a non-zero exit;
 
 - All filesystem reads go through `resolveSafePath` (rejects absolute paths and traversal).
 - Server binds to `127.0.0.1` only.
+- Every request's `Host` must be a loopback name (`isAllowedHost`) or it is refused with a bare 403 — the DNS-rebinding guard.
 - External links always use `rel="noopener noreferrer"`.
 - `innerHTML` only used to inject server-rendered (trusted) HTML.
 - `.mdview.json` parser validates types and rejects unsafe `lineWidth` strings before they hit CSS.

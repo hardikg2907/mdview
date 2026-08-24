@@ -1,3 +1,4 @@
+import dns from 'node:dns/promises';
 import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -25,6 +26,10 @@ Options:
   --palette <name>         Override the palette for this run (one of: ${PALETTES.join(', ')})
   --version, -v            Print version and exit
   --help, -h               Show this help
+
+Environment:
+  PORT                     Default port when --port is omitted
+  MDVIEW_DEBUG=1           Print full stack traces on unexpected errors
 
 Examples:
   mdview ./docs                          Browse a folder
@@ -62,8 +67,58 @@ function readVersion(): string {
   return 'unknown';
 }
 
-export function parseArgs(argv: string[]): ParseResult {
-  const args: Args = { target: '.', port: 7331, portExplicit: false, open: true, embedMode: false };
+export const DEFAULT_PORT = 7331;
+
+/**
+ * A name is nicer to type and remember than a loopback IP, and `*.localhost` is
+ * reserved to loopback by RFC 6761 — browsers resolve it without any setup and
+ * without touching /etc/hosts. The server still binds 127.0.0.1 only; this
+ * changes the URL we print and open, not what we listen on.
+ */
+const FRIENDLY_HOST = 'mdview.localhost';
+
+function isLoopbackAddress(addr: string): boolean {
+  return addr === '::1' || addr.startsWith('127.');
+}
+
+/**
+ * Resolve the hostname to show the user, falling back to the literal loopback
+ * address when the friendly name can't be trusted.
+ *
+ * `every` rather than `some` is the point: a resolver that answers
+ * `mdview.localhost` with a routable address (a wildcard DNS hijack, a
+ * corporate split-horizon zone) must not be handed a URL, because the browser
+ * would then send the request off this machine. Falling back costs nothing.
+ */
+async function resolveDisplayHost(): Promise<string> {
+  try {
+    const addrs = await dns.lookup(FRIENDLY_HOST, { all: true });
+    if (addrs.length > 0 && addrs.every((a) => isLoopbackAddress(a.address))) {
+      return FRIENDLY_HOST;
+    }
+  } catch {
+    // No such name on this resolver (some musl/Alpine and locked-down setups).
+  }
+  return '127.0.0.1';
+}
+
+/**
+ * PORT is the near-universal convention for "listen here", and it is what a
+ * local reverse proxy such as portless injects when it runs mdview as a child
+ * to give it a port-free URL of its own. Junk values are ignored rather than
+ * fatal — PORT is often exported for an unrelated project, and refusing to
+ * start would be worse than using the default.
+ */
+function envPort(): number | undefined {
+  const raw = process.env.PORT;
+  if (!raw) return undefined;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 0 || n > 65535) return undefined;
+  return n;
+}
+
+export function parseArgs(argv: string[], defaultPort: number = DEFAULT_PORT): ParseResult {
+  const args: Args = { target: '.', port: defaultPort, portExplicit: false, open: true, embedMode: false };
   let targetSet = false;
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]!;
@@ -188,7 +243,7 @@ async function main(): Promise<void> {
 
   let parsed: ParseResult;
   try {
-    parsed = parseArgs(argv);
+    parsed = parseArgs(argv, envPort() ?? DEFAULT_PORT);
   } catch (err) {
     console.error((err as Error).message);
     printUsage();
@@ -214,10 +269,14 @@ async function main(): Promise<void> {
   const app = await createServer({ rootAbsPath, rootInfo, clientDir, paletteOverride: args.palette, embedMode: args.embedMode });
   const boundPort = await listen(app, args.port, args.portExplicit);
 
+  // Embed mode stays on the literal address: the extension reconstructs the
+  // expected prefix from the port it was given and rejects the handshake if the
+  // URL doesn't match, so a friendly hostname there would break the contract.
+  const host = args.embedMode ? '127.0.0.1' : await resolveDisplayHost();
   const url =
     rootInfo.rootKind === 'file'
-      ? `http://127.0.0.1:${boundPort}/?file=${encodeURIComponent(rootInfo.rootRelPath)}`
-      : `http://127.0.0.1:${boundPort}/`;
+      ? `http://${host}:${boundPort}/?file=${encodeURIComponent(rootInfo.rootRelPath)}`
+      : `http://${host}:${boundPort}/`;
   if (args.embedMode) {
     // Why: under --vscode the extension parses this JSON to discover the
     // ephemeral port and ready state. Single-line, machine-parseable contract.

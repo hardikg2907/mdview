@@ -42,6 +42,7 @@ Skim these before exploring code. They will answer most "where does X live?" que
 - **Folder regex search must remain bounded.** `pattern.matchAllWithBudget` + the per-line-length cap in `src/server/fs/grep.ts` are ReDoS guards. If you replace them, replace with something stronger (e.g. `re2`), not nothing.
 - **User-supplied `ignore` basenames in config are tightly validated** (`/^[A-Za-z0-9_.\-+]{1,64}$/`, with `.` and `..` explicitly rejected) before they reach the watcher or tree walker. The comparison is basename equality only — no globs, no regex, no path joining. Do not loosen this to support patterns without a real glob library and the corresponding ReDoS guard.
 - **Server binds to `127.0.0.1` only.** Don't add a `--host 0.0.0.0` flag without an explicit auth story.
+- **Every request's `Host` header is checked against a loopback allow-list** (`isAllowedHost`, `src/server/hosts.ts`), in an `onRequest` hook so it covers the API, `/__asset/*`, the SSE stream and the SPA shell alike. This is the DNS-rebinding boundary — the loopback bind does not stop a page the user is already browsing from re-resolving its own domain to 127.0.0.1. Only names that cannot resolve off this machine belong on the list (`localhost`, `*.localhost`, the loopback literals). Do not add a routable name, and do not skip the hook for "internal" routes.
 - Treat every user-supplied input — query params, file contents, watch events — as untrusted. Validate length and shape before passing to a regex, the filesystem, or a rendered template.
 
 ### 3.2 Cross-platform
