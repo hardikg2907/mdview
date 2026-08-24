@@ -47,11 +47,10 @@ describe('WEBVIEW_PORT', () => {
 
 describe('buildHostHtml', () => {
   const NONCE = 'dGVzdG5vbmNlMTIz';
-  const IFRAME_URL = 'http://localhost:7331/?file=README.md&embed=vscode';
+  const IFRAME_URL = 'http://127.0.0.1:54732/?file=README.md&embed=vscode';
 
   function build(overrides: Partial<Parameters<typeof buildHostHtml>[0]> = {}): string {
     return buildHostHtml({
-      webviewPort: WEBVIEW_PORT,
       iframeUrl: IFRAME_URL,
       nonce: NONCE,
       ...overrides,
@@ -62,16 +61,30 @@ describe('buildHostHtml', () => {
     expect(typeof build()).toBe('string');
   });
 
-  it('contains the iframe src with the given URL (HTML-escaped)', () => {
+  it('embeds the iframe URL in the relay script, not as a static src attribute', () => {
     const html = build();
-    // The & in the query string is escaped to &amp; in the attribute value.
-    expect(html).toContain(`src="${escapeHtmlAttr(IFRAME_URL)}"`);
+    // The relay sets iframe.src at runtime (after appending the webview id), so
+    // there must be no static src= on the iframe, and the URL must appear inside
+    // the script as a JSON string literal.
+    expect(html).not.toMatch(/<iframe[^>]*\ssrc=/);
+    expect(html).toContain(JSON.stringify(IFRAME_URL));
+  });
+
+  it('appends the webview id and a request id to the iframe URL at runtime', () => {
+    const html = build();
+    expect(html).toContain("get('id')");
+    expect(html).toContain('vscodeBrowserReqId');
+  });
+
+  it('sandboxes the iframe', () => {
+    const html = build();
+    expect(html).toContain('sandbox="allow-scripts allow-forms allow-same-origin allow-downloads"');
   });
 
   it('contains exactly the required CSP', () => {
     const html = build();
     const expectedCsp =
-      `default-src 'none'; frame-src http://localhost:* http://127.0.0.1:*; script-src 'nonce-${NONCE}'; style-src 'unsafe-inline';`;
+      `default-src 'none'; font-src data:; style-src 'unsafe-inline'; script-src 'nonce-${NONCE}'; frame-src *;`;
     expect(html).toContain(expectedCsp);
   });
 
@@ -104,16 +117,13 @@ describe('buildHostHtml', () => {
     expect(html).toContain('ab&quot;cd&lt;ef&gt;gh&amp;ij');
   });
 
-  it('escapes an iframe src that contains HTML-special characters', () => {
-    const unsafeUrl = 'http://localhost:7331/?file=a"b<c>d&e=f';
+  it('embeds the iframe URL as a JSON string literal so quotes cannot break out of the script', () => {
+    const unsafeUrl = 'http://127.0.0.1:54732/?file=a"b&e=f';
     const html = build({ iframeUrl: unsafeUrl });
-    expect(html).not.toContain(unsafeUrl);
-    expect(html).toContain('http://localhost:7331/?file=a&quot;b&lt;c&gt;d&amp;e=f');
-  });
-
-  it('uses port 7331 in the relay origin check', () => {
-    const html = build();
-    expect(html).toContain('http://localhost:7331');
+    // JSON.stringify escapes the embedded double-quote, so the raw form never
+    // appears verbatim inside the script.
+    expect(html).toContain(JSON.stringify(unsafeUrl));
+    expect(html).toContain('a\\"b');
   });
 
   it('contains the iframe with id=spa', () => {
@@ -142,11 +152,13 @@ describe('buildHostHtml', () => {
     expect(html).toContain('acquireVsCodeApi');
   });
 
-  it('contains iframe source AND origin check in relay', () => {
+  it('validates inbound messages by source and discovered origin', () => {
     const html = build();
-    // The relay must check e.source === iframe.contentWindow.
+    // The relay must gate inbound messages on e.source === iframe.contentWindow.
     expect(html).toContain('iframe.contentWindow');
-    // The relay must check e.origin.
-    expect(html).toContain("e.origin !== 'http://localhost:7331'");
+    // The iframe origin is discovered (post-proxy it is opaque) and locked, then
+    // every later inbound message is checked against it.
+    expect(html).toContain('iframeOrigin');
+    expect(html).toContain('e.origin !== iframeOrigin');
   });
 });

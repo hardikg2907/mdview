@@ -20,7 +20,6 @@ describe('readConfig — happy path defaults', () => {
     const cfg = readConfig(folderUri);
     expect(cfg.port).toBe(0);
     expect(cfg.palette).toBe('auto');
-    expect(cfg.ignore).toEqual([]);
     expect(cfg.preview.openIn).toBe('webview');
   });
 });
@@ -87,44 +86,6 @@ describe('readConfig — palette validation', () => {
   });
 });
 
-describe('readConfig — ignore validation', () => {
-  it('keeps valid basenames', () => {
-    wsMock.__setConfig('mdview.ignore', ['node_modules', 'dist', 'package-lock.json']);
-    expect(readConfig(folderUri).ignore).toEqual(['node_modules', 'dist', 'package-lock.json']);
-  });
-
-  it('drops ".."', () => {
-    wsMock.__setConfig('mdview.ignore', ['..', 'dist']);
-    expect(readConfig(folderUri).ignore).toEqual(['dist']);
-  });
-
-  it('drops "."', () => {
-    wsMock.__setConfig('mdview.ignore', ['.', 'src']);
-    expect(readConfig(folderUri).ignore).toEqual(['src']);
-  });
-
-  it('drops path-separator entries', () => {
-    wsMock.__setConfig('mdview.ignore', ['evil/path', 'dist']);
-    expect(readConfig(folderUri).ignore).toEqual(['dist']);
-  });
-
-  it('drops entries with spaces', () => {
-    wsMock.__setConfig('mdview.ignore', ['with space', 'dist']);
-    expect(readConfig(folderUri).ignore).toEqual(['dist']);
-  });
-
-  it('drops entries over 64 characters', () => {
-    const tooLong = 'a'.repeat(65);
-    wsMock.__setConfig('mdview.ignore', [tooLong, 'dist']);
-    expect(readConfig(folderUri).ignore).toEqual(['dist']);
-  });
-
-  it('returns empty array when given non-array', () => {
-    wsMock.__setConfig('mdview.ignore', 'not-an-array');
-    expect(readConfig(folderUri).ignore).toEqual([]);
-  });
-});
-
 describe('readConfig — preview.openIn validation', () => {
   it('falls back to webview for unknown value', () => {
     wsMock.__setConfig('mdview.preview.openIn', 'tab');
@@ -147,7 +108,6 @@ describe('buildCliArgs', () => {
     const cfg: ResolvedConfig = {
       port: 3000,
       palette: 'nord',
-      ignore: ['node_modules'],
       preview: { openIn: 'webview' },
     };
     const args = buildCliArgs('/workspace/project', cfg, 'nord');
@@ -159,11 +119,10 @@ describe('buildCliArgs', () => {
     expect(args[0]).toBe('/workspace/project');
   });
 
-  it('does NOT include --ignore flags (CLI does not accept them; uses .mdview.json)', () => {
+  it('does NOT include an --ignore flag (CLI does not accept one)', () => {
     const cfg: ResolvedConfig = {
       port: 0,
       palette: 'auto',
-      ignore: ['dist', 'node_modules'],
       preview: { openIn: 'webview' },
     };
     const args = buildCliArgs('/workspace/project', cfg, 'paper');
@@ -174,7 +133,6 @@ describe('buildCliArgs', () => {
     const cfg: ResolvedConfig = {
       port: 0,
       palette: 'auto',
-      ignore: [],
       preview: { openIn: 'webview' },
     };
     const args = buildCliArgs('/workspace/project', cfg, 'paper');

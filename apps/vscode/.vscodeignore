@@ -1,0 +1,17 @@
+# Source and build inputs — only dist/ ships.
+src/**
+tests/**
+**/*.ts
+**/*.map
+tsconfig.json
+vitest.config.ts
+esbuild.config.mjs
+
+# Dev metadata.
+.gitignore
+.vscode-test/**
+**/*.vsix
+package-lock.json
+
+# Do NOT ignore node_modules: esbuild marks @hardikg/mdview external, so the
+# bundled CLI and its runtime deps must ship in the VSIX.
