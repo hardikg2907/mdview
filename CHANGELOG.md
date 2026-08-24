@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.1] — 2026-08-24
+
+### Fixed
+- Live reload stopped working for any URL that named a file without its root id — a bookmark from before 0.8.0, or the VS Code extension sending a workspace-relative path. Such a request resolves against the primary root and the server answers with the workspace-scoped path, but the page kept comparing watch events against the path it had asked for, so nothing ever matched and the document silently stopped updating on save. The comparison now uses the path the server actually served. The first load always worked, which is why this got past the 0.8.0 checks.
+
 ## [0.8.0] — 2026-08-24
 
 One background server, many folders. `mdview <path>` no longer holds the terminal.
