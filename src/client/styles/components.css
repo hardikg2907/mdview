@@ -124,6 +124,29 @@
 .tree-dir .tree-icon { color: var(--accent); opacity: .85; }
 .tree-dir:hover .tree-icon { opacity: 1; }
 
+/* Workspace roots: one per open folder, so they read as section headers rather
+   than as ordinary directories you happen to be inside. */
+.tree-root {
+  font-size: .74rem;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+.tree-root .tree-icon { color: var(--fg-muted); }
+.tree-root:hover { color: var(--accent); }
+
+.tree-empty {
+  padding: 18px 14px;
+  color: var(--fg-muted);
+  font-size: .85rem;
+  line-height: 1.5;
+  text-align: center;
+}
+.tree-empty code {
+  font-size: .95em;
+  color: var(--fg);
+}
+
 /* File rows: lighter weight */
 .tree-file {
   font-weight: 400;

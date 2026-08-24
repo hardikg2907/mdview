@@ -134,3 +134,54 @@ describe('rankAll', () => {
     expect(rankAll(files, 'xyz123')).toEqual([]);
   });
 });
+
+describe('workspace-scoped paths', () => {
+  const files = [
+    { relPath: 'alpha/docs/api.md', name: 'api.md' },
+    { relPath: 'beta/docs/api.md', name: 'api.md' },
+    { relPath: 'alpha/README.md', name: 'README.md' },
+  ];
+
+  it('still ranks a basename match above a path match once paths carry a root id', () => {
+    const ranked = files
+      .map((f) => rankFile(f, 'api'))
+      .filter((r): r is NonNullable<typeof r> => r !== null);
+    expect(ranked.length).toBe(2);
+    expect(ranked.every((r) => r.name === 'api.md')).toBe(true);
+  });
+
+  it('lets the root id itself be searched, so a root name narrows results', () => {
+    const ranked = files
+      .map((f) => rankFile(f, 'beta'))
+      .filter((r): r is NonNullable<typeof r> => r !== null);
+    expect(ranked.map((r) => r.relPath)).toEqual(['beta/docs/api.md']);
+  });
+
+  it('highlights inside the basename at the right offset in a prefixed path', () => {
+    const r = rankFile({ relPath: 'alpha/docs/api.md', name: 'api.md' }, 'api');
+    const [start, end] = r?.matchRanges[0] ?? [-1, -1];
+    expect('alpha/docs/api.md'.slice(start, end)).toBe('api');
+  });
+
+  it('flattens a multi-root tree into root-qualified paths', () => {
+    const entries = flattenMdFiles([
+      {
+        name: 'alpha',
+        relPath: 'alpha',
+        type: 'dir',
+        children: [
+          { name: 'README.md', relPath: 'alpha/README.md', type: 'file', isMarkdown: true },
+        ],
+      },
+      {
+        name: 'beta',
+        relPath: 'beta',
+        type: 'dir',
+        children: [
+          { name: 'README.md', relPath: 'beta/README.md', type: 'file', isMarkdown: true },
+        ],
+      },
+    ]);
+    expect(entries.map((e) => e.relPath)).toEqual(['alpha/README.md', 'beta/README.md']);
+  });
+});

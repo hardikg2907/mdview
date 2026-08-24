@@ -57,17 +57,23 @@ export function FolderTree({ tree, currentPath, onSelect, onCollapse }: Props) {
           <IconPanelLeftClose size={14} />
         </button>
       </div>
-      <ul class="tree" role="tree">
-        {tree.map((node) => (
-          <TreeItem
-            key={node.relPath}
-            node={node}
-            currentPath={currentPath}
-            onSelect={onSelect}
-            depth={0}
-          />
-        ))}
-      </ul>
+      {tree.length === 0 ? (
+        <p class="tree-empty">
+          No folders open. Run <code>mdview &lt;path&gt;</code> to add one.
+        </p>
+      ) : (
+        <ul class="tree" role="tree">
+          {tree.map((node) => (
+            <TreeItem
+              key={node.relPath}
+              node={node}
+              currentPath={currentPath}
+              onSelect={onSelect}
+              depth={0}
+            />
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
@@ -81,7 +87,11 @@ interface ItemProps {
 
 function TreeItem({ node, currentPath, onSelect, depth }: ItemProps) {
   const isAncestor = currentPath?.startsWith(node.relPath + '/') ?? false;
-  const [open, setOpen] = useState(isAncestor);
+  // A workspace root is the only depth-0 directory whose relPath is a bare id
+  // with no separator — every other node carries its root's prefix. Roots start
+  // expanded: collapsing the folder you just opened would hide everything.
+  const isRoot = depth === 0 && !node.relPath.includes('/');
+  const [open, setOpen] = useState(isAncestor || isRoot);
   useEffect(() => {
     if (isAncestor) setOpen(true);
   }, [currentPath]);
@@ -92,7 +102,7 @@ function TreeItem({ node, currentPath, onSelect, depth }: ItemProps) {
     return (
       <li class="tree-li tree-li-dir" role="treeitem" aria-expanded={open}>
         <button
-          class={`tree-item tree-dir ${open ? 'is-open' : ''}`}
+          class={`tree-item tree-dir ${open ? 'is-open' : ''} ${isRoot ? 'tree-root' : ''}`}
           style={{ paddingLeft: indent }}
           onClick={() => setOpen((o) => !o)}
         >

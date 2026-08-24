@@ -270,6 +270,11 @@ export function App() {
             onOpenFile={handleSelect}
           />
         )}
+        {treeData?.roots.length === 0 && (
+          <div class="status">
+            No folders open. Run <code>mdview &lt;path&gt;</code> in a folder to add one.
+          </div>
+        )}
         {fileLoading.value && !file && <ContentSkeleton />}
         {fileError.value && <div class="status status-error">Error: {fileError.value}</div>}
         {file && <Content file={file} onInternalNavigate={handleInternalNav} />}

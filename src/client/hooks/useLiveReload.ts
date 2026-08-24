@@ -24,7 +24,9 @@ export function useLiveReload({ currentPath, scrollerRef }: Args): void {
       });
       return;
     }
-    if (e.kind === 'add' || e.kind === 'unlink' || e.kind === 'config') {
+    // A workspace event means a root was opened or closed, which only the tree
+    // can reflect — same refetch as any other structural change.
+    if (e.kind === 'add' || e.kind === 'unlink' || e.kind === 'config' || e.kind === 'workspace') {
       void fetchTree();
     }
   }, [currentPath, scrollerRef]);
