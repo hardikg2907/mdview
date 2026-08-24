@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- `@fastify/static` 9 → 10 (major). Closes two high-severity advisories in the component that serves the SPA: authorization bypass via non-canonical URL paths (GHSA-8pvw-jcv7-9cmj) and route-guard bypass via path traversal (GHSA-83w8-p2f5-377r). The plugin is registered at a single call site with a `root` + `prefix` only, and v10 changes nothing we use — its diff against v9 is `fastify-plugin` ^5 → ^6 and `content-disposition` ^1 → ^2.
+- Lockfile-only bumps clearing five further high-severity shipped-dep advisories: `brace-expansion` (DoS via unbounded expansion), `fast-uri` (host confusion via backslash authority delimiter), `find-my-way` (HTTP/2 DoS), `js-yaml` (quadratic CPU in `!!omap`), `linkify-it` (quadratic `mailto:` scan). `npm audit --omit=dev` is back to zero.
+- The one remaining advisory is the `low`, dev-only `esbuild` one already deferred in 0.7.1: it is reachable only through `tsup`/`vite`, is absent from shipped deps, and never enters the published tarball. `npm audit fix` still cannot resolve it without a breaking parent bump.
+
 ## [0.7.1] — 2026-07-01
 
 ### Security
