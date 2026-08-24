@@ -66,8 +66,15 @@ mdview <path>              # file or folder
 mdview                     # current directory
 mdview --port 9000         # custom port (default 7331; auto-fallback unless --port is explicit)
 mdview --no-open           # don't auto-launch the browser
+mdview --palette nord      # override the configured palette for this run
 mdview --help              # show usage
 ```
+
+`--palette` takes `classic`, `paper`, `nord`, `solarized`, or `high-contrast`.
+It wins over both `.mdview.json` and the global config, and never writes to
+either. There is also a `--vscode` flag, used by the VS Code extension to run
+mdview as a sidecar; it implies `--no-open` and prints a single JSON ready line
+instead of the human-readable output.
 
 Closes when you `Ctrl-C` or `kill` the process. Set `MDVIEW_DEBUG=1` for full stack traces on unexpected errors.
 
@@ -186,7 +193,7 @@ Node 20+, TypeScript, Fastify 5, markdown-it 14, Shiki 1, gray-matter, chokidar 
 ## Tests
 
 ```bash
-npm test            # vitest, server + client (289 tests)
+npm test            # vitest, server + client (331 tests)
 npm run typecheck   # both tsconfigs
 npm run build       # vite (client) + tsup (server CLI)
 ```

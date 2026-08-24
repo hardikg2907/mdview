@@ -118,6 +118,23 @@ Implementation: shortcuts live in a single registry at `src/client/shortcuts.ts`
 - **Custom subtle tooltips** on header controls + outline pills + search options (CSS-only via `[data-tooltip]` attribute; `aria-label` retained for accessibility).
 - **Graceful shutdown** with explicit port-conflict messages and `MDVIEW_DEBUG=1` for full stack traces.
 
+## CLI
+
+| Flag | Behavior |
+|---|---|
+| `<path>` | File or folder. A file serves its parent directory as the root and pins the view to that file. Defaults to the current directory. |
+| `--port <n>` | Bind a specific port. Default 7331, which auto-falls-back through 10 consecutive ports; an explicit `--port` does not fall back and fails loudly instead. `--port 0` takes a kernel-assigned port. |
+| `--no-open` | Don't launch a browser. |
+| `--palette <name>` | `classic` / `paper` / `nord` / `solarized` / `high-contrast`. Applied at API-response time, so it overrides `.mdview.json` and the global config without modifying either on disk. |
+| `--vscode` | Sidecar mode for the VS Code extension: implies `--no-open`, emits one JSON ready line (`{"event":"ready","url":…,"port":…}`) instead of human output, drops `frame-ancestors` so a webview can frame the SPA, and shuts down when stdin closes. |
+| `--help` / `--version` | Usage and version. |
+
+Subcommand: `mdview config path`, `mdview config ignore list|add|rm` — see
+Themes & palettes.
+
+Errors are mapped to a one-line `mdview: …` message with a non-zero exit;
+`MDVIEW_DEBUG=1` prints the full stack instead.
+
 ## Security & boundaries
 
 - All filesystem reads go through `resolveSafePath` (rejects absolute paths and traversal).

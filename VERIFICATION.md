@@ -222,14 +222,14 @@ node bin/mdview.mjs ./test-fixtures/showcase.md --no-open
 
 ### 30. `--vscode` embed mode (CLI side)
 - `mdview --vscode --port 0 ./test-fixtures` → **single line** of JSON on stdout: `{"event":"ready","url":"http://127.0.0.1:<port>/","port":<port>}`. No "mdview → …" / "watching: …" human lines. No browser tab opens (`--vscode` implies `--no-open`).
-- `curl -s -D - http://127.0.0.1:<port>/ | grep -i content-security-policy` → response header contains `frame-ancestors *`. Run the same `curl` against a default-mode instance → header contains `frame-ancestors 'none'`.
+- `curl -s -D - http://127.0.0.1:<port>/ | grep -i content-security-policy` → the header has **no** `frame-ancestors` directive at all. Run the same `curl` against a default-mode instance → header contains `frame-ancestors 'none'`. (0.7.1 dropped the directive under `--vscode` rather than widening it to `*`; Chromium 142 rejects the webview origin against a wildcard.)
 - `(echo "" ; sleep 1) | node bin/mdview.mjs --vscode --port 0 ./test-fixtures` → the CLI prints its ready JSON, then exits cleanly on its own (exit code 0) when stdin closes. Default-mode invocations are unaffected by stdin close.
 
 ### 31. SPA embed mode (`?embed=vscode`)
 Set up a small iframe harness (the SPA's embed mode requires both the `?embed=vscode` query *and* being framed; opening the URL directly in a browser tab won't activate it):
 
 ```bash
-# Terminal 1 — server with --vscode so framing is allowed (frame-ancestors *)
+# Terminal 1 — server with --vscode so framing is allowed (no frame-ancestors)
 mdview --vscode --port 7331 ./test-fixtures
 
 # Terminal 2 — serve a one-page harness over HTTP (file:// can't frame http:// in Chrome)

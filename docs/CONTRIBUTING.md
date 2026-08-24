@@ -29,12 +29,12 @@ The vite dev server proxies `/api/*` to `localhost:7331`, so HMR works for the c
 
 ## Quality gates
 
-Run all four before sending a change:
+Run all five before sending a change:
 
 ```bash
 npm run typecheck     # tsc --noEmit on both server and client tsconfigs
 npm run lint          # biome check (lint only — formatter disabled)
-npm test              # vitest run — 289 tests
+npm test              # vitest run — 331 tests
 npm run build         # vite + tsup must both succeed
 npm audit --omit=dev  # 0 vulnerabilities in shipped deps (release blocker, see CLAUDE.md §6)
 ```
@@ -98,6 +98,17 @@ tests/
 
 test-fixtures/                      ← manual-test markdown files (showcase.md, math.md, …)
 docs/                               ← architecture, contributing, features
+scripts/                            ← capture-screenshots.mjs (npm run capture)
+apps/vscode/                        ← VS Code extension: separate package, own deps + tests
+```
+
+`apps/vscode` is its own npm package with its own lockfile, tsconfig and vitest
+config. The root gate above does **not** touch it — run its checks separately
+when you change it, or when you change a CLI contract it depends on (the
+`--vscode` ready line, the `?file=` URL shape, the embed-mode CSP):
+
+```bash
+cd apps/vscode && npm run typecheck && npm run test:unit   # 157 tests
 ```
 
 ### Where to add a new feature

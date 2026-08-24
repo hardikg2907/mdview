@@ -75,7 +75,15 @@ src/
 tests/
 ├── server/                          ← vitest unit tests (markdown, math, grep, config, …)
 └── client/                          ← persisted-signal, scroll-spy, outline-nav, search-pattern, …
+
+apps/
+└── vscode/                          ← VS Code extension; separate package, own deps + test runner
 ```
+
+`apps/vscode` is a side-by-side package, not a workspace member — it consumes the
+published `@hardikg/mdview` and talks to it across a process boundary (spawn +
+ready-JSON on stdout + a webview iframe + `postMessage`). The root quality gate
+does not cover it.
 
 ## Server (`src/server/`)
 
@@ -248,7 +256,8 @@ Sequence shortcuts (e.g. `gg`) use a module-scoped timestamp + `resetPendingSequ
 
 - **`tests/server/`** — vitest unit tests for every logic-heavy module (markdown, math, shiki, frontmatter, outline, resolve, tree, links, grep, config). Node env.
 - **`tests/client/`** — persisted-signal, scroll-spy, outline-nav, outline-filter, search-pattern, relative-time. happy-dom env.
-- 97 tests total. UI components have **no automated tests** — verified via manual walks of `test-fixtures/` (`showcase.md`, `math.md`, `linked-doc.md`).
+- 331 tests total (149 server, 182 client). The VS Code extension carries a further 157 in `apps/vscode/tests/unit/` under its own vitest config — those are **not** run by the root `npm test`.
+- UI components have **no automated tests** — verified via manual walks of `test-fixtures/` (`showcase.md`, `math.md`, `linked-doc.md`).
 
 ## Security model
 
@@ -258,6 +267,28 @@ Sequence shortcuts (e.g. `gg`) use a module-scoped timestamp + `resetPendingSequ
 - **Clipboard:** writes only happen in user-initiated event handlers.
 - **Project config:** `validateConfig` rejects `lineWidth` strings that don't match a tight character class (so untrusted CSS can't slip in via `.mdview.json`).
 - The server binds to `127.0.0.1` only (never 0.0.0.0). Single-machine, single-user.
+
+### Content-Security-Policy
+
+`markdown-it` runs with `html: true`, so inline HTML in a document reaches the
+page verbatim. The CSP is what keeps that from becoming script execution. It is
+assembled in `buildCspHtml()` (`src/server/index.ts`) and applied by an `onSend`
+hook that fires for `text/html` responses only, alongside
+`x-content-type-options: nosniff` and `referrer-policy: no-referrer`.
+
+| Directive | Value | Why |
+|---|---|---|
+| `default-src` | `'self'` | Nothing off-origin loads. |
+| `script-src` | `'self'` | No `'unsafe-inline'`, no CDN. This is why the FOUC-avoiding theme bootstrap is an external `public/bootstrap.js` rather than an inline `<script>`. |
+| `style-src` | `'self' 'unsafe-inline'` | KaTeX and mermaid set inline `style` attributes on the nodes they generate. |
+| `img-src` | `'self' data: blob:` | `data:` for inlined SVG, `blob:` for mermaid's rendered output. |
+| `font-src` | `'self' data:` | JetBrains Mono subsets are same-origin; KaTeX inlines some faces. |
+| `connect-src` | `'self'` | Confines `fetch` and the SSE stream to this origin. |
+| `base-uri` / `form-action` | `'none'` | No `<base>` hijack, no form posts anywhere. |
+| `frame-ancestors` | `'none'`, **omitted** under `--vscode` | Blocks framing by default. Under `--vscode` the directive is dropped entirely rather than widened to `*`: Chromium 142 (VS Code 1.126) rejects the webview's `vscode-webview://` origin against a wildcard, so an omitted directive is the only thing that both frames correctly and stays honest about what is being allowed. |
+
+Adding a `script-src` source, adding `'unsafe-inline'` to `script-src`, or
+weakening `connect-src` are all regressions — see `CLAUDE.md` §3.1.
 
 ## Design constraints baked in
 
