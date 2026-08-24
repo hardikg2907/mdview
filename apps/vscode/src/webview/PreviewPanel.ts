@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import * as crypto from 'node:crypto';
-import { buildHostHtml, WEBVIEW_PORT } from './host.html';
+import { buildHostHtml } from './host.html';
 import { Dispatcher } from '../messages/dispatcher';
 import type { KnownIncomingMessage, OutgoingMessage } from '../messages/types';
 import { log } from '../output';
@@ -22,7 +22,7 @@ export class PreviewPanel {
   constructor(
     private readonly extensionUri: vscode.Uri,
     /** The actual port the CLI is listening on. */
-    actualPort: number,
+    private readonly actualPort: number,
     /** The initial file to display (relative path from workspace root). */
     initialRelPath: string,
   ) {
@@ -36,12 +36,12 @@ export class PreviewPanel {
       {
         enableScripts: true,
         retainContextWhenHidden: true,
-        // portMapping routes iframe requests for localhost:7331 to the CLI's
-        // actual ephemeral port, including through VS Code remote tunnels.
-        portMapping: [{ webviewPort: WEBVIEW_PORT, extensionHostPort: actualPort }],
-        // Empty: all resources are served by the CLI's HTTP server, not via
-        // vscode-resource:// URIs. This forbids extension-local resource access.
-        localResourceRoots: [],
+        // No portMapping: VS Code 1.126 (Chromium 142) no longer routes iframe
+        // navigations through it. The iframe loads the CLI's real port via the
+        // webview resource proxy instead (see host.html.ts). localResourceRoots
+        // is left at the extension root (matching VS Code's Simple Browser); we
+        // serve no vscode-resource:// content ourselves.
+        localResourceRoots: [extensionUri],
       },
     );
 
@@ -61,8 +61,13 @@ export class PreviewPanel {
 
     this.subscriptions.push(
       this.panel.onDidDispose(() => {
-        this.cleanup();
+        // Fire BEFORE cleanup: cleanup() disposes disposeEmitter, and firing a
+        // disposed emitter is a no-op — so listeners (e.g. the extension's
+        // handler that removes this panel from its per-folder map) must run
+        // first. Otherwise a stale, disposed panel lingers in the map and the
+        // next "open preview" reuses it → "Webview is disposed".
         this.disposeEmitter.fire();
+        this.cleanup();
       }),
     );
 
@@ -106,10 +111,9 @@ export class PreviewPanel {
 
   private setHtml(relPath: string): void {
     const iframeUrl =
-      `http://localhost:${WEBVIEW_PORT}/?file=${encodeURIComponent(relPath)}&embed=vscode`;
+      `http://127.0.0.1:${this.actualPort}/?file=${encodeURIComponent(relPath)}&embed=vscode`;
 
     this.panel.webview.html = buildHostHtml({
-      webviewPort: WEBVIEW_PORT,
       iframeUrl,
       nonce: this.nonce,
     });

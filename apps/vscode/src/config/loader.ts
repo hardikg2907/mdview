@@ -5,12 +5,10 @@ export type Palette = 'classic' | 'paper' | 'nord' | 'solarized' | 'high-contras
 export type PaletteSetting = Palette | 'auto';
 
 const KNOWN_PALETTES: readonly PaletteSetting[] = ['auto', 'classic', 'paper', 'nord', 'solarized', 'high-contrast'] as const;
-const IGNORE_PATTERN = /^[A-Za-z0-9_.\-+]{1,64}$/;
 
 export interface ResolvedConfig {
   port: number;
   palette: PaletteSetting;
-  ignore: string[];
   preview: { openIn: 'webview' | 'browser' };
 }
 
@@ -32,22 +30,11 @@ export function readConfig(folderUri: vscode.Uri): ResolvedConfig {
     : 'auto';
   if (palette !== rawPalette) log(`mdview.palette "${rawPalette}" is invalid; using 'auto'.`);
 
-  const rawIgnore = cfg.get<string[]>('ignore', []) ?? [];
-  const ignore = Array.isArray(rawIgnore)
-    ? rawIgnore.filter(
-        (s) => typeof s === 'string' && IGNORE_PATTERN.test(s) && s !== '.' && s !== '..',
-      )
-    : [];
-  if (ignore.length !== rawIgnore.length)
-    log(
-      `mdview.ignore contained invalid entries; filtered to ${ignore.length} of ${rawIgnore.length}.`,
-    );
-
   // preview.openIn: allow-list, default 'webview'.
   const rawOpenIn = cfg.get<string>('preview.openIn', 'webview');
   const openIn: 'webview' | 'browser' = rawOpenIn === 'browser' ? 'browser' : 'webview';
 
-  return { port, palette, ignore, preview: { openIn } };
+  return { port, palette, preview: { openIn } };
 }
 
 export function buildCliArgs(
@@ -59,7 +46,5 @@ export function buildCliArgs(
   // ephemeral port and reports it back in the ready signal.
   const args: string[] = [folderPath, '--vscode', '--port', String(cfg.port)];
   args.push('--palette', resolvedPalette);
-  // The CLI has no --ignore flag; ignores come from .mdview.json. cfg.ignore is
-  // kept on ResolvedConfig so callers can surface validation results to the user.
   return args;
 }
