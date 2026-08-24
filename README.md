@@ -50,13 +50,13 @@ node bin/mdview.mjs ./docs
 ### Share with friends without publishing
 
 ```bash
-npm run build && npm pack    # produces mdview-0.6.0.tgz
+npm run build && npm pack    # produces hardikg-mdview-<version>.tgz
 ```
 
 Send them the `.tgz` (Slack/Drive/AirDrop). They install with:
 
 ```bash
-npm install -g ./mdview-0.6.0.tgz
+npm install -g ./hardikg-mdview-<version>.tgz
 ```
 
 ## Usage

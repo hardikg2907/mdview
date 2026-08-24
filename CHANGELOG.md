@@ -7,11 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-- **Paths in URLs are now workspace-scoped**: `?file=docs/api.md` becomes `?file=<rootId>/docs/api.md`, and asset URLs become `/__asset/<rootId>/<path>`. This is what lets one server host several unrelated folders at once (the CLI still opens one per run; opening more arrives with the shared daemon). An unprefixed path still resolves against the first root, so existing links and the VS Code extension keep working.
-- `/api/tree` now returns `{ roots, tree, config }`. With a single root its contents stay at the top level exactly as before; a second root is what introduces a folder node per root. Window-level settings (palette, font, line width) come from the first root; `ignore` stays per-root.
-- Folder search covers every open folder root and labels each hit with its root. The 200-hit cap is a budget for the whole search rather than per root.
-- With more than one folder open the sidebar groups each under its own heading, expanded by default. `⌘P` and folder search span every folder and show which one each result is in. Live reload learns a `workspace` event, so a folder opened or closed elsewhere appears in tabs that are already open without a reload. Closing the last folder shows an empty state rather than an endless skeleton.
+## [0.8.0] — 2026-08-24
+
+One background server, many folders. `mdview <path>` no longer holds the terminal.
 
 ### Added
 - **`mdview <path>` returns the shell.** It starts one detached background server the first time it's needed; every later `mdview <path>`, in any repo, adds that folder to the same server and opens it. So unrelated folders — `~/work/api/docs` and `~/notes` — can be read side by side in one window at one stable URL. `--foreground` (`-f`) runs a server in the terminal as before.
@@ -21,6 +19,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `--port` and `--palette` now imply `--foreground`: each overrides a setting belonging to a whole server, and the background one is shared. A useful side effect is that every invocation that worked before behaves exactly as it did — only the bare `mdview [path]` form changed.
 - The printed and opened URL is now `http://mdview.localhost:7331/` instead of `http://127.0.0.1:7331/`. `*.localhost` is reserved to loopback by RFC 6761 and resolves with no setup, no `/etc/hosts` entry and no privileges; the server still binds `127.0.0.1` only. If the local resolver doesn't answer the name with a loopback address the CLI falls back to the literal address rather than printing a URL that could leave the machine. `--vscode` keeps `127.0.0.1` unconditionally, because the extension validates that exact prefix.
 - `PORT` is honoured as the default port when `--port` is omitted, so mdview runs unchanged under a local reverse proxy such as [portless](https://github.com/vercel-labs/portless) for a port-free URL. Invalid values are ignored rather than fatal.
+
+### Changed
+- **Paths in URLs are now workspace-scoped**: `?file=docs/api.md` becomes `?file=<rootId>/docs/api.md`, and asset URLs become `/__asset/<rootId>/<path>`. This is what lets one server host several unrelated folders at once. An unprefixed path still resolves against the first root, so existing links and existing bookmarks keep working, as does the VS Code extension.
+- `/api/tree` now returns `{ roots, tree, config }`. With a single root its contents stay at the top level exactly as before; a second root is what introduces a folder node per root. Window-level settings (palette, font, line width) come from the first root; `ignore` stays per-root.
+- Folder search covers every open folder root and labels each hit with its root. The 200-hit cap is a budget for the whole search rather than per root.
+- With more than one folder open the sidebar groups each under its own heading, expanded by default. `⌘P` and folder search span every folder and show which one each result is in. Live reload learns a `workspace` event, so a folder opened or closed elsewhere appears in tabs that are already open without a reload. Closing the last folder shows an empty state rather than an endless skeleton.
 
 ### Security
 - There is deliberately **no HTTP endpoint that changes which folders are served**. The CLI writes `workspace.json` and the server watches it, so adding a root requires filesystem access, which a web page does not have — nothing to CSRF, and no shared token to store or leak. `/api/health` is read-only and reports ids, a pid and a start time, never absolute paths.

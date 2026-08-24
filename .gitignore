@@ -5,7 +5,7 @@ bin/*.map
 .DS_Store
 *.log
 .idea
-mdview-*.tgz
+*.tgz
 apps/vscode/node_modules
 apps/vscode/dist
 apps/vscode/*.vsix
