@@ -13,3 +13,5 @@ apps/vscode/.vscode-test
 .vscode/*
 !.vscode/launch.json
 !.vscode/tasks.json
+brag-output
+.claude/settings.local.json
