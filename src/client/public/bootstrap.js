@@ -12,7 +12,18 @@
  */
 (function () {
   var THEMES = ['light', 'dark'];
-  var PALETTES = ['classic', 'paper', 'nord', 'solarized', 'high-contrast'];
+  // Must stay in sync with PALETTES in src/shared/types.ts. Duplicated because
+  // this file is plain JS that runs before any module loads.
+  var PALETTES = [
+    'flexoki',
+    'paper',
+    'solarized',
+    'everforest',
+    'rose-pine',
+    'kanagawa',
+    'catppuccin',
+    'high-contrast',
+  ];
   var theme = null;
   var palette = null;
   var wide = null;
@@ -37,7 +48,7 @@
       theme = 'light';
     }
   }
-  if (!palette) palette = 'classic';
+  if (!palette) palette = 'flexoki';
   var root = document.documentElement;
   root.dataset.theme = theme;
   root.dataset.palette = palette;

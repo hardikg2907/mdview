@@ -14,7 +14,7 @@ describe('validateConfig', () => {
   });
 
   it('accepts valid palettes', () => {
-    expect(validateConfig({ palette: 'nord' })).toEqual({ palette: 'nord' });
+    expect(validateConfig({ palette: 'kanagawa' })).toEqual({ palette: 'kanagawa' });
     expect(validateConfig({ palette: 'solarized' })).toEqual({ palette: 'solarized' });
   });
 
@@ -62,7 +62,7 @@ describe('validateConfig', () => {
   });
 
   it('drops unknown top-level fields silently', () => {
-    expect(validateConfig({ palette: 'nord', undocumented: 123 })).toEqual({ palette: 'nord' });
+    expect(validateConfig({ palette: 'kanagawa', undocumented: 123 })).toEqual({ palette: 'kanagawa' });
   });
 
   describe('ignore field', () => {
@@ -102,13 +102,13 @@ describe('mergeConfigs', () => {
   });
 
   it('lets project override global for scalar fields', () => {
-    const merged = mergeConfigs({ palette: 'nord' }, { palette: 'solarized' });
+    const merged = mergeConfigs({ palette: 'kanagawa' }, { palette: 'solarized' });
     expect(merged?.palette).toBe('solarized');
   });
 
   it('falls back to global when project is missing a field', () => {
-    const merged = mergeConfigs({ palette: 'nord', fontFamily: 'mono' }, { palette: 'classic' });
-    expect(merged?.palette).toBe('classic');
+    const merged = mergeConfigs({ palette: 'kanagawa', fontFamily: 'mono' }, { palette: 'flexoki' });
+    expect(merged?.palette).toBe('flexoki');
     expect(merged?.fontFamily).toBe('mono');
   });
 

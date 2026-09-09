@@ -63,6 +63,8 @@ instead of by a `/<name>/api/...` route prefix.
 
 ## Bugs / Polish (open)
 
+- [ ] **Code-block payload scales with the palette count.** `render/shiki.ts` renders with `defaultColor: false`, so every token carries one CSS variable per (palette, mode) pair — that is what makes a palette swap instant with no re-render. Going from 5 to 8 palettes took a 40-line TypeScript block from **175 KB to 337 KB of HTML (+92%, 337 → 647 bytes per token)**, measured. Nothing is compressed (the server registers no compression plugin), so that lands in the DOM as-is; a 500-line code document is now several MB. The fix is to render only the active palette's light/dark pair and re-fetch on palette change — palette changes are a rare settings action, while the light/dark toggle, which must stay instant, keeps both its variants. That would take the same block to roughly 60 KB, i.e. **cheaper than before the new palettes landed**. Do this before adding a ninth palette.
+
 - [x] **Pre-commit hooks** (landed 0.6.1) — husky v9 with `pre-commit` (`typecheck && lint && test && audit`, ~7s) and `pre-push` (`build`, ~25s). Linter is biome (single binary, no plugin chain), a11y off because the custom widgets are intentionally non-standard. Audit was added to the commit hook too, with an offline-bypass note in CONTRIBUTING.
 
 ---

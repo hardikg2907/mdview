@@ -8,11 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Five new palettes: Everforest, Rosé Pine, Kanagawa, Catppuccin, and Flexoki** — each with a full light and dark variant and its own Shiki theme pair, so code blocks stay inside the palette. Base colours come from each project's own palette file; all six upstream projects are MIT.
+- **Every palette now carries its own paper grain.** The ground texture used to be defined once per light/dark theme, so a warm brown grain (`rgba(120, 70, 30, …)`) was washed over every palette including the cool ones — visible on Nord and on `high-contrast`'s pure white. Each palette now restates `--paper-grain` as a low-alpha tint of its own ink, and `high-contrast` sets it to `none`: any texture over a maximum-contrast ground works against the one thing that palette exists to provide.
 - **VS Code extension: two-way cursor sync.** Clicking a heading or an internal link in the preview moves the editor cursor and reveals the line; moving the cursor in the editor scrolls the preview to the nearest heading at or above that line, debounced at 80ms. A suppression window breaks the feedback loop so VS Code's own selection-change event isn't echoed back as a jitter loop. Inbound paths from the webview are canonicalized with `realpath` and rejected unless they stay inside the workspace folder. The extension is still unpublished (`0.1.0`).
 - VS Code extension: `mdview: Open in Browser` command, and the preview now follows the active editor and the VS Code colour theme.
 
+### Changed
+- **Flexoki is the new default palette**, replacing `classic`. It keeps the warm-cream editorial look but is built on a measured 15-step base ramp rather than hand-picked creams, and it is the only palette here designed for reading prose rather than for reading code.
+- The VS Code extension's `auto` palette no longer picks a different palette for light and dark themes. Light versus dark is a separate axis in the renderer — every palette defines both — so `auto` now follows only the high-contrast kinds and otherwise leaves the palette alone.
+
 ### Removed
-- VS Code extension: the `mdview.ignore` setting. The CLI has no `--ignore` flag, so the value never reached the server — `.mdview.json` at the folder root is the one place ignores are configured.
+- **The `classic` and `nord` palettes.** `--palette classic` and `--palette nord` now exit non-zero and list the valid names. A `palette` of either in `.mdview.json` or a stale one in `localStorage` degrades silently to the default, which is the existing behaviour for any unrecognised palette — no migration needed.
+- The VS Code extension drops both from the `mdview.palette` setting enum.
 
 ### Security
 - `fastify` 5.8.5 → 5.12.3. Closes a schema-validation bypass via root primitive coercion (GHSA-w2qp-rph6-63g4) and `X-Forwarded-*` spoofing under `trustProxy` hop-count (GHSA-3m5p-2c4r-xxw2). Neither is reachable here — the server defines no root-primitive schemas and never sets `trustProxy` — but the dep ships to users.

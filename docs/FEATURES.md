@@ -34,7 +34,7 @@ Comprehensive catalog of what `mdview` does today (post Phase 2, May 2026).
 | Feature | Implementation |
 |---------|----------------|
 | CommonMark + GFM (tables, task lists, strikethrough, autolinks) | `markdown-it` with linkify enabled |
-| **Server-side syntax highlighting (Shiki, palette-aware)** | `render/shiki.ts` — renders 10 theme variants per token (5 palettes × light/dark) inline as CSS variables; CSS picks the active variant via `[data-palette][data-theme]`. Zero client highlighter bundle. No re-render on palette swap. |
+| **Server-side syntax highlighting (Shiki, palette-aware)** | `render/shiki.ts` — renders 16 theme variants per token (8 palettes × light/dark) inline as CSS variables; CSS picks the active variant via `[data-palette][data-theme]`. Zero client highlighter bundle. No re-render on palette swap. |
 | Mermaid diagrams (lazy-loaded) | server emits `<div class="mermaid-block">`; `lib/mermaid-loader.ts` does dynamic `import('mermaid')` only when present |
 | **Math / LaTeX (KaTeX, lazy-loaded)** | custom `markdown-it` core rule in `render/math.ts` emits `<span class="math-inline">` and `<div class="math-block">`; `lib/katex-loader.ts` dynamic-imports KaTeX + injects its CSS only when math is present |
 | Front matter (YAML) parsing & display | `render/frontmatter.ts` + `<details>` block in `Content.tsx` |
@@ -78,7 +78,8 @@ Comprehensive catalog of what `mdview` does today (post Phase 2, May 2026).
 | Light + dark themes | CSS variables in `theme.css`, swapped via `data-theme` on `<html>` |
 | OS preference detection | `useTheme.ts` matchMedia subscription |
 | Manual override (persisted) | `themeSignal` + `localStorage` key `mdview-theme` |
-| **Palette picker — classic / paper / nord / solarized / high-contrast** | `ViewMenu.tsx` in header (consolidated gear menu); `usePalette.ts` resolves user override > project config > default; `data-palette` attribute on `<html>` |
+| **Palette picker — flexoki / paper / solarized / everforest / rose-pine / kanagawa / catppuccin / high-contrast** | `ViewMenu.tsx` in header (consolidated gear menu); `usePalette.ts` resolves user override > project config > default (`flexoki`); `data-palette` attribute on `<html>` |
+| **Per-palette paper grain** | `theme.css` — every palette restates `--paper-grain` as a low-alpha wash of its own ink; `high-contrast` sets it to `none` |
 | **High-contrast palette** | `data-palette="high-contrast"` — near-pure-white / near-pure-black prose, bolder accents, stronger borders; pairs with `github-light-high-contrast` / `github-dark-high-contrast` Shiki themes |
 | **Per-project config (`.mdview.json`)** | `src/server/config.ts` validates & loads; included in `/api/tree` response; live-reloaded |
 | **Global config (`~/.config/mdview/config.json`)** | `loadGlobalConfig` honours `$XDG_CONFIG_HOME`; merged with per-project via `mergeConfigs` (project wins for scalars; `ignore` is unioned) |

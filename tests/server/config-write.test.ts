@@ -51,18 +51,18 @@ describe('addIgnoreEntries', () => {
   });
 
   it('appends to an existing ignore array, dedupes, sorts', async () => {
-    writeFileSync(cfgPath, JSON.stringify({ palette: 'nord', ignore: ['c', 'a'] }));
+    writeFileSync(cfgPath, JSON.stringify({ palette: 'kanagawa', ignore: ['c', 'a'] }));
     const result = await addIgnoreEntries(['b', 'a', 'd'], cfgPath);
     expect(result.after).toEqual(['a', 'b', 'c', 'd']);
     const written = JSON.parse(readFileSync(cfgPath, 'utf8'));
-    expect(written).toEqual({ palette: 'nord', ignore: ['a', 'b', 'c', 'd'] });
+    expect(written).toEqual({ palette: 'kanagawa', ignore: ['a', 'b', 'c', 'd'] });
   });
 
   it('preserves unknown top-level fields', async () => {
-    writeFileSync(cfgPath, JSON.stringify({ palette: 'nord', mystery: { x: 1 } }));
+    writeFileSync(cfgPath, JSON.stringify({ palette: 'kanagawa', mystery: { x: 1 } }));
     await addIgnoreEntries(['deps'], cfgPath);
     const written = JSON.parse(readFileSync(cfgPath, 'utf8'));
-    expect(written.palette).toBe('nord');
+    expect(written.palette).toBe('kanagawa');
     expect(written.mystery).toEqual({ x: 1 });
   });
 
@@ -86,11 +86,11 @@ describe('addIgnoreEntries', () => {
 
 describe('removeIgnoreEntries', () => {
   it('removes the listed names and drops the field when empty', async () => {
-    writeFileSync(cfgPath, JSON.stringify({ palette: 'nord', ignore: ['a', 'b'] }));
+    writeFileSync(cfgPath, JSON.stringify({ palette: 'kanagawa', ignore: ['a', 'b'] }));
     const result = await removeIgnoreEntries(['a', 'b'], cfgPath);
     expect(result.after).toEqual([]);
     const written = JSON.parse(readFileSync(cfgPath, 'utf8'));
-    expect(written).toEqual({ palette: 'nord' });
+    expect(written).toEqual({ palette: 'kanagawa' });
     expect('ignore' in written).toBe(false);
   });
 

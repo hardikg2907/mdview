@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { highlightCode } from '../../src/render/shiki.js';
+import { PALETTES } from '../../src/shared/types.js';
 
 describe('highlightCode', () => {
   it('produces shiki-themed html for known language', async () => {
@@ -12,22 +13,13 @@ describe('highlightCode', () => {
 
   it('emits a CSS variable per (palette, mode) pair', async () => {
     const html = await highlightCode('const x = 1;', 'ts');
-    // One variable per palette/mode combo lands on each token's style attr.
-    // We only need to confirm representative entries to lock the multi-theme
-    // contract — exhaustive enumeration would just couple to Shiki's output.
-    for (const v of [
-      '--shiki-classic-light',
-      '--shiki-classic-dark',
-      '--shiki-paper-light',
-      '--shiki-paper-dark',
-      '--shiki-nord-light',
-      '--shiki-nord-dark',
-      '--shiki-solarized-light',
-      '--shiki-solarized-dark',
-      '--shiki-high-contrast-light',
-      '--shiki-high-contrast-dark',
-    ]) {
-      expect(html).toContain(v);
+    // Driven off PALETTES rather than a hand-written list: a palette added to
+    // the allow-list without a matching entry in PALETTE_THEME_MAP would
+    // otherwise render with no colour under that palette and pass silently.
+    for (const palette of PALETTES) {
+      for (const mode of ['light', 'dark']) {
+        expect(html).toContain(`--shiki-${palette}-${mode}`);
+      }
     }
     // Old single-mode names must NOT leak through.
     expect(html).not.toMatch(/--shiki-light\b/);

@@ -17,8 +17,8 @@ let xdgRoot: string;
 beforeAll(() => {
   execSync('npm run build:server', { cwd: REPO_ROOT, stdio: 'inherit' });
   fixtureRoot = mkdtempSync(path.join(tmpdir(), 'mdview-palette-fixture-'));
-  // A project config with palette=classic — the CLI override should beat it.
-  writeFileSync(path.join(fixtureRoot, '.mdview.json'), JSON.stringify({ palette: 'classic' }));
+  // A project config with a palette — the CLI override should beat it.
+  writeFileSync(path.join(fixtureRoot, '.mdview.json'), JSON.stringify({ palette: 'solarized' }));
   writeFileSync(path.join(fixtureRoot, 'doc.md'), '# Doc\n\nbody\n');
   xdgRoot = mkdtempSync(path.join(tmpdir(), 'mdview-palette-xdg-'));
 }, 60_000);
@@ -116,13 +116,13 @@ function spawnCliExpectExit(args: string[]): Promise<ExitResult> {
 }
 
 describe('--palette flag', () => {
-  it('overrides .mdview.json palette with nord', async () => {
-    const { child, port } = await spawnCliReady(['--palette', 'nord', fixtureRoot]);
+  it('overrides .mdview.json palette with rose-pine', async () => {
+    const { child, port } = await spawnCliReady(['--palette', 'rose-pine', fixtureRoot]);
     try {
       const res = await fetch(`http://127.0.0.1:${port}/api/tree`);
       expect(res.ok).toBe(true);
       const body = (await res.json()) as { config: { palette?: string } | null };
-      expect(body.config?.palette).toBe('nord');
+      expect(body.config?.palette).toBe('rose-pine');
     } finally {
       child.kill();
     }
@@ -144,8 +144,8 @@ describe('--palette flag', () => {
     const result = await spawnCliExpectExit(['--palette', 'banana', fixtureRoot]);
     expect(result.code).not.toBe(0);
     expect(result.stderr).toMatch(/banana/);
-    // Lists at least one valid palette so the user can recover.
-    expect(result.stderr).toMatch(/classic|paper|nord|solarized|high-contrast/);
+    // Lists every valid palette so the user can recover.
+    for (const p of PALETTES) expect(result.stderr).toContain(p);
   });
 
   it('without --palette, returns whatever the loaded config has (a real palette)', async () => {
@@ -154,7 +154,7 @@ describe('--palette flag', () => {
       const res = await fetch(`http://127.0.0.1:${port}/api/tree`);
       expect(res.ok).toBe(true);
       const body = (await res.json()) as { config: { palette?: string } | null };
-      // .mdview.json supplies palette=classic in the fixture. Don't pin to a
+      // .mdview.json supplies a palette in the fixture. Don't pin to a
       // specific value — just confirm the override hasn't leaked.
       const p = body.config?.palette;
       expect(p).toBeDefined();

@@ -1,6 +1,8 @@
+import { readFileSync } from 'node:fs';
+import * as path from 'node:path';
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as vscode from 'vscode';
-import { readConfig, buildCliArgs } from '../../src/config/loader';
+import { readConfig, buildCliArgs, KNOWN_PALETTES } from '../../src/config/loader';
 import type { ResolvedConfig } from '../../src/config/loader';
 
 // Cast to access test helpers defined in the mock
@@ -78,11 +80,22 @@ describe('readConfig — palette validation', () => {
   });
 
   it('accepts all valid palettes', () => {
-    for (const p of ['auto', 'classic', 'paper', 'nord', 'solarized', 'high-contrast'] as const) {
+    for (const p of KNOWN_PALETTES) {
       wsMock.__resetConfig();
       wsMock.__setConfig('mdview.palette', p);
       expect(readConfig(folderUri).palette).toBe(p);
     }
+  });
+
+  it('contributes exactly the allow-listed palettes to VS Code settings', () => {
+    // A value offered in the settings dropdown that readConfig then rejects
+    // silently degrades to 'auto', which is invisible to the user. Keep the
+    // contributed enum and the allow-list identical.
+    const pkg = JSON.parse(
+      readFileSync(path.join(__dirname, '..', '..', 'package.json'), 'utf8'),
+    ) as { contributes: { configuration: { properties: Record<string, { enum?: string[] }> } } };
+    const contributed = pkg.contributes.configuration.properties['mdview.palette'].enum;
+    expect(contributed).toEqual([...KNOWN_PALETTES]);
   });
 });
 
@@ -107,15 +120,15 @@ describe('buildCliArgs', () => {
   it('includes --vscode, --port, --palette flags', () => {
     const cfg: ResolvedConfig = {
       port: 3000,
-      palette: 'nord',
+      palette: 'kanagawa',
       preview: { openIn: 'webview' },
     };
-    const args = buildCliArgs('/workspace/project', cfg, 'nord');
+    const args = buildCliArgs('/workspace/project', cfg, 'kanagawa');
     expect(args).toContain('--vscode');
     expect(args).toContain('--port');
     expect(args).toContain('3000');
     expect(args).toContain('--palette');
-    expect(args).toContain('nord');
+    expect(args).toContain('kanagawa');
     expect(args[0]).toBe('/workspace/project');
   });
 

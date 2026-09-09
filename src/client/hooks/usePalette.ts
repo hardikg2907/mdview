@@ -19,7 +19,7 @@ function readStored(): Palette | null {
 const initialStored = readStored();
 const persisted = createPersistedString<Palette>(
   STORAGE_KEY,
-  initialStored ?? 'classic',
+  initialStored ?? 'flexoki',
   PALETTES,
 );
 
@@ -39,7 +39,7 @@ export function setPalette(p: Palette): void {
  * Apply `data-palette` to <html> for CSS theming. Resolution order:
  *   1. Explicit user override (localStorage) wins.
  *   2. Otherwise, the project config's palette (if any) is used.
- *   3. Otherwise, fall back to whatever's stored (default 'classic').
+ *   3. Otherwise, fall back to whatever's stored (default 'flexoki').
  */
 export function usePalette(): Palette {
   useEffect(() => {

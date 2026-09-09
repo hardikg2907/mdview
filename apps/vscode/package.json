@@ -31,7 +31,8 @@
           "description": "Where 'mdview: Open Preview' should display the rendered markdown."
         },
         "mdview.palette": {
-          "type": "string", "enum": ["auto", "classic", "paper", "nord", "solarized", "high-contrast"],
+          "type": "string",
+          "enum": ["auto", "flexoki", "paper", "solarized", "everforest", "rose-pine", "kanagawa", "catppuccin", "high-contrast"],
           "default": "auto",
           "description": "'auto' follows the VS Code theme."
         },

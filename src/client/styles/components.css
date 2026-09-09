@@ -1157,10 +1157,13 @@ mark.search-hit.is-active {
   border: 1px solid var(--border-strong);
   flex-shrink: 0;
 }
-.palette-swatch-classic { background: linear-gradient(135deg, #fcfbf6 50%, #c2410c 50%); }
-.palette-swatch-paper   { background: linear-gradient(135deg, #f7f1e3 50%, #8b5a2b 50%); }
-.palette-swatch-nord    { background: linear-gradient(135deg, #eceff4 50%, #5e81ac 50%); }
-.palette-swatch-solarized { background: linear-gradient(135deg, #fdf6e3 50%, #b58900 50%); }
+.palette-swatch-flexoki    { background: linear-gradient(135deg, #fffcf0 50%, #bc5215 50%); }
+.palette-swatch-paper      { background: linear-gradient(135deg, #f7f1e3 50%, #8b5a2b 50%); }
+.palette-swatch-solarized  { background: linear-gradient(135deg, #fdf6e3 50%, #b58900 50%); }
+.palette-swatch-everforest { background: linear-gradient(135deg, #fdf6e3 50%, #8da101 50%); }
+.palette-swatch-rose-pine  { background: linear-gradient(135deg, #faf4ed 50%, #907aa9 50%); }
+.palette-swatch-kanagawa   { background: linear-gradient(135deg, #f2ecbc 50%, #cc6d00 50%); }
+.palette-swatch-catppuccin { background: linear-gradient(135deg, #eff1f5 50%, #8839ef 50%); }
 .palette-swatch-high-contrast { background: linear-gradient(135deg, #ffffff 50%, #000000 50%); }
 
 /* ============================================================

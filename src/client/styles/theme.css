@@ -27,77 +27,87 @@
   --header-height: 52px;
 }
 
-/* ----- LIGHT (warm cream paper) ----- */
+/* ===== Base palette: Flexoki =====
+   Steph Ango's Flexoki, mapped onto the token contract below. It is the
+   default, so it lives in the bare theme blocks and carries no
+   [data-palette] selector — exactly the arrangement every other palette
+   overrides. Base hexes are upstream; the tint surfaces this UI needs and
+   Flexoki does not define (--accent-soft / --accent-tint / --quote-bg) are
+   derived from them. */
+
+/* ----- LIGHT (paper) ----- */
 :root[data-theme="light"], :root:not([data-theme]) {
-  --bg: #fcfbf6;
+  --bg: #fffcf0;
   --bg-elev: #ffffff;
-  --bg-sidebar: #f4f1e8;
-  --bg-sidebar-2: #ede9dd;
-  --fg: #1f1a14;
-  --fg-strong: #0f0c08;
-  --fg-muted: #7a6e5e;
-  --fg-subtle: #a89c87;
-  --border: #e3dccb;
-  --border-strong: #d6cdb6;
-  --link: #ad3a02;
-  --link-hover: #c2410c;
-  --accent: #c2410c;
-  --accent-strong: #9a3409;
-  --accent-soft: #fbe4d0;
-  --accent-tint: #fdf3eb;
-  --code-bg: #f3eede;
-  --quote-bar: #c2410c;
-  --quote-bg: #fdf3eb;
-  --quote-fg: #5b4a36;
+  --bg-sidebar: #f2f0e5;
+  --bg-sidebar-2: #e6e4d9;
+  --fg: #1c1b1a;
+  --fg-strong: #100f0f;
+  --fg-muted: #6f6e69;
+  --fg-subtle: #b7b5ac;
+  --border: #e6e4d9;
+  --border-strong: #dad8ce;
+  --link: #205ea6;
+  --link-hover: #174a86;
+  --accent: #bc5215;
+  --accent-strong: #9c430f;
+  --accent-soft: #ffe7ce;
+  --accent-tint: #fbf4e9;
+  --code-bg: #f2f0e5;
+  --quote-bar: #bc5215;
+  --quote-bg: #fbf4e9;
+  --quote-fg: #575653;
   --shadow: 0 1px 2px rgba(60, 40, 20, .05), 0 1px 0 rgba(60, 40, 20, .03);
   --shadow-md: 0 6px 24px -10px rgba(60, 40, 20, .12),
                0 2px 6px -2px rgba(60, 40, 20, .06);
-  --selection-bg: #fbe4d0;
-  --selection-fg: #2b1707;
+  --selection-bg: #ffe7ce;
+  --selection-fg: #27180e;
 
-  /* Faint paper grain — orange-tinted radial dots, very low opacity */
+  /* Faint paper grain. The tint is a low-alpha wash of this palette's own
+     ink, which is why every palette below restates it: a warm grain over a
+     cool ground reads as a dirty screen. --paper-grain-size is set once here
+     and inherited, since no palette varies the lattice. */
   --paper-grain:
-    radial-gradient(circle at 1px 1px, rgba(120, 70, 30, .045) 1px, transparent 0);
+    radial-gradient(circle at 1px 1px, rgba(87, 86, 83, .055) 1px, transparent 0);
   --paper-grain-size: 22px 22px;
 }
 
-/* ----- DARK (deep coffee, warmer) ----- */
+/* ----- DARK (black) ----- */
 :root[data-theme="dark"] {
-  --bg: #16110c;
-  --bg-elev: #1d1812;
-  --bg-sidebar: #120e0a;
-  --bg-sidebar-2: #1a140e;
-  --fg: #ece4d6;
-  --fg-strong: #fbf6ec;
-  --fg-muted: #9a8c75;
-  --fg-subtle: #6e6453;
-  --border: #2a2218;
-  --border-strong: #38301f;
-  --link: #f59e6b;
-  --link-hover: #ffb380;
-  --accent: #f59e6b;
-  --accent-strong: #ffb380;
-  --accent-soft: #3a210e;
-  --accent-tint: #221610;
-  --code-bg: #221b13;
-  --quote-bar: #f59e6b;
-  --quote-bg: #1f160d;
-  --quote-fg: #c2b496;
+  --bg: #1c1b1a;
+  --bg-elev: #282726;
+  --bg-sidebar: #100f0f;
+  --bg-sidebar-2: #1c1b1a;
+  --fg: #cecdc3;
+  --fg-strong: #fffcf0;
+  --fg-muted: #878580;
+  --fg-subtle: #575653;
+  --border: #282726;
+  --border-strong: #403e3c;
+  --link: #4385be;
+  --link-hover: #6ba3d4;
+  --accent: #da702c;
+  --accent-strong: #e89a63;
+  --accent-soft: #27180e;
+  --accent-tint: #1e1a16;
+  --code-bg: #100f0f;
+  --quote-bar: #da702c;
+  --quote-bg: #1e1a16;
+  --quote-fg: #b7b5ac;
   --shadow: 0 1px 2px rgba(0, 0, 0, .4);
   --shadow-md: 0 8px 28px -10px rgba(0, 0, 0, .55),
                0 2px 8px -2px rgba(0, 0, 0, .3);
-  --selection-bg: #c2410c;
-  --selection-fg: #fff7ec;
+  --selection-bg: #bc5215;
+  --selection-fg: #fffcf0;
 
   --paper-grain:
-    radial-gradient(circle at 1px 1px, rgba(245, 200, 140, .035) 1px, transparent 0);
+    radial-gradient(circle at 1px 1px, rgba(206, 205, 195, .05) 1px, transparent 0);
   --paper-grain-size: 22px 22px;
 }
 
 /* ===== Palettes (per-project + user override) ===== */
-/* The default 'classic' palette inherits whatever theme.css already set
-   above. Other palettes override the relevant color vars. They're scoped to
-   work in both light and dark themes. */
+/* Each block overrides the base above. They restate every token they change
+   in both themes, including --paper-grain. */
 
 /* Paper — warmer, more sepia */
 :root[data-palette="paper"][data-theme="light"] {
@@ -105,68 +115,55 @@
   --bg-elev: #fdf9ed;
   --bg-sidebar: #efe7d2;
   --bg-sidebar-2: #e7debe;
+  --fg: #2b2015;
+  --fg-strong: #17110a;
+  --fg-muted: #7a6a52;
+  --fg-subtle: #a89575;
+  --border: #e2d7bd;
+  --border-strong: #d4c6a5;
   --accent: #8b5a2b;
   --accent-strong: #6f4720;
   --accent-soft: #f1e2c5;
   --accent-tint: #f6ecd6;
   --link: #8b5a2b;
   --link-hover: #6f4720;
+  --code-bg: #efe7d2;
   --quote-bar: #8b5a2b;
+  --quote-bg: #f6ecd6;
+  --quote-fg: #6a5940;
+  --selection-bg: #f1e2c5;
+  --selection-fg: #2b2015;
+  --paper-grain:
+    radial-gradient(circle at 1px 1px, rgba(122, 106, 82, .06) 1px, transparent 0);
 }
 :root[data-palette="paper"][data-theme="dark"] {
   --bg: #1a140d;
   --bg-elev: #221a10;
+  --bg-sidebar: #150f09;
+  --bg-sidebar-2: #1f1811;
+  --fg: #e8ddc8;
+  --fg-strong: #f7efdc;
+  --fg-muted: #a08d6f;
+  --fg-subtle: #6f604a;
+  --border: #2c2317;
+  --border-strong: #3b301f;
   --accent: #e0a663;
   --accent-strong: #f0bb7d;
   --link: #e0a663;
   --link-hover: #f0bb7d;
+  --code-bg: #221a10;
+  --accent-soft: #3a2a14;
+  --accent-tint: #241c12;
+  --quote-bar: #e0a663;
+  --quote-bg: #241c12;
+  --quote-fg: #c0ad8c;
+  --selection-bg: #8b5a2b;
+  --selection-fg: #f7efdc;
+  --paper-grain:
+    radial-gradient(circle at 1px 1px, rgba(232, 221, 200, .04) 1px, transparent 0);
 }
 
-/* Nord — cool blues, frosty */
-:root[data-palette="nord"][data-theme="light"] {
-  --bg: #eceff4;
-  --bg-elev: #ffffff;
-  --bg-sidebar: #e5e9f0;
-  --bg-sidebar-2: #d8dee9;
-  --fg: #2e3440;
-  --fg-strong: #2e3440;
-  --fg-muted: #4c566a;
-  --fg-subtle: #6c7a8e;
-  --border: #d8dee9;
-  --border-strong: #c0c8d4;
-  --accent: #5e81ac;
-  --accent-strong: #4c6f95;
-  --accent-soft: #d8e0ec;
-  --accent-tint: #ebf0f7;
-  --link: #5e81ac;
-  --link-hover: #4c6f95;
-  --quote-bar: #5e81ac;
-  --quote-bg: #ebf0f7;
-  --code-bg: #e5e9f0;
-}
-:root[data-palette="nord"][data-theme="dark"] {
-  --bg: #2e3440;
-  --bg-elev: #3b4252;
-  --bg-sidebar: #292e39;
-  --bg-sidebar-2: #353b48;
-  --fg: #eceff4;
-  --fg-strong: #ffffff;
-  --fg-muted: #b8c2d0;
-  --fg-subtle: #6c7a8e;
-  --border: #3b4252;
-  --border-strong: #4c566a;
-  --accent: #88c0d0;
-  --accent-strong: #b6dde7;
-  --accent-soft: #3b4252;
-  --accent-tint: #353b48;
-  --link: #88c0d0;
-  --link-hover: #b6dde7;
-  --quote-bar: #88c0d0;
-  --quote-bg: #353b48;
-  --code-bg: #3b4252;
-}
-
-/* Solarized — Ethan Schoonover's classic palette */
+/* Solarized — Ethan Schoonover's palette */
 :root[data-palette="solarized"][data-theme="light"] {
   --bg: #fdf6e3;
   --bg-elev: #ffffff;
@@ -175,7 +172,9 @@
   --fg: #586e75;
   --fg-strong: #002b36;
   --fg-muted: #93a1a1;
+  --fg-subtle: #a8b3b0;
   --border: #e3dfc8;
+  --border-strong: #d3cdb4;
   --accent: #b58900;
   --accent-strong: #806300;
   --accent-soft: #f4ecc9;
@@ -183,7 +182,13 @@
   --link: #268bd2;
   --link-hover: #1e6da3;
   --quote-bar: #b58900;
+  --quote-bg: #fbf6df;
+  --quote-fg: #657b83;
   --code-bg: #eee8d5;
+  --selection-bg: #f4ecc9;
+  --selection-fg: #002b36;
+  --paper-grain:
+    radial-gradient(circle at 1px 1px, rgba(88, 110, 117, .055) 1px, transparent 0);
 }
 :root[data-palette="solarized"][data-theme="dark"] {
   --bg: #002b36;
@@ -193,6 +198,7 @@
   --fg: #93a1a1;
   --fg-strong: #fdf6e3;
   --fg-muted: #586e75;
+  --fg-subtle: #46595f;
   --border: #073642;
   --border-strong: #135362;
   --accent: #b58900;
@@ -202,11 +208,235 @@
   --link: #268bd2;
   --link-hover: #4ba0db;
   --quote-bar: #b58900;
+  --quote-bg: #08313e;
+  --quote-fg: #839496;
   --code-bg: #073642;
+  --selection-bg: #135362;
+  --selection-fg: #fdf6e3;
+  --paper-grain:
+    radial-gradient(circle at 1px 1px, rgba(147, 161, 161, .045) 1px, transparent 0);
+}
+
+/* Everforest — sainnhe's soft-contrast green, medium variant */
+:root[data-palette="everforest"][data-theme="light"] {
+  --bg: #fdf6e3;
+  --bg-elev: #fffbef;
+  --bg-sidebar: #efebd4;
+  --bg-sidebar-2: #e6e2cc;
+  --fg: #5c6a72;
+  --fg-strong: #3a454a;
+  --fg-muted: #829181;
+  --fg-subtle: #a6b0a0;
+  --border: #e0dcc7;
+  --border-strong: #bdc3af;
+  --accent: #8da101;
+  --accent-strong: #6d7d00;
+  --accent-soft: #eaedc8;
+  --accent-tint: #f4f4e2;
+  --link: #3a94c5;
+  --link-hover: #2b7aa6;
+  --code-bg: #efebd4;
+  --quote-bar: #8da101;
+  --quote-bg: #f2f2e0;
+  --quote-fg: #829181;
+  --selection-bg: #eaedc8;
+  --selection-fg: #3a454a;
+  --paper-grain:
+    radial-gradient(circle at 1px 1px, rgba(92, 106, 114, .055) 1px, transparent 0);
+}
+:root[data-palette="everforest"][data-theme="dark"] {
+  --bg: #2d353b;
+  --bg-elev: #343f44;
+  --bg-sidebar: #232a2e;
+  --bg-sidebar-2: #2d353b;
+  --fg: #d3c6aa;
+  --fg-strong: #eee4cc;
+  --fg-muted: #9da9a0;
+  --fg-subtle: #7a8478;
+  --border: #3d484d;
+  --border-strong: #475258;
+  --accent: #a7c080;
+  --accent-strong: #c2d69f;
+  --accent-soft: #425047;
+  --accent-tint: #333d3e;
+  --link: #7fbbb3;
+  --link-hover: #9fd0c9;
+  --code-bg: #232a2e;
+  --quote-bar: #a7c080;
+  --quote-bg: #333d3e;
+  --quote-fg: #9da9a0;
+  --selection-bg: #475258;
+  --selection-fg: #d3c6aa;
+  --paper-grain:
+    radial-gradient(circle at 1px 1px, rgba(211, 198, 170, .045) 1px, transparent 0);
+}
+
+/* Rosé Pine — Dawn in light, the main variant in dark */
+:root[data-palette="rose-pine"][data-theme="light"] {
+  --bg: #faf4ed;
+  --bg-elev: #fffaf3;
+  --bg-sidebar: #f2e9e1;
+  --bg-sidebar-2: #eadfd4;
+  --fg: #464261;
+  --fg-strong: #332f4a;
+  --fg-muted: #797593;
+  --fg-subtle: #9893a5;
+  --border: #eadfd4;
+  --border-strong: #dfd3c8;
+  --accent: #907aa9;
+  --accent-strong: #75608c;
+  --accent-soft: #ece2f1;
+  --accent-tint: #f7f2f8;
+  --link: #286983;
+  --link-hover: #1c5065;
+  --code-bg: #f2e9e1;
+  --quote-bar: #907aa9;
+  --quote-bg: #f7f2f8;
+  --quote-fg: #797593;
+  --selection-bg: #dfdad9;
+  --selection-fg: #464261;
+  --paper-grain:
+    radial-gradient(circle at 1px 1px, rgba(121, 117, 147, .055) 1px, transparent 0);
+}
+:root[data-palette="rose-pine"][data-theme="dark"] {
+  --bg: #191724;
+  --bg-elev: #1f1d2e;
+  --bg-sidebar: #14121d;
+  --bg-sidebar-2: #1f1d2e;
+  --fg: #e0def4;
+  --fg-strong: #ffffff;
+  --fg-muted: #908caa;
+  --fg-subtle: #6e6a86;
+  --border: #26233a;
+  --border-strong: #403d52;
+  --accent: #c4a7e7;
+  --accent-strong: #d9c4f2;
+  --accent-soft: #2b2540;
+  --accent-tint: #211e30;
+  --link: #9ccfd8;
+  --link-hover: #bde1e8;
+  --code-bg: #1f1d2e;
+  --quote-bar: #c4a7e7;
+  --quote-bg: #211e30;
+  --quote-fg: #908caa;
+  --selection-bg: #403d52;
+  --selection-fg: #e0def4;
+  --paper-grain:
+    radial-gradient(circle at 1px 1px, rgba(224, 222, 244, .045) 1px, transparent 0);
+}
+
+/* Kanagawa — Lotus in light, Wave in dark */
+:root[data-palette="kanagawa"][data-theme="light"] {
+  --bg: #f2ecbc;
+  --bg-elev: #f7f2cf;
+  --bg-sidebar: #e7dba0;
+  --bg-sidebar-2: #e4d794;
+  --fg: #545464;
+  --fg-strong: #43436c;
+  --fg-muted: #716e61;
+  --fg-subtle: #8a8980;
+  --border: #dcd5ac;
+  --border-strong: #d5cea3;
+  --accent: #cc6d00;
+  --accent-strong: #a85a00;
+  --accent-soft: #f9d791;
+  --accent-tint: #f5eec4;
+  --link: #4d699b;
+  --link-hover: #3a5280;
+  --code-bg: #e7dba0;
+  --quote-bar: #cc6d00;
+  --quote-bg: #f0e8b4;
+  --quote-fg: #716e61;
+  --selection-bg: #c9cbd1;
+  --selection-fg: #43436c;
+  --paper-grain:
+    radial-gradient(circle at 1px 1px, rgba(84, 84, 100, .06) 1px, transparent 0);
+}
+:root[data-palette="kanagawa"][data-theme="dark"] {
+  --bg: #1f1f28;
+  --bg-elev: #2a2a37;
+  --bg-sidebar: #16161d;
+  --bg-sidebar-2: #1a1a22;
+  --fg: #dcd7ba;
+  --fg-strong: #f0ebd2;
+  --fg-muted: #c8c093;
+  --fg-subtle: #727169;
+  --border: #2a2a37;
+  --border-strong: #363646;
+  --accent: #e6c384;
+  --accent-strong: #f2d6a3;
+  --accent-soft: #49443c;
+  --accent-tint: #252530;
+  --link: #7e9cd8;
+  --link-hover: #9cb3e4;
+  --code-bg: #16161d;
+  --quote-bar: #e6c384;
+  --quote-bg: #223249;
+  --quote-fg: #c8c093;
+  --selection-bg: #2d4f67;
+  --selection-fg: #dcd7ba;
+  --paper-grain:
+    radial-gradient(circle at 1px 1px, rgba(220, 215, 186, .045) 1px, transparent 0);
+}
+
+/* Catppuccin — Latte in light, Mocha in dark */
+:root[data-palette="catppuccin"][data-theme="light"] {
+  --bg: #eff1f5;
+  --bg-elev: #ffffff;
+  --bg-sidebar: #e6e9ef;
+  --bg-sidebar-2: #dce0e8;
+  --fg: #4c4f69;
+  --fg-strong: #3a3d52;
+  --fg-muted: #6c6f85;
+  --fg-subtle: #9ca0b0;
+  --border: #ccd0da;
+  --border-strong: #bcc0cc;
+  --accent: #8839ef;
+  --accent-strong: #7128cc;
+  --accent-soft: #e7d9fb;
+  --accent-tint: #f3ecfd;
+  --link: #1e66f5;
+  --link-hover: #1450c8;
+  --code-bg: #e6e9ef;
+  --quote-bar: #8839ef;
+  --quote-bg: #f3ecfd;
+  --quote-fg: #6c6f85;
+  --selection-bg: #ccd0da;
+  --selection-fg: #4c4f69;
+  --paper-grain:
+    radial-gradient(circle at 1px 1px, rgba(76, 79, 105, .05) 1px, transparent 0);
+}
+:root[data-palette="catppuccin"][data-theme="dark"] {
+  --bg: #1e1e2e;
+  --bg-elev: #313244;
+  --bg-sidebar: #181825;
+  --bg-sidebar-2: #11111b;
+  --fg: #cdd6f4;
+  --fg-strong: #ffffff;
+  --fg-muted: #a6adc8;
+  --fg-subtle: #7f849c;
+  --border: #313244;
+  --border-strong: #45475a;
+  --accent: #cba6f7;
+  --accent-strong: #ddc4fa;
+  --accent-soft: #2f2743;
+  --accent-tint: #252033;
+  --link: #89b4fa;
+  --link-hover: #a8c9fb;
+  --code-bg: #181825;
+  --quote-bar: #cba6f7;
+  --quote-bg: #252033;
+  --quote-fg: #a6adc8;
+  --selection-bg: #45475a;
+  --selection-fg: #cdd6f4;
+  --paper-grain:
+    radial-gradient(circle at 1px 1px, rgba(205, 214, 244, .045) 1px, transparent 0);
 }
 
 /* High contrast — pure black/white, bold accents, strong borders.
-   Loosely mirrors VSCode "Light/Dark High Contrast" themes. */
+   Loosely mirrors VSCode "Light/Dark High Contrast" themes.
+   Grain is off here: any texture over a maximum-contrast ground works
+   against the one thing this palette exists to provide. */
 :root[data-palette="high-contrast"][data-theme="light"] {
   --bg: #ffffff;
   --bg-elev: #ffffff;
@@ -232,6 +462,7 @@
   --selection-fg: #ffffff;
   --shadow: 0 0 0 1px #000000;
   --shadow-md: 0 0 0 2px #000000;
+  --paper-grain: none;
 }
 :root[data-palette="high-contrast"][data-theme="dark"] {
   --bg: #000000;
@@ -258,6 +489,7 @@
   --selection-fg: #000000;
   --shadow: 0 0 0 1px #ffffff;
   --shadow-md: 0 0 0 2px #ffffff;
+  --paper-grain: none;
 }
 
 /* Wide layout: relaxes the reading-column cap. */
@@ -284,25 +516,25 @@ html, body {
 }
 
 /* Shiki theme switching — palette-aware.
-   Each token carries one CSS variable per (palette, mode) pair (10 total):
-   --shiki-classic-light, --shiki-classic-dark, --shiki-paper-light, …
+   Each token carries one CSS variable per (palette, mode) pair (16 total):
+   --shiki-flexoki-light, --shiki-flexoki-dark, --shiki-paper-light, …
    plus matching `*-bg` for the pre background. We pick one based on
-   [data-palette][data-theme]. Defaults (no data-palette → classic; no
+   [data-palette][data-theme]. Defaults (no data-palette → flexoki; no
    data-theme → light) mirror the bootstrap script in index.html. */
 
-/* classic (also: default when no data-palette is set) */
-:root[data-palette="classic"][data-theme="light"] .shiki span,
-:root[data-palette="classic"]:not([data-theme]) .shiki span,
+/* flexoki (also: default when no data-palette is set) */
+:root[data-palette="flexoki"][data-theme="light"] .shiki span,
+:root[data-palette="flexoki"]:not([data-theme]) .shiki span,
 :root:not([data-palette])[data-theme="light"] .shiki span,
-:root:not([data-palette]):not([data-theme]) .shiki span { color: var(--shiki-classic-light) !important; }
-:root[data-palette="classic"][data-theme="light"] .shiki,
-:root[data-palette="classic"]:not([data-theme]) .shiki,
+:root:not([data-palette]):not([data-theme]) .shiki span { color: var(--shiki-flexoki-light) !important; }
+:root[data-palette="flexoki"][data-theme="light"] .shiki,
+:root[data-palette="flexoki"]:not([data-theme]) .shiki,
 :root:not([data-palette])[data-theme="light"] .shiki,
-:root:not([data-palette]):not([data-theme]) .shiki { background-color: var(--shiki-classic-light-bg) !important; }
-:root[data-palette="classic"][data-theme="dark"] .shiki span,
-:root:not([data-palette])[data-theme="dark"] .shiki span { color: var(--shiki-classic-dark) !important; }
-:root[data-palette="classic"][data-theme="dark"] .shiki,
-:root:not([data-palette])[data-theme="dark"] .shiki { background-color: var(--shiki-classic-dark-bg) !important; }
+:root:not([data-palette]):not([data-theme]) .shiki { background-color: var(--shiki-flexoki-light-bg) !important; }
+:root[data-palette="flexoki"][data-theme="dark"] .shiki span,
+:root:not([data-palette])[data-theme="dark"] .shiki span { color: var(--shiki-flexoki-dark) !important; }
+:root[data-palette="flexoki"][data-theme="dark"] .shiki,
+:root:not([data-palette])[data-theme="dark"] .shiki { background-color: var(--shiki-flexoki-dark-bg) !important; }
 
 /* paper */
 :root[data-palette="paper"][data-theme="light"] .shiki span,
@@ -312,14 +544,6 @@ html, body {
 :root[data-palette="paper"][data-theme="dark"] .shiki span { color: var(--shiki-paper-dark) !important; }
 :root[data-palette="paper"][data-theme="dark"] .shiki { background-color: var(--shiki-paper-dark-bg) !important; }
 
-/* nord */
-:root[data-palette="nord"][data-theme="light"] .shiki span,
-:root[data-palette="nord"]:not([data-theme]) .shiki span { color: var(--shiki-nord-light) !important; }
-:root[data-palette="nord"][data-theme="light"] .shiki,
-:root[data-palette="nord"]:not([data-theme]) .shiki { background-color: var(--shiki-nord-light-bg) !important; }
-:root[data-palette="nord"][data-theme="dark"] .shiki span { color: var(--shiki-nord-dark) !important; }
-:root[data-palette="nord"][data-theme="dark"] .shiki { background-color: var(--shiki-nord-dark-bg) !important; }
-
 /* solarized */
 :root[data-palette="solarized"][data-theme="light"] .shiki span,
 :root[data-palette="solarized"]:not([data-theme]) .shiki span { color: var(--shiki-solarized-light) !important; }
@@ -327,6 +551,38 @@ html, body {
 :root[data-palette="solarized"]:not([data-theme]) .shiki { background-color: var(--shiki-solarized-light-bg) !important; }
 :root[data-palette="solarized"][data-theme="dark"] .shiki span { color: var(--shiki-solarized-dark) !important; }
 :root[data-palette="solarized"][data-theme="dark"] .shiki { background-color: var(--shiki-solarized-dark-bg) !important; }
+
+/* everforest */
+:root[data-palette="everforest"][data-theme="light"] .shiki span,
+:root[data-palette="everforest"]:not([data-theme]) .shiki span { color: var(--shiki-everforest-light) !important; }
+:root[data-palette="everforest"][data-theme="light"] .shiki,
+:root[data-palette="everforest"]:not([data-theme]) .shiki { background-color: var(--shiki-everforest-light-bg) !important; }
+:root[data-palette="everforest"][data-theme="dark"] .shiki span { color: var(--shiki-everforest-dark) !important; }
+:root[data-palette="everforest"][data-theme="dark"] .shiki { background-color: var(--shiki-everforest-dark-bg) !important; }
+
+/* rose-pine */
+:root[data-palette="rose-pine"][data-theme="light"] .shiki span,
+:root[data-palette="rose-pine"]:not([data-theme]) .shiki span { color: var(--shiki-rose-pine-light) !important; }
+:root[data-palette="rose-pine"][data-theme="light"] .shiki,
+:root[data-palette="rose-pine"]:not([data-theme]) .shiki { background-color: var(--shiki-rose-pine-light-bg) !important; }
+:root[data-palette="rose-pine"][data-theme="dark"] .shiki span { color: var(--shiki-rose-pine-dark) !important; }
+:root[data-palette="rose-pine"][data-theme="dark"] .shiki { background-color: var(--shiki-rose-pine-dark-bg) !important; }
+
+/* kanagawa */
+:root[data-palette="kanagawa"][data-theme="light"] .shiki span,
+:root[data-palette="kanagawa"]:not([data-theme]) .shiki span { color: var(--shiki-kanagawa-light) !important; }
+:root[data-palette="kanagawa"][data-theme="light"] .shiki,
+:root[data-palette="kanagawa"]:not([data-theme]) .shiki { background-color: var(--shiki-kanagawa-light-bg) !important; }
+:root[data-palette="kanagawa"][data-theme="dark"] .shiki span { color: var(--shiki-kanagawa-dark) !important; }
+:root[data-palette="kanagawa"][data-theme="dark"] .shiki { background-color: var(--shiki-kanagawa-dark-bg) !important; }
+
+/* catppuccin */
+:root[data-palette="catppuccin"][data-theme="light"] .shiki span,
+:root[data-palette="catppuccin"]:not([data-theme]) .shiki span { color: var(--shiki-catppuccin-light) !important; }
+:root[data-palette="catppuccin"][data-theme="light"] .shiki,
+:root[data-palette="catppuccin"]:not([data-theme]) .shiki { background-color: var(--shiki-catppuccin-light-bg) !important; }
+:root[data-palette="catppuccin"][data-theme="dark"] .shiki span { color: var(--shiki-catppuccin-dark) !important; }
+:root[data-palette="catppuccin"][data-theme="dark"] .shiki { background-color: var(--shiki-catppuccin-dark-bg) !important; }
 
 /* high-contrast */
 :root[data-palette="high-contrast"][data-theme="light"] .shiki span,

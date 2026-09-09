@@ -19,10 +19,13 @@ import {
 } from './Icons.js';
 
 const PALETTE_LABELS: Record<Palette, string> = {
-  classic: 'Classic',
+  flexoki: 'Flexoki',
   paper: 'Paper',
-  nord: 'Nord',
   solarized: 'Solarized',
+  everforest: 'Everforest',
+  'rose-pine': 'Rosé Pine',
+  kanagawa: 'Kanagawa',
+  catppuccin: 'Catppuccin',
   'high-contrast': 'High contrast',
 };
 

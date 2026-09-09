@@ -13,17 +13,26 @@ const COMMON_LANGUAGES = [
  * picks the right one based on `[data-palette][data-theme]`.
  *
  * Underlying Shiki themes are deduped before being loaded (`min-light` is
- * shared by paper-light and nord-light, etc.) — see `UNDERLYING_THEMES`.
+ * shared by flexoki-light and paper-light, etc.) — see `UNDERLYING_THEMES`.
  */
 const PALETTE_THEME_MAP = {
-  'classic-light': 'github-light',
-  'classic-dark': 'github-dark',
+  // Flexoki has no upstream TextMate theme. `min-light` and `vesper` are the
+  // closest bundled stand-ins: both are deliberately low-chroma, which is the
+  // one property of Flexoki that a louder theme would contradict.
+  'flexoki-light': 'min-light',
+  'flexoki-dark': 'vesper',
   'paper-light': 'min-light',
   'paper-dark': 'vitesse-dark',
-  'nord-light': 'min-light',
-  'nord-dark': 'nord',
   'solarized-light': 'solarized-light',
   'solarized-dark': 'solarized-dark',
+  'everforest-light': 'everforest-light',
+  'everforest-dark': 'everforest-dark',
+  'rose-pine-light': 'rose-pine-dawn',
+  'rose-pine-dark': 'rose-pine',
+  'kanagawa-light': 'kanagawa-lotus',
+  'kanagawa-dark': 'kanagawa-wave',
+  'catppuccin-light': 'catppuccin-latte',
+  'catppuccin-dark': 'catppuccin-mocha',
   'high-contrast-light': 'github-light-high-contrast',
   'high-contrast-dark': 'github-dark-high-contrast',
 } as const;

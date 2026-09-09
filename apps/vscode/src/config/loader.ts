@@ -1,10 +1,29 @@
 import * as vscode from 'vscode';
 import { log } from '../output';
 
-export type Palette = 'classic' | 'paper' | 'nord' | 'solarized' | 'high-contrast';
+export type Palette =
+  | 'flexoki'
+  | 'paper'
+  | 'solarized'
+  | 'everforest'
+  | 'rose-pine'
+  | 'kanagawa'
+  | 'catppuccin'
+  | 'high-contrast';
 export type PaletteSetting = Palette | 'auto';
 
-const KNOWN_PALETTES: readonly PaletteSetting[] = ['auto', 'classic', 'paper', 'nord', 'solarized', 'high-contrast'] as const;
+/** Allow-list for `mdview.palette`. Must match the enum contributed in package.json. */
+export const KNOWN_PALETTES: readonly PaletteSetting[] = [
+  'auto',
+  'flexoki',
+  'paper',
+  'solarized',
+  'everforest',
+  'rose-pine',
+  'kanagawa',
+  'catppuccin',
+  'high-contrast',
+] as const;
 
 export interface ResolvedConfig {
   port: number;

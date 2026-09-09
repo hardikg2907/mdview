@@ -51,7 +51,7 @@ node bin/mdview.mjs ./test-fixtures/showcase.md --no-open
 
 ### 4b. View menu + wide layout
 - Header right side shows three icons: a gear (View), theme toggle, and the keyboard `?` button. Nothing else.
-- Click the gear → popover lists Focus mode, Minimap, Wide layout, a divider, and five palette swatches with checks on the active palette.
+- Click the gear → popover lists Focus mode, Minimap, Wide layout, a divider, and eight palette swatches with checks on the active palette.
 - Toggle "Wide layout" (or press `w`) → main column visibly relaxes from ~70ch to ~100ch; reload persists the choice.
 - Toggle Focus, Minimap, and palettes from inside the menu — behavior matches the previous separate buttons.
 
@@ -65,7 +65,7 @@ node bin/mdview.mjs ./test-fixtures/showcase.md --no-open
 - Multiple languages render with Shiki highlighting; the font is JetBrains Mono.
 - Hover a code block → "Copy" button appears top-right.
 - Click "Copy" → clipboard receives the code; button briefly says "Copied".
-- Switch palette via the header swatch (classic ↔ nord ↔ solarized ↔ high-contrast) → code-block colors update **instantly**, no re-render and no flash. Each palette uses a tailored Shiki theme.
+- Switch palette via the header swatch (flexoki ↔ everforest ↔ catppuccin ↔ high-contrast) → code-block colors update **instantly**, no re-render and no flash. Each palette uses a tailored Shiki theme.
 
 ### 7. Mermaid
 - Mermaid block renders as an SVG diagram.
@@ -78,15 +78,17 @@ node bin/mdview.mjs ./test-fixtures/showcase.md --no-open
 
 ### 9. Themes & palettes
 - Theme toggle (sun/moon icon, header right) flips light/dark instantly.
-- Palette picker icon (palette/swatch, header right) opens a menu with five swatches: classic / paper / nord / solarized / high-contrast. Click any → page palette and code-block colors swap live.
+- Palette picker icon (palette/swatch, header right) opens a menu with eight swatches: flexoki / paper / solarized / everforest / rose-pine / kanagawa / catppuccin / high-contrast. Click any → page palette and code-block colors swap live.
+- In each palette, look at the page background at 100% zoom: the paper grain should read as a tint of that palette's own text colour, never as a warm brown wash over a cool ground. On `high-contrast` there should be **no** grain at all.
+- Switch to `rose-pine` or `catppuccin`, then toggle light/dark → grain, code background and quote bar all stay inside that palette.
 - High-contrast in dark mode → near-pure-white text on near-black background, bold accent. Light mode → mirror.
 - Reload — both theme and palette persist **without a flash of the default** (an inline `<head>` script applies them before first paint).
 - Hard-reload in Safari private mode → theme/palette still applies; check DevTools console for a single `mdview: localStorage access blocked` warning (acceptable, not an error).
 - `⌘\` shortcut also toggles theme.
 
 ### 10. Per-project config (`.mdview.json`)
-- A `.mdview.json` already exists in `test-fixtures/` setting `palette: "nord"`.
-- On first load (with no user palette override yet), the page should boot in Nord.
+- A `.mdview.json` already exists in `test-fixtures/` setting `palette: "everforest"`.
+- On first load (with no user palette override yet), the page should boot in Everforest.
 - Pick a different palette manually → user override wins, persists.
 - Edit `.mdview.json` to a different palette and save → if no user override is active, the page palette swaps live.
 
@@ -213,8 +215,9 @@ node bin/mdview.mjs ./test-fixtures/showcase.md --no-open
 - Set `MDVIEW_DEBUG=1` and trigger an error → full stack trace printed.
 
 ### 28. `--palette` flag
-- `mdview --palette nord ./test-fixtures` → page renders in the `nord` palette regardless of what `.mdview.json` configures. The on-disk config file is **not** modified.
-- `mdview --palette banana ./test-fixtures` → exits with `Invalid --palette 'banana'. Valid: classic, paper, nord, solarized, high-contrast`, exit code non-zero.
+- `mdview --palette kanagawa ./test-fixtures` → page renders in the `kanagawa` palette regardless of what `.mdview.json` configures. The on-disk config file is **not** modified.
+- `mdview --palette banana ./test-fixtures` → exits with `Invalid --palette 'banana'. Valid: flexoki, paper, solarized, everforest, rose-pine, kanagawa, catppuccin, high-contrast`, exit code non-zero.
+- `mdview --palette classic ./test-fixtures` and `mdview --palette nord ./test-fixtures` → both now rejected the same way. These two were removed; the error must list the replacements.
 - Without `--palette` → existing behavior (whatever `.mdview.json` or global config says).
 
 ### 29. `--port 0` ephemeral
@@ -331,7 +334,7 @@ cd /some/other/repo && mdview .
 ### 37. Regressions the daemon must not cause
 
 - `mdview --foreground --no-open ./test-fixtures` → blocks, prints `watching:`, Ctrl-C stops it. Writes **no** `daemon.json`; `/api/health` 404s.
-- `mdview --port 9000 ./test-fixtures` and `mdview --palette nord ./test-fixtures` → both block in the terminal, exactly as before the daemon existed.
+- `mdview --port 9000 ./test-fixtures` and `mdview --palette kanagawa ./test-fixtures` → both block in the terminal, exactly as before the daemon existed.
 - `mdview --vscode --port 0 ./test-fixtures` → still one JSON line with a `http://127.0.0.1:<port>/` URL, still exits on stdin close.
 
 ## Tests

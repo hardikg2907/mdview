@@ -70,7 +70,7 @@ mdview stop                # stop the background server
 mdview --foreground        # run in this terminal instead (Ctrl-C to stop)
 mdview --no-open           # don't auto-launch the browser
 mdview --port 9000         # one-off server on a specific port (implies --foreground)
-mdview --palette nord      # palette for this run (implies --foreground)
+mdview --palette kanagawa  # palette for this run (implies --foreground)
 mdview --help              # show usage
 ```
 
@@ -121,7 +121,8 @@ works as-is behind a local proxy like
 [portless](https://github.com/vercel-labs/portless) if you want the port gone
 entirely.
 
-`--palette` takes `classic`, `paper`, `nord`, `solarized`, or `high-contrast`.
+`--palette` takes `flexoki`, `paper`, `solarized`, `everforest`, `rose-pine`,
+`kanagawa`, `catppuccin`, or `high-contrast`.
 It wins over both `.mdview.json` and the global config, and never writes to
 either. There is also a `--vscode` flag, used by the VS Code extension to run
 mdview as a sidecar; it implies `--no-open` and prints a single JSON ready line
@@ -168,7 +169,7 @@ Click the keyboard icon in the header anytime to see the full list.
 - 3-pane layout: folder tree, content, outline. Both sidebars collapse to a thin label rail; both have drag handles to resize (widths persist).
 - Editorial typography (serif body, italic accent H1, paper-grain background, JetBrains Mono in code blocks).
 - Light & dark theme — follows your OS preference, with a manual override that persists.
-- Five built-in palettes: classic / paper / nord / solarized / high-contrast. Pick one from the header palette swatch. Code blocks follow the palette (Nord syntax in Nord, Solarized in Solarized, etc.).
+- Eight built-in palettes: flexoki / paper / solarized / everforest / rose-pine / kanagawa / catppuccin / high-contrast. Pick one from the header palette swatch. Each defines a full light and dark variant, and each carries its own paper grain, so the texture is never a warm wash over a cool ground. Code blocks follow the palette (Everforest syntax in Everforest, Catppuccin in Catppuccin, etc.).
 - Reading-progress bar pinned to the bottom of the header.
 - Doc stats strip below the H1 (reading time, word count, heading count, "Updated N ago").
 - Focus mode dims everything except the section at the viewport center.
@@ -184,7 +185,7 @@ Click the keyboard icon in the header anytime to see the full list.
 
 **Rendering**
 - CommonMark + GFM (tables, task lists, strikethrough, autolinks).
-- Server-side syntax highlighting via Shiki, palette-aware (10 variants per token — one for every palette/theme combination) — zero client highlighter bundle, no re-render on theme/palette swap.
+- Server-side syntax highlighting via Shiki, palette-aware (16 variants per token — one for every palette/theme combination) — zero client highlighter bundle, no re-render on theme/palette swap.
 - Mermaid diagrams, lazy-loaded only when a doc contains a `mermaid` fence.
 - Math via KaTeX (`$inline$` and `$$block$$`), lazy-loaded only when a doc contains math.
 - Custom-styled task list checkboxes (filled accent when checked, hollow when unchecked).
@@ -216,7 +217,7 @@ Two layered files, both optional, same schema:
 
 ```json
 {
-  "palette": "nord",
+  "palette": "everforest",
   "fontFamily": "serif",
   "lineWidth": "70ch",
   "defaultCollapsed": { "tree": false, "outline": false },

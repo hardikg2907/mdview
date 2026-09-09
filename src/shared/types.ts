@@ -54,8 +54,26 @@ export type WatchEvent =
   // tree, which is the only thing that can have changed.
   | { kind: 'workspace' };
 
-export type Palette = 'classic' | 'paper' | 'nord' | 'solarized' | 'high-contrast';
-export const PALETTES: readonly Palette[] = ['classic', 'paper', 'nord', 'solarized', 'high-contrast'];
+export type Palette =
+  | 'flexoki'
+  | 'paper'
+  | 'solarized'
+  | 'everforest'
+  | 'rose-pine'
+  | 'kanagawa'
+  | 'catppuccin'
+  | 'high-contrast';
+/** Order here is the order of the palette picker. `flexoki` is the default. */
+export const PALETTES: readonly Palette[] = [
+  'flexoki',
+  'paper',
+  'solarized',
+  'everforest',
+  'rose-pine',
+  'kanagawa',
+  'catppuccin',
+  'high-contrast',
+];
 
 export type FontFamily = 'serif' | 'sans' | 'mono';
 
