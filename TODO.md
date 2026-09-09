@@ -1,6 +1,8 @@
 # mdview — TODO
 
-Roadmap of pending work. v1 and phases 2 and 3 are shipped and in active use; phase 4 (editor extensions) is in progress on a branch.
+Roadmap of pending work. v1 and phases 2 and 3 are shipped and in active use.
+Phase 4 (editor extensions) is partly done: the VS Code extension works and is
+on `main`, but it has never been published.
 
 ---
 
@@ -30,12 +32,17 @@ Originally-deferred MVP-adjacent features. Build as a coordinated push once v1 h
 
 ## Phase 4 — Editor extensions (VS Code, Zed)
 
-Distribute the viewer as a native side-panel inside the user's editor instead of (or alongside) the standalone server.
+Distribute the viewer as a native side-panel inside the user's editor instead of
+(or alongside) the standalone server. The VS Code extension lives in
+`apps/vscode` as a side-by-side package with its own deps and test suite; design
+notes are in `docs/superpowers/specs/2026-05-24-vscode-extension-design.md`.
 
-- [ ] **VS Code extension** — webview panel that renders the active `.md` file using the mdview UI; auto-updates when the editor's active file changes; shares the in-editor theme; published to the VS Code Marketplace.
+- [x] **VS Code extension** — webview panel that renders the active `.md` file using the mdview UI, auto-updates when the editor's active file changes, and follows the in-editor theme. It spawns the CLI per workspace folder (`ServerPool`) and frames the SPA through VS Code's webview resource proxy.
+- [x] **Editor-aware features** — heading and internal-link clicks in the preview move the editor cursor and reveal the line; moving the cursor scrolls the preview to the nearest heading at or above it, debounced, with a suppression window so the two don't chase each other.
+- [ ] **Publish to the Marketplace** — still `0.1.0` and unpublished. Needs a publisher account, an icon, a README with screenshots, and a real `CHANGELOG` for the extension itself. The integration test runner (`@vscode/test-electron`) has never been run in CI.
 - [ ] **Zed extension** — equivalent for Zed once their extension API supports webviews; similar UX (split-pane preview, theme follow, live update on save).
-- [ ] **Architecture** — extract the rendering pipeline + frontend into a reusable package so the standalone CLI, VS Code extension, and Zed extension all share one codebase. The extensions ship the renderer in-process (no spawning a Node server).
-- [ ] **Editor-aware features** — "Reveal in editor" link to jump back to source line, sync scroll position with editor cursor, optionally watch only the active file rather than the workspace.
+- [ ] **Architecture** — extract the rendering pipeline + frontend into a reusable package so the standalone CLI, VS Code extension, and Zed extension all share one codebase. The extensions would then ship the renderer in-process instead of spawning a Node server, which is what the current extension does.
+- [ ] **Watch scope** — optionally watch only the active file rather than the whole workspace folder.
 
 ## Phase 3 — Workspaces
 

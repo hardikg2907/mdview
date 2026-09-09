@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **VS Code extension: two-way cursor sync.** Clicking a heading or an internal link in the preview moves the editor cursor and reveals the line; moving the cursor in the editor scrolls the preview to the nearest heading at or above that line, debounced at 80ms. A suppression window breaks the feedback loop so VS Code's own selection-change event isn't echoed back as a jitter loop. Inbound paths from the webview are canonicalized with `realpath` and rejected unless they stay inside the workspace folder. The extension is still unpublished (`0.1.0`).
+- VS Code extension: `mdview: Open in Browser` command, and the preview now follows the active editor and the VS Code colour theme.
+
+### Removed
+- VS Code extension: the `mdview.ignore` setting. The CLI has no `--ignore` flag, so the value never reached the server — `.mdview.json` at the folder root is the one place ignores are configured.
+
+### Security
+- `fastify` 5.8.5 → 5.12.3. Closes a schema-validation bypass via root primitive coercion (GHSA-w2qp-rph6-63g4) and `X-Forwarded-*` spoofing under `trustProxy` hop-count (GHSA-3m5p-2c4r-xxw2). Neither is reachable here — the server defines no root-primitive schemas and never sets `trustProxy` — but the dep ships to users.
+- `js-yaml` 3.15.1 → 3.15.2 (transitively, via `gray-matter`). Closes unbounded CPU use on empty merge sources (GHSA-2883-xcg3-v3hh). This one is reachable: `js-yaml` parses frontmatter out of whatever markdown the user opens.
+
 ## [0.8.1] — 2026-08-24
 
 ### Fixed
