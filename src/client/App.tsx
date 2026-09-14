@@ -16,7 +16,7 @@ import { useAltWheelScroll } from './hooks/useAltWheelScroll.js';
 import { fileError, fileLoading, fileSignal, loadFile } from './hooks/useFile.js';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts.js';
 import { useLiveReload } from './hooks/useLiveReload.js';
-import { usePalette } from './hooks/usePalette.js';
+import { paletteSignal, usePalette } from './hooks/usePalette.js';
 import { readRootFromUrl, usePathRouting } from './hooks/usePathRouting.js';
 import { setMainScroller } from './hooks/useScroller.js';
 import { activeHeadingId, lockScrollSpy, useScrollSpy } from './hooks/useScrollSpy.js';
@@ -80,7 +80,12 @@ export function App() {
     }
   }, [tree, currentPath]);
 
-  useEffect(() => { void loadFile(currentPath); }, [currentPath]);
+  // Refetches on a palette change: code colours are rendered server-side for
+  // the active palette only. The light/dark toggle is not in here — both its
+  // variants ship in every response, so it repaints with no request.
+  useEffect(() => {
+    void loadFile(currentPath);
+  }, [currentPath, paletteSignal.value]);
   useEffect(() => { closeSearch(); }, [currentPath]);
 
   // Update browser tab title to reflect the currently-open file.

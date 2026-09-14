@@ -4,13 +4,28 @@ import { parseFrontmatter } from '../../render/frontmatter.js';
 import { rewriteImageSrc, tagInternalLinks } from '../../render/links.js';
 import { renderMarkdown } from '../../render/markdown.js';
 import { extractOutline } from '../../render/outline.js';
-import type { RenderedFile } from '../../shared/types.js';
+import {
+  DEFAULT_PALETTE,
+  PALETTES,
+  type Palette,
+  type RenderedFile,
+} from '../../shared/types.js';
 import { resolveSafePath } from '../fs/resolve.js';
 import { parseWorkspacePath, type RootState, toWorkspacePath } from '../workspace.js';
 
 export function registerApiFile(app: FastifyInstance, roots: readonly RootState[]): void {
-  app.get<{ Querystring: { path?: string } }>('/api/file', async (req, reply) => {
+  app.get<{ Querystring: { path?: string; palette?: string } }>(
+    '/api/file',
+    async (req, reply) => {
     const requested = req.query.path?.trim() ?? '';
+    // Untrusted query value: checked against the allow-list, never used to
+    // build a key or a path. An unknown palette renders the default rather
+    // than failing the request — the document is what was asked for, and the
+    // colours are recoverable by picking a palette again.
+    const rawPalette = req.query.palette?.trim() ?? '';
+    const palette: Palette = (PALETTES as readonly string[]).includes(rawPalette)
+      ? (rawPalette as Palette)
+      : DEFAULT_PALETTE;
     const primary = roots[0];
     if (!primary) {
       return reply.code(404).send({ error: 'No folders are open' });
@@ -64,7 +79,7 @@ export function registerApiFile(app: FastifyInstance, roots: readonly RootState[
     }
 
     const { data, body, bodyStartLine } = parseFrontmatter(raw);
-    const { html: rawHtml, tokens } = await renderMarkdown(body, bodyStartLine);
+    const { html: rawHtml, tokens } = await renderMarkdown(body, bodyStartLine, palette);
     // Link and image rewriting run against the workspace-scoped path, so
     // relative targets resolve within the same root and the ?file= and
     // /__asset/ URLs they emit come out already root-qualified.
@@ -85,5 +100,6 @@ export function registerApiFile(app: FastifyInstance, roots: readonly RootState[
       lastModified: mtimeMs,
     };
     return reply.send(result);
-  });
+    },
+  );
 }

@@ -79,8 +79,19 @@ node bin/mdview.mjs ./test-fixtures/showcase.md --no-open
 ### 9. Themes & palettes
 - Theme toggle (sun/moon icon, header right) flips light/dark instantly.
 - Palette picker icon (palette/swatch, header right) opens a menu with eight swatches: flexoki / paper / solarized / everforest / rose-pine / kanagawa / catppuccin / high-contrast. Click any → page palette and code-block colors swap live.
-- In each palette, look at the page background at 100% zoom: the paper grain should read as a tint of that palette's own text colour, never as a warm brown wash over a cool ground. On `high-contrast` there should be **no** grain at all.
-- Switch to `rose-pine` or `catppuccin`, then toggle light/dark → grain, code background and quote bar all stay inside that palette.
+- Ground texture differs by palette, at 100% zoom, on the page background:
+  - `flexoki` / `paper` / `solarized` → a fine dot lattice, tinted with that palette's own text colour (never a warm brown wash over a cool ground).
+  - `everforest` / `kanagawa` → mottled fibre noise, no visible grid.
+  - `rose-pine` / `catppuccin` → dots plus a wide bleed of the accent colour down from the top edge; scroll to the top to see it.
+  - `high-contrast` → **no** texture at all, in both light and dark.
+- Switch to `rose-pine` or `catppuccin`, then toggle light/dark → texture, code background and quote bar all stay inside that palette.
+
+### 9b. Palette switching and the code payload
+- Open a document with code blocks (`showcase.md`). Inspect any token inside `.shiki` → its `style` has exactly **two** custom properties, `--shiki-light` and `--shiki-dark`. Palette-scoped names like `--shiki-everforest-light` must **not** appear; they would mean every palette is being rendered again.
+- With DevTools → Network filtered to `api/file`: toggling **light/dark** fires **no** request, and code colours still change.
+- Changing **palette** fires exactly one `/api/file` request, carrying `?palette=<name>`, and the code recolours to that palette.
+- `curl 'http://127.0.0.1:<port>/api/file?path=showcase.md&palette=banana'` returns 200 with the default palette's colours — an unknown palette must not fail the request.
+- Compare response sizes: `?palette=flexoki` on `showcase.md` should be roughly 30 KB, not 200 KB.
 - High-contrast in dark mode → near-pure-white text on near-black background, bold accent. Light mode → mirror.
 - Reload — both theme and palette persist **without a flash of the default** (an inline `<head>` script applies them before first paint).
 - Hard-reload in Safari private mode → theme/palette still applies; check DevTools console for a single `mdview: localStorage access blocked` warning (acceptable, not an error).

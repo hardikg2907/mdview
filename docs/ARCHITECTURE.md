@@ -188,7 +188,7 @@ The renderer lives in `src/render/`, **outside** `src/server/`, because it has n
 
 1. **`frontmatter.ts`** — `parseFrontmatter(raw)` peels off `---`-delimited YAML using `gray-matter`. Returns `{ data, body }`.
 2. **`markdown.ts`** — `renderMarkdown(body)` constructs a singleton `markdown-it` instance with `linkify`, `markdown-it-anchor` (custom slugify), `markdown-it-task-lists`, and the local **`mathPlugin`**. Walks the token list to intercept `fence` tokens: `mermaid` becomes a `<div class="mermaid-block" data-source="...">` for client rendering, everything else is highlighted via Shiki.
-3. **`shiki.ts`** — `highlightCode(code, lang)` lazy-loads languages on demand; uses dual-theme (`github-light` / `github-dark`) with `defaultColor: false` so the client can swap themes purely via CSS.
+3. **`shiki.ts`** — `highlightCode(code, lang, palette)` lazy-loads languages on demand. It renders the requested palette's light and dark themes with `defaultColor: false`, so each token carries exactly `--shiki-light` and `--shiki-dark` and the light/dark toggle repaints purely in CSS. Changing *palette* refetches, because only the active one is rendered: rendering all eight put 16 variables on every token and took a real document from 30 KB to 204 KB.
 4. **`math.ts`** — markdown-it core rule that scans for `$$...$$` paragraphs and `$...$` inline runs (with whitespace heuristics and code-span exclusion), emitting `<span class="math-inline">` / `<div class="math-block">` placeholders with URL-encoded `data-source`.
 5. **`outline.ts`** — `extractOutline(tokens)` walks heading tokens, builds a nested `OutlineNode[]` tree using a stack-based algorithm. Handles non-monotonic depth jumps (e.g. h1 → h3 with no h2).
 6. **`links.ts`** — `tagInternalLinks(html, currentRelPath)` adds `data-internal-link="<resolved-path>"` to relative `.md` `<a href>`s so the client can intercept them. `rewriteImageSrc(html, currentRelPath)` rewrites relative `<img src>` to `/__asset/<resolved>` so they resolve against the content root, not the SPA bundle.
@@ -236,7 +236,7 @@ const { signal, set } = createPersistedSignal('mdview-foo', defaultValue, { pars
 | Signal | File | Purpose |
 |--------|------|---------|
 | `themeSignal` | `useTheme.ts` | `'light' \| 'dark'` |
-| `paletteSignal` | `usePalette.ts` | `'classic' \| 'paper' \| 'nord' \| 'solarized'` |
+| `paletteSignal` | `usePalette.ts` | one of `PALETTES` (`src/shared/types.ts`); a change refetches the document |
 | `fileSignal`, `fileLoading`, `fileError` | `useFile.ts` | Currently rendered file (incl. `lastModified`) |
 | `treeSignal`, `configSignal` | `useTree.ts` | Folder tree + project config |
 | `currentPathSignal` | `usePathRouting.ts` | Currently open file path |

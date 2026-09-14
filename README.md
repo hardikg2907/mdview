@@ -169,7 +169,7 @@ Click the keyboard icon in the header anytime to see the full list.
 - 3-pane layout: folder tree, content, outline. Both sidebars collapse to a thin label rail; both have drag handles to resize (widths persist).
 - Editorial typography (serif body, italic accent H1, paper-grain background, JetBrains Mono in code blocks).
 - Light & dark theme — follows your OS preference, with a manual override that persists.
-- Eight built-in palettes: flexoki / paper / solarized / everforest / rose-pine / kanagawa / catppuccin / high-contrast. Pick one from the header palette swatch. Each defines a full light and dark variant, and each carries its own paper grain, so the texture is never a warm wash over a cool ground. Code blocks follow the palette (Everforest syntax in Everforest, Catppuccin in Catppuccin, etc.).
+- Eight built-in palettes: flexoki / paper / solarized / everforest / rose-pine / kanagawa / catppuccin / high-contrast. Pick one from the header palette swatch. Each defines a full light and dark variant and its own ground texture: a dot grain on the paper-like palettes, fibre noise on Everforest and Kanagawa, an accent wash on Rosé Pine and Catppuccin, and none at all on high-contrast. Code blocks follow the palette (Everforest syntax in Everforest, Catppuccin in Catppuccin, etc.).
 - Reading-progress bar pinned to the bottom of the header.
 - Doc stats strip below the H1 (reading time, word count, heading count, "Updated N ago").
 - Focus mode dims everything except the section at the viewport center.
@@ -185,7 +185,7 @@ Click the keyboard icon in the header anytime to see the full list.
 
 **Rendering**
 - CommonMark + GFM (tables, task lists, strikethrough, autolinks).
-- Server-side syntax highlighting via Shiki, palette-aware (16 variants per token — one for every palette/theme combination) — zero client highlighter bundle, no re-render on theme/palette swap.
+- Server-side syntax highlighting via Shiki, palette-aware: two variants per token, light and dark, for whichever palette is active. Zero client highlighter bundle, and the light/dark toggle repaints with no request.
 - Mermaid diagrams, lazy-loaded only when a doc contains a `mermaid` fence.
 - Math via KaTeX (`$inline$` and `$$block$$`), lazy-loaded only when a doc contains math.
 - Custom-styled task list checkboxes (filled accent when checked, hollow when unchecked).

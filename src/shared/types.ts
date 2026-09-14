@@ -63,7 +63,9 @@ export type Palette =
   | 'kanagawa'
   | 'catppuccin'
   | 'high-contrast';
-/** Order here is the order of the palette picker. `flexoki` is the default. */
+/** The palette used when nothing else has been chosen. */
+export const DEFAULT_PALETTE: Palette = 'flexoki';
+/** Order here is the order of the palette picker. */
 export const PALETTES: readonly Palette[] = [
   'flexoki',
   'paper',

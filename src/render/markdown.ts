@@ -1,6 +1,7 @@
 import MarkdownIt from 'markdown-it';
 import anchor from 'markdown-it-anchor';
 import taskLists from 'markdown-it-task-lists';
+import { DEFAULT_PALETTE, type Palette } from '../shared/types.js';
 import { mathPlugin } from './math.js';
 import { highlightCode } from './shiki.js';
 
@@ -32,6 +33,7 @@ md.use(mathPlugin);
 export async function renderMarkdown(
   source: string,
   bodyStartLine = 0,
+  palette: Palette = DEFAULT_PALETTE,
 ): Promise<RenderResult> {
   const tokens = md.parse(source, {});
   for (const token of tokens) {
@@ -47,7 +49,7 @@ export async function renderMarkdown(
         token.content =
           `<div class="mermaid-block" data-source="${encodeURIComponent(token.content)}"></div>\n`;
       } else {
-        const highlighted = await highlightCode(token.content, lang);
+        const highlighted = await highlightCode(token.content, lang, palette);
         token.type = 'html_block';
         token.content = highlighted + '\n';
       }

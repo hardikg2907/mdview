@@ -11,19 +11,36 @@ describe('highlightCode', () => {
     expect(html).toMatch(/style="[^"]*(?:color:|--shiki-)/);
   });
 
-  it('emits a CSS variable per (palette, mode) pair', async () => {
+  it('emits one CSS variable per mode, for the requested palette only', async () => {
     const html = await highlightCode('const x = 1;', 'ts');
-    // Driven off PALETTES rather than a hand-written list: a palette added to
-    // the allow-list without a matching entry in PALETTE_THEME_MAP would
-    // otherwise render with no colour under that palette and pass silently.
+    // Both modes ship so the light/dark toggle repaints with no refetch.
+    expect(html).toContain('--shiki-light');
+    expect(html).toContain('--shiki-dark');
+    // Palette-scoped names are what the old render-every-palette scheme
+    // emitted; their return would mean the payload regression is back.
     for (const palette of PALETTES) {
-      for (const mode of ['light', 'dark']) {
-        expect(html).toContain(`--shiki-${palette}-${mode}`);
-      }
+      expect(html).not.toContain(`--shiki-${palette}-light`);
+      expect(html).not.toContain(`--shiki-${palette}-dark`);
     }
-    // Old single-mode names must NOT leak through.
-    expect(html).not.toMatch(/--shiki-light\b/);
-    expect(html).not.toMatch(/--shiki-dark\b/);
+  });
+
+  it('colours a token differently per palette', async () => {
+    // Guards the wiring end to end: if the palette argument were dropped on
+    // the way to Shiki, every palette would render identical bytes.
+    const [a, b] = await Promise.all([
+      highlightCode('const x = 1;', 'ts', 'everforest'),
+      highlightCode('const x = 1;', 'ts', 'catppuccin'),
+    ]);
+    expect(a).not.toEqual(b);
+  });
+
+  it('renders every palette in the allow-list', async () => {
+    // A palette missing from PALETTE_THEMES would throw or silently emit no
+    // colour; this fails on the first one that does.
+    for (const palette of PALETTES) {
+      const html = await highlightCode('const x = 1;', 'ts', palette);
+      expect(html).toContain('--shiki-light');
+    }
   });
 
   it('falls back gracefully for unknown language', async () => {
