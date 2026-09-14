@@ -20,6 +20,20 @@
   --transition: 200ms ease;
   --transition-pane: 220ms cubic-bezier(.2, .8, .2, 1);
 
+  /* Reusable ground textures.
+
+     Three patterns, assigned per palette below rather than offered as a
+     setting: the texture is part of a palette's identity, and a 4-way picker
+     crossed with 8 palettes is 32 combinations nobody would author or test.
+
+     The noise tiles are fractal turbulence rather than a lattice, so they
+     never form the faint moire a repeating dot grid can show at some zoom
+     levels. They are data: URIs, which `img-src 'self' data: blob:` already
+     permits — no CSP change. The ink colour is baked into each tile (SVG
+     can't read a custom property), hence one dark-ink and one light-ink. */
+  --grain-noise-ink: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.055'/%3E%3C/svg%3E");
+  --grain-noise-paper: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='140' height='140' fill='%23ffffff' filter='url(%23n)' opacity='.045'/%3E%3C/svg%3E");
+
   /* Layout dimensions */
   --tree-width: 264px;
   --outline-width: 280px;
@@ -63,10 +77,10 @@
   --selection-bg: #ffe7ce;
   --selection-fg: #27180e;
 
-  /* Faint paper grain. The tint is a low-alpha wash of this palette's own
-     ink, which is why every palette below restates it: a warm grain over a
-     cool ground reads as a dirty screen. --paper-grain-size is set once here
-     and inherited, since no palette varies the lattice. */
+  /* Dot grain: a 22px lattice tinted with this palette's own ink. Every
+     palette restates the grain, both because a warm tint over a cool ground
+     reads as a dirty screen and because the pattern itself varies — see the
+     palette blocks below. */
   --paper-grain:
     radial-gradient(circle at 1px 1px, rgba(87, 86, 83, .055) 1px, transparent 0);
   --paper-grain-size: 22px 22px;
@@ -241,8 +255,10 @@
   --quote-fg: #829181;
   --selection-bg: #eaedc8;
   --selection-fg: #3a454a;
-  --paper-grain:
-    radial-gradient(circle at 1px 1px, rgba(92, 106, 114, .055) 1px, transparent 0);
+  /* Fibre noise: these two palettes are the lowest-contrast grounds here, and
+     a lattice is more visible on them than on a cream. */
+  --paper-grain: var(--grain-noise-ink);
+  --paper-grain-size: 140px 140px;
 }
 :root[data-palette="everforest"][data-theme="dark"] {
   --bg: #2d353b;
@@ -267,8 +283,8 @@
   --quote-fg: #9da9a0;
   --selection-bg: #475258;
   --selection-fg: #d3c6aa;
-  --paper-grain:
-    radial-gradient(circle at 1px 1px, rgba(211, 198, 170, .045) 1px, transparent 0);
+  --paper-grain: var(--grain-noise-paper);
+  --paper-grain-size: 140px 140px;
 }
 
 /* Rosé Pine — Dawn in light, the main variant in dark */
@@ -295,8 +311,12 @@
   --quote-fg: #797593;
   --selection-bg: #dfdad9;
   --selection-fg: #464261;
+  /* Accent wash: a wide bleed of the palette's accent from the top edge over
+     the dot grain, so the header reads as attached to the document. */
   --paper-grain:
-    radial-gradient(circle at 1px 1px, rgba(121, 117, 147, .055) 1px, transparent 0);
+    radial-gradient(120% 60% at 50% -12%, rgba(144, 122, 169, .10), transparent 62%),
+    radial-gradient(circle at 1px 1px, rgba(121, 117, 147, .05) 1px, transparent 0);
+  --paper-grain-size: auto, 22px 22px;
 }
 :root[data-palette="rose-pine"][data-theme="dark"] {
   --bg: #191724;
@@ -322,7 +342,9 @@
   --selection-bg: #403d52;
   --selection-fg: #e0def4;
   --paper-grain:
-    radial-gradient(circle at 1px 1px, rgba(224, 222, 244, .045) 1px, transparent 0);
+    radial-gradient(120% 60% at 50% -12%, rgba(196, 167, 231, .10), transparent 62%),
+    radial-gradient(circle at 1px 1px, rgba(224, 222, 244, .04) 1px, transparent 0);
+  --paper-grain-size: auto, 22px 22px;
 }
 
 /* Kanagawa — Lotus in light, Wave in dark */
@@ -349,8 +371,10 @@
   --quote-fg: #716e61;
   --selection-bg: #c9cbd1;
   --selection-fg: #43436c;
-  --paper-grain:
-    radial-gradient(circle at 1px 1px, rgba(84, 84, 100, .06) 1px, transparent 0);
+  /* Fibre noise: these two palettes are the lowest-contrast grounds here, and
+     a lattice is more visible on them than on a cream. */
+  --paper-grain: var(--grain-noise-ink);
+  --paper-grain-size: 140px 140px;
 }
 :root[data-palette="kanagawa"][data-theme="dark"] {
   --bg: #1f1f28;
@@ -375,8 +399,8 @@
   --quote-fg: #c8c093;
   --selection-bg: #2d4f67;
   --selection-fg: #dcd7ba;
-  --paper-grain:
-    radial-gradient(circle at 1px 1px, rgba(220, 215, 186, .045) 1px, transparent 0);
+  --paper-grain: var(--grain-noise-paper);
+  --paper-grain-size: 140px 140px;
 }
 
 /* Catppuccin — Latte in light, Mocha in dark */
@@ -404,7 +428,9 @@
   --selection-bg: #ccd0da;
   --selection-fg: #4c4f69;
   --paper-grain:
-    radial-gradient(circle at 1px 1px, rgba(76, 79, 105, .05) 1px, transparent 0);
+    radial-gradient(120% 60% at 50% -12%, rgba(136, 57, 239, .07), transparent 62%),
+    radial-gradient(circle at 1px 1px, rgba(76, 79, 105, .045) 1px, transparent 0);
+  --paper-grain-size: auto, 22px 22px;
 }
 :root[data-palette="catppuccin"][data-theme="dark"] {
   --bg: #1e1e2e;
@@ -430,7 +456,9 @@
   --selection-bg: #45475a;
   --selection-fg: #cdd6f4;
   --paper-grain:
-    radial-gradient(circle at 1px 1px, rgba(205, 214, 244, .045) 1px, transparent 0);
+    radial-gradient(120% 60% at 50% -12%, rgba(203, 166, 247, .10), transparent 62%),
+    radial-gradient(circle at 1px 1px, rgba(205, 214, 244, .04) 1px, transparent 0);
+  --paper-grain-size: auto, 22px 22px;
 }
 
 /* High contrast — pure black/white, bold accents, strong borders.
@@ -515,82 +543,20 @@ html, body {
   color: var(--selection-fg);
 }
 
-/* Shiki theme switching — palette-aware.
-   Each token carries one CSS variable per (palette, mode) pair (16 total):
-   --shiki-flexoki-light, --shiki-flexoki-dark, --shiki-paper-light, …
-   plus matching `*-bg` for the pre background. We pick one based on
-   [data-palette][data-theme]. Defaults (no data-palette → flexoki; no
-   data-theme → light) mirror the bootstrap script in index.html. */
+/* Shiki theme switching.
 
-/* flexoki (also: default when no data-palette is set) */
-:root[data-palette="flexoki"][data-theme="light"] .shiki span,
-:root[data-palette="flexoki"]:not([data-theme]) .shiki span,
-:root:not([data-palette])[data-theme="light"] .shiki span,
-:root:not([data-palette]):not([data-theme]) .shiki span { color: var(--shiki-flexoki-light) !important; }
-:root[data-palette="flexoki"][data-theme="light"] .shiki,
-:root[data-palette="flexoki"]:not([data-theme]) .shiki,
-:root:not([data-palette])[data-theme="light"] .shiki,
-:root:not([data-palette]):not([data-theme]) .shiki { background-color: var(--shiki-flexoki-light-bg) !important; }
-:root[data-palette="flexoki"][data-theme="dark"] .shiki span,
-:root:not([data-palette])[data-theme="dark"] .shiki span { color: var(--shiki-flexoki-dark) !important; }
-:root[data-palette="flexoki"][data-theme="dark"] .shiki,
-:root:not([data-palette])[data-theme="dark"] .shiki { background-color: var(--shiki-flexoki-dark-bg) !important; }
-
-/* paper */
-:root[data-palette="paper"][data-theme="light"] .shiki span,
-:root[data-palette="paper"]:not([data-theme]) .shiki span { color: var(--shiki-paper-light) !important; }
-:root[data-palette="paper"][data-theme="light"] .shiki,
-:root[data-palette="paper"]:not([data-theme]) .shiki { background-color: var(--shiki-paper-light-bg) !important; }
-:root[data-palette="paper"][data-theme="dark"] .shiki span { color: var(--shiki-paper-dark) !important; }
-:root[data-palette="paper"][data-theme="dark"] .shiki { background-color: var(--shiki-paper-dark-bg) !important; }
-
-/* solarized */
-:root[data-palette="solarized"][data-theme="light"] .shiki span,
-:root[data-palette="solarized"]:not([data-theme]) .shiki span { color: var(--shiki-solarized-light) !important; }
-:root[data-palette="solarized"][data-theme="light"] .shiki,
-:root[data-palette="solarized"]:not([data-theme]) .shiki { background-color: var(--shiki-solarized-light-bg) !important; }
-:root[data-palette="solarized"][data-theme="dark"] .shiki span { color: var(--shiki-solarized-dark) !important; }
-:root[data-palette="solarized"][data-theme="dark"] .shiki { background-color: var(--shiki-solarized-dark-bg) !important; }
-
-/* everforest */
-:root[data-palette="everforest"][data-theme="light"] .shiki span,
-:root[data-palette="everforest"]:not([data-theme]) .shiki span { color: var(--shiki-everforest-light) !important; }
-:root[data-palette="everforest"][data-theme="light"] .shiki,
-:root[data-palette="everforest"]:not([data-theme]) .shiki { background-color: var(--shiki-everforest-light-bg) !important; }
-:root[data-palette="everforest"][data-theme="dark"] .shiki span { color: var(--shiki-everforest-dark) !important; }
-:root[data-palette="everforest"][data-theme="dark"] .shiki { background-color: var(--shiki-everforest-dark-bg) !important; }
-
-/* rose-pine */
-:root[data-palette="rose-pine"][data-theme="light"] .shiki span,
-:root[data-palette="rose-pine"]:not([data-theme]) .shiki span { color: var(--shiki-rose-pine-light) !important; }
-:root[data-palette="rose-pine"][data-theme="light"] .shiki,
-:root[data-palette="rose-pine"]:not([data-theme]) .shiki { background-color: var(--shiki-rose-pine-light-bg) !important; }
-:root[data-palette="rose-pine"][data-theme="dark"] .shiki span { color: var(--shiki-rose-pine-dark) !important; }
-:root[data-palette="rose-pine"][data-theme="dark"] .shiki { background-color: var(--shiki-rose-pine-dark-bg) !important; }
-
-/* kanagawa */
-:root[data-palette="kanagawa"][data-theme="light"] .shiki span,
-:root[data-palette="kanagawa"]:not([data-theme]) .shiki span { color: var(--shiki-kanagawa-light) !important; }
-:root[data-palette="kanagawa"][data-theme="light"] .shiki,
-:root[data-palette="kanagawa"]:not([data-theme]) .shiki { background-color: var(--shiki-kanagawa-light-bg) !important; }
-:root[data-palette="kanagawa"][data-theme="dark"] .shiki span { color: var(--shiki-kanagawa-dark) !important; }
-:root[data-palette="kanagawa"][data-theme="dark"] .shiki { background-color: var(--shiki-kanagawa-dark-bg) !important; }
-
-/* catppuccin */
-:root[data-palette="catppuccin"][data-theme="light"] .shiki span,
-:root[data-palette="catppuccin"]:not([data-theme]) .shiki span { color: var(--shiki-catppuccin-light) !important; }
-:root[data-palette="catppuccin"][data-theme="light"] .shiki,
-:root[data-palette="catppuccin"]:not([data-theme]) .shiki { background-color: var(--shiki-catppuccin-light-bg) !important; }
-:root[data-palette="catppuccin"][data-theme="dark"] .shiki span { color: var(--shiki-catppuccin-dark) !important; }
-:root[data-palette="catppuccin"][data-theme="dark"] .shiki { background-color: var(--shiki-catppuccin-dark-bg) !important; }
-
-/* high-contrast */
-:root[data-palette="high-contrast"][data-theme="light"] .shiki span,
-:root[data-palette="high-contrast"]:not([data-theme]) .shiki span { color: var(--shiki-high-contrast-light) !important; }
-:root[data-palette="high-contrast"][data-theme="light"] .shiki,
-:root[data-palette="high-contrast"]:not([data-theme]) .shiki { background-color: var(--shiki-high-contrast-light-bg) !important; }
-:root[data-palette="high-contrast"][data-theme="dark"] .shiki span { color: var(--shiki-high-contrast-dark) !important; }
-:root[data-palette="high-contrast"][data-theme="dark"] .shiki { background-color: var(--shiki-high-contrast-dark-bg) !important; }
+   Each token carries exactly two CSS variables, --shiki-light and
+   --shiki-dark, plus matching `*-bg` for the pre background. The server
+   renders only the active palette's pair (see render/shiki.ts), so the
+   palette is already baked in by the time this runs and only the mode is
+   selected here. The no-[data-theme] branches mirror the bootstrap script's
+   light default for the window before it runs. */
+:root[data-theme="light"] .shiki span,
+:root:not([data-theme]) .shiki span { color: var(--shiki-light) !important; }
+:root[data-theme="light"] .shiki,
+:root:not([data-theme]) .shiki { background-color: var(--shiki-light-bg) !important; }
+:root[data-theme="dark"] .shiki span { color: var(--shiki-dark) !important; }
+:root[data-theme="dark"] .shiki { background-color: var(--shiki-dark-bg) !important; }
 
 /* Scrollbar polish */
 .pane-tree, .pane-outline, .pane-main {
