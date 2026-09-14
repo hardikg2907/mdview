@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] — 2026-09-14
+
+Eight palettes, each with its own ground texture — and code blocks that are
+smaller than they were at five.
+
 ### Added
 - **Five new palettes: Everforest, Rosé Pine, Kanagawa, Catppuccin, and Flexoki** — each with a full light and dark variant and its own Shiki theme pair, so code blocks stay inside the palette. Base colours come from each project's own palette file; all six upstream projects are MIT.
 - **Each palette now has its own ground texture.** Previously one texture was defined per light/dark theme, so a warm brown grain (`rgba(120, 70, 30, …)`) was washed over every palette including the cool ones. There are now three patterns, assigned per palette: a dot grain tinted with the palette's own ink on the paper-like palettes (flexoki, paper, solarized), fibre noise on the two lowest-contrast grounds (everforest, kanagawa), and an accent wash — a wide bleed of the palette's accent down from the top edge — on rose-pine and catppuccin. `high-contrast` gets none, because texture over a maximum-contrast ground works against the one thing that palette exists to provide. The noise is an SVG `feTurbulence` data URI, which the existing `img-src 'self' data: blob:` already permits, so the CSP is untouched.
