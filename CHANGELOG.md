@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **The file tree scrolls sideways**, like the Zed and VS Code sidebars. Long names are no longer truncated with an ellipsis; scroll the tree horizontally to read them instead of widening the pane. The "Files" header stays in place while the tree scrolls.
 
+### Security
+- Bumped shipped dependencies to clear advisories: `fastify` 5.12.3 → 5.12.5 (DoS via HTTP/2 trailer responses), `fast-uri` 3.1.6 → 3.1.8 and 4.1.4 → 4.2.1 (host confusion and authority injection in URI handling), `markdown-it` 14.2.0 → 14.3.2 (quadratic paths in `linkify`), and `brace-expansion` 5.0.9 → 5.0.12 (DoS on crafted brace patterns). The `markdown-it` one was reachable: the renderer enables `linkify`, so opening a few hundred KB of crafted markdown could block the server for tens of seconds. The others were not reachable as mdview is configured (the server does not enable HTTP/2), but they ship in the install. Lockfile-only change.
+
 ## [0.9.0] — 2026-09-14
 
 Eight palettes, each with its own ground texture — and code blocks that are
