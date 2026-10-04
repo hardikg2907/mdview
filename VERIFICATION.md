@@ -43,6 +43,12 @@ node bin/mdview.mjs ./test-fixtures/showcase.md --no-open
 - Drag below the collapse threshold (~140 px) → pane snaps to collapsed rail and width resets to default.
 - `⌘B` / `⌘.` still toggle correctly afterwards.
 
+### 4-tree. Tree indent and horizontal scroll
+- Open a file four or more folders deep → each level steps in by the same small amount; no level jumps further than the one above it.
+- Give a file a name longer than the pane → the name is not cut off with `…`; a horizontal scrollbar appears at the bottom of the tree pane, and scrolling sideways (trackpad or shift+wheel) shows the full name.
+- While scrolled sideways or down, the "Files" head bar and its collapse button stay in place.
+- Rows of a short tree that fits the pane show no horizontal scrollbar, including while hovering a row.
+
 ### 4a. Collapse controls live inside the panes
 - Tree expanded → "Files" head bar at the top of the tree pane has a single collapse button on the right (`⌘B` tooltip). Header has no tree-toggle button.
 - Click the in-pane button → tree collapses to the vertical "FILES" rail. Click the rail → tree expands again.

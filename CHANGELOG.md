@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **File-tree indentation no longer grows with depth.** Each level added its own offset on top of its parent's, so the indent compounded: a file five folders down sat about 310 px in, past the edge of a default-width pane. Every level now adds one fixed 14 px step, so the same file sits under 90 px in.
+
+### Changed
+- **The file tree scrolls sideways**, like the Zed and VS Code sidebars. Long names are no longer truncated with an ellipsis; scroll the tree horizontally to read them instead of widening the pane. The "Files" header stays in place while the tree scrolls.
+
 ## [0.9.0] — 2026-09-14
 
 Eight palettes, each with its own ground texture — and code blocks that are

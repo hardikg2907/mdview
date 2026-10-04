@@ -31,7 +31,7 @@ interface Props {
 
 export function FolderTree({ tree, currentPath, onSelect, onCollapse }: Props) {
   return (
-    <div class="pane-content">
+    <div class="pane-content tree-pane">
       <div class="pane-head">
         <span class="pane-head-title">
           Files
@@ -62,17 +62,19 @@ export function FolderTree({ tree, currentPath, onSelect, onCollapse }: Props) {
           No folders open. Run <code>mdview &lt;path&gt;</code> to add one.
         </p>
       ) : (
-        <ul class="tree" role="tree">
-          {tree.map((node) => (
-            <TreeItem
-              key={node.relPath}
-              node={node}
-              currentPath={currentPath}
-              onSelect={onSelect}
-              depth={0}
-            />
-          ))}
-        </ul>
+        <div class="tree-scroll">
+          <ul class="tree" role="tree">
+            {tree.map((node) => (
+              <TreeItem
+                key={node.relPath}
+                node={node}
+                currentPath={currentPath}
+                onSelect={onSelect}
+                depth={0}
+              />
+            ))}
+          </ul>
+        </div>
       )}
     </div>
   );
@@ -95,15 +97,11 @@ function TreeItem({ node, currentPath, onSelect, depth }: ItemProps) {
   useEffect(() => {
     if (isAncestor) setOpen(true);
   }, [currentPath]);
-  // Indent: leftmost gutter for guide rails + per-level offset.
-  const indent = `${10 + depth * 14}px`;
-
   if (node.type === 'dir') {
     return (
       <li class="tree-li tree-li-dir" role="treeitem" aria-expanded={open}>
         <button
           class={`tree-item tree-dir ${open ? 'is-open' : ''} ${isRoot ? 'tree-root' : ''}`}
-          style={{ paddingLeft: indent }}
           onClick={() => setOpen((o) => !o)}
         >
           <span class={`chev ${open ? 'open' : ''}`} aria-hidden>
@@ -115,7 +113,7 @@ function TreeItem({ node, currentPath, onSelect, depth }: ItemProps) {
           <span class="name">{node.name}</span>
         </button>
         {open && node.children && node.children.length > 0 && (
-          <ul class="tree-children" style={{ paddingLeft: `${10 + depth * 14 + 7}px` }}>
+          <ul class="tree-children">
             {node.children.map((c) => (
               <TreeItem
                 key={c.relPath}
@@ -144,7 +142,6 @@ function TreeItem({ node, currentPath, onSelect, depth }: ItemProps) {
       {isMd ? (
         <a
           class={cls}
-          style={{ paddingLeft: indent }}
           href={href}
           title={node.name}
           onClick={(e) => {
@@ -162,7 +159,7 @@ function TreeItem({ node, currentPath, onSelect, depth }: ItemProps) {
           <span class="name">{node.name}</span>
         </a>
       ) : (
-        <span class={cls} style={{ paddingLeft: indent }} title={node.name}>
+        <span class={cls} title={node.name}>
           <span class="tree-icon" aria-hidden>
             <IconFile size={14} />
           </span>

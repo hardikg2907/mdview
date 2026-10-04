@@ -559,21 +559,22 @@ html, body {
 :root[data-theme="dark"] .shiki { background-color: var(--shiki-dark-bg) !important; }
 
 /* Scrollbar polish */
-.pane-tree, .pane-outline, .pane-main {
+.tree-scroll, .pane-outline, .pane-main {
   scrollbar-width: thin;
   scrollbar-color: var(--border-strong) transparent;
 }
 .pane-main::-webkit-scrollbar,
-.pane-tree::-webkit-scrollbar,
+.tree-scroll::-webkit-scrollbar,
 .pane-outline::-webkit-scrollbar { width: 10px; height: 10px; }
+.tree-scroll::-webkit-scrollbar-corner { background: transparent; }
 .pane-main::-webkit-scrollbar-thumb,
-.pane-tree::-webkit-scrollbar-thumb,
+.tree-scroll::-webkit-scrollbar-thumb,
 .pane-outline::-webkit-scrollbar-thumb {
   background: var(--border-strong);
   border-radius: 999px;
   border: 2px solid var(--bg);
 }
-.pane-tree::-webkit-scrollbar-thumb,
+.tree-scroll::-webkit-scrollbar-thumb,
 .pane-outline::-webkit-scrollbar-thumb {
   border-color: var(--bg-sidebar);
 }

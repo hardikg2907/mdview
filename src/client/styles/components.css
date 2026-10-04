@@ -67,8 +67,23 @@
 /* ============================================================
    FOLDER TREE
    ============================================================ */
+/* The head stays put while only the rows scroll, on both axes — long names
+   scroll into view instead of forcing the pane wider. */
+.tree-pane {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.tree-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
 .tree {
+  --tree-indent: 14px;
   list-style: none;
+  width: max-content;
+  min-width: 100%;
   padding: 2px 8px 24px;
   font-size: var(--fs-small);
   font-family: var(--font-sans);
@@ -77,15 +92,16 @@
 
 .tree-li { position: relative; }
 
-/* Indentation guide hairlines for nested children */
+/* Each level adds one fixed step. The guide hairline sits under the parent
+   row's chevron. */
 .tree-children {
   position: relative;
-  padding-left: 0;
+  padding-left: var(--tree-indent);
 }
 .tree-children::before {
   content: "";
   position: absolute;
-  left: 0;
+  left: 13px;
   top: 2px;
   bottom: 2px;
   width: 1px;
@@ -189,8 +205,6 @@
 }
 
 .tree .name {
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
   flex: 1;
 }

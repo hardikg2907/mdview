@@ -10,7 +10,7 @@ Comprehensive catalog of what `mdview` does today (post Phase 2, May 2026).
 | Collapsible sidebars with thin label rails when collapsed | `useUiState`, persisted in `localStorage` (`mdview-tree-collapsed`, `mdview-outline-collapsed`); collapse buttons live inside each pane (no duplicate header toggles) |
 | **Resizable sidebars** with drag handles | `Resizer.tsx` — pointer-driven, pointer-capture, persisted widths (`mdview-tree-width`, `mdview-outline-width`); collapses below threshold |
 | **Wide layout toggle** — relaxes the reading-column cap (70ch → 100ch) | `useUiState` (`mdview-wide-layout`), `data-wide` attribute, View menu toggle, `w` shortcut |
-| Folder tree with folder/file icons, expand/collapse | `FolderTree.tsx` |
+| Folder tree with folder/file icons, expand/collapse; fixed per-level indent (`--tree-indent`) and horizontal scroll for long names | `FolderTree.tsx`, `.tree-scroll` in `components.css` |
 | Outline sidebar with depth indentation, scroll-spy, per-node fold | `Outline.tsx`, `useScrollSpy.ts` |
 | **Outline level filter (2-thumb range slider)** | `Outline.tsx` head + `useOutlineLevels.ts` + `lib/outline-filter.ts`; min/max persisted via `mdview-outline-min-level` + `mdview-outline-max-level`; visible set derived as `{min..max}` via a computed signal |
 | Breadcrumbs reflecting current heading; clickable segments | `Breadcrumbs.tsx` |

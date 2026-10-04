@@ -27,7 +27,7 @@
   grid-area: tree;
   background: var(--bg-sidebar);
   border-right: 1px solid var(--border);
-  overflow: hidden auto;
+  overflow: hidden;
   position: relative;
 }
 .app-shell > .pane-header {
