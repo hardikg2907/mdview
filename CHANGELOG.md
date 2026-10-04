@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.1] — 2026-10-04
+
+A file tree that keeps deep paths readable, and a dependency refresh.
+
 ### Fixed
 - **File-tree indentation no longer grows with depth.** Each level added its own offset on top of its parent's, so the indent compounded: a file five folders down sat about 310 px in, past the edge of a default-width pane. Every level now adds one fixed 14 px step, so the same file sits under 90 px in.
 
