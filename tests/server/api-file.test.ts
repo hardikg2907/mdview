@@ -14,6 +14,10 @@ describe('GET /api/file (markdown-only)', () => {
     root = mkdtempSync(path.join(tmpdir(), 'mdview-file-'));
     writeFileSync(path.join(root, 'README.md'), '# Hello\n\nbody');
     writeFileSync(path.join(root, 'code.md'), '```ts\nconst x = 1;\n```\n');
+    writeFileSync(
+      path.join(root, 'evil.md'),
+      '---js\n{ ranInServer: typeof process === "object", pid: process.pid }\n---\n# Hello',
+    );
     writeFileSync(path.join(root, '.env'), 'SECRET=hunter2');
     writeFileSync(path.join(root, 'notes.txt'), 'plain text');
 
@@ -66,6 +70,13 @@ describe('GET /api/file (markdown-only)', () => {
     const res = await app.inject({ method: 'GET', url: '/api/file?path=w/README.md' });
     expect(res.statusCode).toBe(200);
     expect(res.json()).toMatchObject({ relPath: 'w/README.md' });
+  });
+
+  it('does not evaluate a ---js front matter block', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/file?path=evil.md' });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ frontmatter: null });
+    expect(res.body).not.toContain(`"pid":${process.pid}`);
   });
 
   it('400s on .env (no markdown extension)', async () => {

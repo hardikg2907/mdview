@@ -1,4 +1,4 @@
-import matter from 'gray-matter';
+import { load } from 'js-yaml';
 
 export interface FrontmatterResult {
   data: Record<string, unknown> | null;
@@ -11,44 +11,87 @@ export interface FrontmatterResult {
   bodyStartLine: number;
 }
 
-export function parseFrontmatter(raw: string): FrontmatterResult {
-  if (!raw.startsWith('---')) {
-    return { data: null, body: raw, bodyStartLine: 0 };
-  }
-  try {
-    const parsed = matter(raw);
-    // CRLF-safe strip so the body and the bodyStartLine offset stay aligned for
-    // both LF- and CRLF-authored sources.
-    const body = parsed.content.replace(/^(?:\r?\n)+/, '');
-    const bodyStartLine = computeBodyStartLine(raw);
-    return {
-      data: parsed.data ?? null,
-      body,
-      bodyStartLine,
-    };
-  } catch {
-    return { data: null, body: raw, bodyStartLine: 0 };
-  }
+// Aliases are shared references, so a few hundred bytes of YAML can expand to
+// hundreds of MB when serialized, or loop back on themselves.
+const MAX_NODES = 10_000;
+
+function unparsed(raw: string): FrontmatterResult {
+  return { data: null, body: raw, bodyStartLine: 0 };
 }
 
-// Computed directly from `raw` so it does not depend on gray-matter's internal
-// byte representation (avoids string-equality coincidences and CRLF normalization
-// surprises). Locates the closing '---' delimiter and skips any blank lines we
-// remove from `body` above, so file-line and body-line stay consistent.
-function computeBodyStartLine(raw: string): number {
-  const lines = raw.split(/\r?\n/);
-  if (lines[0] !== '---') return 0;
+export function parseFrontmatter(raw: string): FrontmatterResult {
+  const block = locateBlock(raw);
+  if (!block) return unparsed(raw);
+
+  let loaded: unknown;
+  try {
+    loaded = load(block.yaml);
+  } catch {
+    return unparsed(raw);
+  }
+  if (!withinBudget(loaded)) return unparsed(raw);
+
+  return {
+    // An empty or comment-only block loads as `undefined`; it is still a
+    // front matter block with no keys.
+    data: loaded === undefined ? {} : isPlainObject(loaded) ? loaded : null,
+    // CRLF-safe strip so the body and the bodyStartLine offset stay aligned for
+    // both LF- and CRLF-authored sources.
+    body: block.body.replace(/^(?:\r?\n)+/, ''),
+    bodyStartLine: block.bodyStartLine,
+  };
+}
+
+// Front matter is only a literal `---` first line plus a literal `---` closing
+// line. Any other opening (`---js`, `---yaml`, a BOM) is body text, so no
+// language hint can select a different parser.
+function locateBlock(
+  raw: string,
+): { yaml: string; body: string; bodyStartLine: number } | null {
+  // Capturing split keeps each line's real terminator, so the body is a
+  // verbatim slice of `raw`, CRLF included.
+  const parts = raw.split(/(\r?\n)/);
+  const lineAt = (i: number): string | undefined => parts[i * 2];
+  const lineCount = Math.ceil(parts.length / 2);
+  if (lineAt(0) !== '---') return null;
   let closingIdx = -1;
-  for (let i = 1; i < lines.length; i++) {
-    if (lines[i] === '---') {
+  for (let i = 1; i < lineCount; i++) {
+    if (lineAt(i) === '---') {
       closingIdx = i;
       break;
     }
   }
-  if (closingIdx < 0) return 0;
-  let bodyLine = closingIdx + 1;
-  while (bodyLine < lines.length && lines[bodyLine] === '') {
-    bodyLine++;
+  if (closingIdx < 0) return null;
+  let bodyStartLine = closingIdx + 1;
+  while (bodyStartLine < lineCount && lineAt(bodyStartLine) === '') {
+    bodyStartLine++;
   }
-  return bodyLine;
+  const yaml: string[] = [];
+  for (let i = 1; i < closingIdx; i++) yaml.push(lineAt(i) ?? '');
+  return {
+    yaml: yaml.join('\n'),
+    body: parts.slice((closingIdx + 1) * 2).join(''),
+    bodyStartLine,
+  };
+}
+
+function withinBudget(root: unknown): boolean {
+  const stack: unknown[] = [root];
+  let visited = 0;
+  while (stack.length > 0) {
+    const node = stack.pop();
+    if (++visited > MAX_NODES) return false;
+    if (Array.isArray(node)) {
+      for (const child of node) stack.push(child);
+    } else if (isPlainObject(node)) {
+      for (const child of Object.values(node)) stack.push(child);
+    }
+  }
+  return true;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  if (typeof value !== 'object' || value === null) return false;
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
 }

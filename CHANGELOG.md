@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- **Front matter is now parsed as YAML only.** Previously a file that began `---js` (or `---javascript`) had its front matter evaluated as JavaScript inside the server process when you opened it, so an untrusted `.md` file could run code on your machine. That path is gone.
+- **YAML aliases can no longer expand a small front matter block into a huge response.** A few hundred bytes of nested aliases could produce hundreds of MB of JSON, or a cycle, and take the server down. The parsed front matter is now bounded at 10,000 nodes; a block over that is treated as plain text.
+- **`gray-matter` is replaced by `js-yaml` 4.** This drops `js-yaml` 3, `argparse` 1 and `sprintf-js`, which `npm audit` flagged, so `npm audit --omit=dev` reports 0 vulnerabilities again.
+
+### Changed
+- A `---js`, `---json` or `---yaml` opening line is no longer treated as front matter. Only a bare `---` line opens a block.
+
 ## [0.9.1] — 2026-10-04
 
 A file tree that keeps deep paths readable, and a dependency refresh.

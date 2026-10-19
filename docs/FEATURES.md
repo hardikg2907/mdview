@@ -37,7 +37,7 @@ Comprehensive catalog of what `mdview` does today (post Phase 2, May 2026).
 | **Server-side syntax highlighting (Shiki, palette-aware)** | `render/shiki.ts` — renders the active palette's light and dark variants per token as inline CSS variables; CSS picks one via `[data-theme]`. Zero client highlighter bundle. Light/dark repaints in CSS; a palette change refetches. |
 | Mermaid diagrams (lazy-loaded) | server emits `<div class="mermaid-block">`; `lib/mermaid-loader.ts` does dynamic `import('mermaid')` only when present |
 | **Math / LaTeX (KaTeX, lazy-loaded)** | custom `markdown-it` core rule in `render/math.ts` emits `<span class="math-inline">` and `<div class="math-block">`; `lib/katex-loader.ts` dynamic-imports KaTeX + injects its CSS only when math is present |
-| Front matter (YAML) parsing & display | `render/frontmatter.ts` + `<details>` block in `Content.tsx` |
+| Front matter (YAML only, bounded) parsing & display | `render/frontmatter.ts` + `<details>` block in `Content.tsx` |
 | Inline HTML pass-through | markdown-it `html: true` |
 | Images with relative-path resolution | `rewriteImageSrc` rewrites to `/__asset/<resolved>`; `api-asset.ts` serves with mime detection |
 | Image lightbox on click | `lib/image-lightbox.ts` + `Lightbox.tsx` |
