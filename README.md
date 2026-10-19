@@ -186,7 +186,7 @@ Click the keyboard icon in the header anytime to see the full list.
 **Rendering**
 - CommonMark + GFM (tables, task lists, strikethrough, autolinks).
 - Server-side syntax highlighting via Shiki, palette-aware: two variants per token, light and dark, for whichever palette is active. Zero client highlighter bundle, and the light/dark toggle repaints with no request.
-- Mermaid diagrams, lazy-loaded only when a doc contains a `mermaid` fence.
+- Mermaid diagrams, rendered with [pele](https://github.com/obsidianmd/pele) and lazy-loaded only when a doc contains a `mermaid` fence. Colours follow the active palette and light/dark.
 - Math via KaTeX (`$inline$` and `$$block$$`), lazy-loaded only when a doc contains math.
 - Custom-styled task list checkboxes (filled accent when checked, hollow when unchecked).
 - Front matter detected and shown as a small collapsible metadata block.
@@ -240,7 +240,7 @@ mdview config ignore rm  deps       # remove one or more basenames
 
 ## Stack
 
-Node 20+, TypeScript, Fastify 5, markdown-it 14, Shiki 1, js-yaml 4, chokidar 4, Preact 10 + @preact/signals, KaTeX 0.16, mermaid 11 (lazy), JetBrains Mono via @fontsource, Vite 6, tsup 8, vitest 2.
+Node 20+, TypeScript, Fastify 5, markdown-it 14, Shiki 1, js-yaml 4, chokidar 4, Preact 10 + @preact/signals, KaTeX 0.16, pele (lazy), JetBrains Mono via @fontsource, Vite 6, tsup 8, vitest 2.
 
 ## Documentation
 

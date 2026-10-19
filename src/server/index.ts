@@ -65,10 +65,10 @@ function buildCspHtml(embedMode: boolean): string {
   const directives = [
     "default-src 'self'",
     "script-src 'self'",
-    // KaTeX + mermaid inject inline styles into rendered output; the rest of
-    // the policy is strict.
+    // KaTeX and the diagram renderer set inline style attributes on their
+    // output; the rest of the policy is strict.
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob:",
+    "img-src 'self' data:",
     "font-src 'self' data:",
     "connect-src 'self'",
     "base-uri 'none'",

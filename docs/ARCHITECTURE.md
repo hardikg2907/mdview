@@ -187,7 +187,7 @@ All request paths that touch the filesystem go through `resolveSafePath(rootAbsP
 The renderer lives in `src/render/`, **outside** `src/server/`, because it has no Node-only or HTTP-specific code. It can run from any context (server route, future editor extension, tests). Each request to `/api/file` runs through this pipeline in order:
 
 1. **`frontmatter.ts`** — `parseFrontmatter(raw)` peels off `---`-delimited YAML using `js-yaml` (default safe schema). Front matter is YAML only: an opening line like `---js` is body text, and a node budget of 10,000 rejects alias bombs and cycles. Returns `{ data, body, bodyStartLine }`.
-2. **`markdown.ts`** — `renderMarkdown(body)` constructs a singleton `markdown-it` instance with `linkify`, `markdown-it-anchor` (custom slugify), `markdown-it-task-lists`, and the local **`mathPlugin`**. Walks the token list to intercept `fence` tokens: `mermaid` becomes a `<div class="mermaid-block" data-source="...">` for client rendering, everything else is highlighted via Shiki.
+2. **`markdown.ts`** — `renderMarkdown(body)` constructs a singleton `markdown-it` instance with `linkify`, `markdown-it-anchor` (custom slugify), `markdown-it-task-lists`, and the local **`mathPlugin`**. Walks the token list to intercept `fence` tokens: `mermaid` becomes a `<div class="mermaid-block" data-source="...">` that the client renders to SVG, everything else is highlighted via Shiki.
 3. **`shiki.ts`** — `highlightCode(code, lang, palette)` lazy-loads languages on demand. It renders the requested palette's light and dark themes with `defaultColor: false`, so each token carries exactly `--shiki-light` and `--shiki-dark` and the light/dark toggle repaints purely in CSS. Changing *palette* refetches, because only the active one is rendered: rendering all eight put 16 variables on every token and took a real document from 30 KB to 204 KB.
 4. **`math.ts`** — markdown-it core rule that scans for `$$...$$` paragraphs and `$...$` inline runs (with whitespace heuristics and code-span exclusion), emitting `<span class="math-inline">` / `<div class="math-block">` placeholders with URL-encoded `data-source`.
 5. **`outline.ts`** — `extractOutline(tokens)` walks heading tokens, builds a nested `OutlineNode[]` tree using a stack-based algorithm. Handles non-monotonic depth jumps (e.g. h1 → h3 with no h2).
@@ -271,7 +271,7 @@ After `Content.tsx` injects the server-rendered HTML, it runs `runWires(root, ct
 
 | Wire | File | Effect |
 |------|------|--------|
-| `mermaid` | `mermaid-loader.ts` | Find `.mermaid-block` divs, dynamically `import('mermaid')`, render each as SVG. Bundle never loaded if no diagrams exist. |
+| `mermaid` | `mermaid-loader.ts` | Find `.mermaid-block` divs, dynamically `import('pele/lazy')` (loads only the diagram types in use), render each as SVG. Bundle never loaded if no diagrams exist. Colours come from CSS variables mapped from the palette tokens in `content.css`, so theme and palette switches need no re-render. Links are limited to `http`, `https` and `mailto`; images are off. |
 | `math` | `katex-loader.ts` | Find `.math-inline` / `.math-block` placeholders, dynamically `import('katex')` + lazy-inject KaTeX CSS, render each. |
 | `internal-links` | `link-router.ts` | Wires click handlers on `a[data-internal-link]` to navigate inside the SPA. |
 | `copy-buttons` | `copy-buttons.ts` | Appends a hover-revealed "Copy" button to each `<pre>`. |
@@ -326,7 +326,7 @@ Sequence shortcuts (e.g. `gg`) use a module-scoped timestamp + `resetPendingSequ
 - **`tsup`** bundles `src/cli.ts` → `bin/mdview.mjs` (Node ESM, ~26 KB minified). `bin/` is gitignored; produced by `npm run build:server`.
 - **Vite** builds the client SPA → `dist/client/` (HTML + hashed assets). `dist/` is gitignored; produced by `npm run build:client`.
 - The server bundle imports `dist/client/index.html` at runtime (resolved relative to the binary's own location).
-- `mermaid`, `katex` (+ its CSS), Shiki language packs, and JetBrains Mono subsets are split into separate chunks (lazy-loaded).
+- `pele` (one chunk per diagram type), `katex` (+ its CSS), Shiki language packs, and JetBrains Mono subsets are split into separate chunks (lazy-loaded).
 - `prepare` script auto-runs `npm run build` if `bin/mdview.mjs` is missing, so `npm install -g github:user/repo` works without an explicit build step.
 
 ## Tests (`tests/`)
@@ -359,8 +359,8 @@ hook that fires for `text/html` responses only, alongside
 |---|---|---|
 | `default-src` | `'self'` | Nothing off-origin loads. |
 | `script-src` | `'self'` | No `'unsafe-inline'`, no CDN. This is why the FOUC-avoiding theme bootstrap is an external `public/bootstrap.js` rather than an inline `<script>`. |
-| `style-src` | `'self' 'unsafe-inline'` | KaTeX and mermaid set inline `style` attributes on the nodes they generate. |
-| `img-src` | `'self' data: blob:` | `data:` for inlined SVG, `blob:` for mermaid's rendered output. |
+| `style-src` | `'self' 'unsafe-inline'` | KaTeX and the diagram renderer set inline `style` attributes on the nodes they generate. |
+| `img-src` | `'self' data:` | `data:` for inlined SVG. |
 | `font-src` | `'self' data:` | JetBrains Mono subsets are same-origin; KaTeX inlines some faces. |
 | `connect-src` | `'self'` | Confines `fetch` and the SSE stream to this origin. |
 | `base-uri` / `form-action` | `'none'` | No `<base>` hijack, no form posts anywhere. |
@@ -374,6 +374,6 @@ weakening `connect-src` are all regressions — see `CLAUDE.md` §3.1.
 - **No new `innerHTML` patterns** beyond the one in `Content.tsx`. Use Preact JSX for dynamic UI; use `createElement` + `append` for DOM augmentation.
 - **`.js` import extensions** in TypeScript source. Node ESM + bundler convention.
 - **Strict TypeScript** with `noUncheckedIndexedAccess`. Avoid `any`.
-- **Lazy-load expensive features** — mermaid, katex, syntax-highlighter languages, font subsets.
+- **Lazy-load expensive features** — diagrams (pele), katex, syntax-highlighter languages, font subsets.
 - **Idempotent DOM helpers** — every wire checks a marker before mutating.
 - **Single source of truth** for shortcuts (`shortcuts.ts`), wires (`wires.ts`), persisted signals (`persisted-signal.ts`), tree utilities (`shared/tree-utils.ts`), search regex (`shared/search-pattern.ts`).

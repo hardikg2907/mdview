@@ -75,7 +75,7 @@ instead of by a `/<name>/api/...` route prefix.
 - Theme toggle (light/dark, OS-driven + manual override, persisted)
 - Folder tree, outline (scroll-spy + collapsible), breadcrumbs (clickable)
 - Live reload via SSE + chokidar; scroll/outline state preserved
-- Markdown rendering: GFM, Shiki dual-theme syntax highlighting, mermaid (lazy), tables, frontmatter, task lists
+- Markdown rendering: GFM, Shiki dual-theme syntax highlighting, mermaid diagrams via pele (lazy), tables, frontmatter, task lists
 - Heading permalinks (hover # to copy URL)
 - Code copy buttons
 - External link `↗` indicator + new-tab opening

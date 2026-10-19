@@ -42,4 +42,12 @@ describe('renderMarkdown', () => {
     const result = await renderMarkdown('# Hi');
     expect(result.tokens.length).toBeGreaterThan(0);
   });
+
+  it('emits a mermaid fence as a client-rendered block with the source URL-encoded', async () => {
+    const src = 'flowchart LR\n  A --> B\n';
+    const { html } = await renderMarkdown('```mermaid\n' + src + '```');
+    expect(html).toContain(`<div class="mermaid-block" data-source="${encodeURIComponent(src)}"></div>`);
+    expect(html).not.toContain('class="shiki');
+    expect(html).not.toContain('<pre');
+  });
 });

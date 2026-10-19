@@ -1,6 +1,8 @@
 export function markExternalLinks(root: HTMLElement): void {
   const anchors = root.querySelectorAll<HTMLAnchorElement>('a[href]');
   anchors.forEach((a) => {
+    // SVG anchors have read-only target/rel properties; assigning them throws.
+    if (!(a instanceof HTMLAnchorElement)) return;
     if (a.dataset.externalProcessed === '1') return;
     if (a.hasAttribute('data-internal-link')) return;
     const href = a.getAttribute('href') ?? '';

@@ -35,7 +35,7 @@ Comprehensive catalog of what `mdview` does today (post Phase 2, May 2026).
 |---------|----------------|
 | CommonMark + GFM (tables, task lists, strikethrough, autolinks) | `markdown-it` with linkify enabled |
 | **Server-side syntax highlighting (Shiki, palette-aware)** | `render/shiki.ts` — renders the active palette's light and dark variants per token as inline CSS variables; CSS picks one via `[data-theme]`. Zero client highlighter bundle. Light/dark repaints in CSS; a palette change refetches. |
-| Mermaid diagrams (lazy-loaded) | server emits `<div class="mermaid-block">`; `lib/mermaid-loader.ts` does dynamic `import('mermaid')` only when present |
+| Mermaid diagrams (lazy-loaded) | server emits `<div class="mermaid-block">`; `lib/mermaid-loader.ts` does dynamic `import('pele/lazy')` only when present; colours come from CSS variables, so palette and light/dark switches need no re-render |
 | **Math / LaTeX (KaTeX, lazy-loaded)** | custom `markdown-it` core rule in `render/math.ts` emits `<span class="math-inline">` and `<div class="math-block">`; `lib/katex-loader.ts` dynamic-imports KaTeX + injects its CSS only when math is present |
 | Front matter (YAML only, bounded) parsing & display | `render/frontmatter.ts` + `<details>` block in `Content.tsx` |
 | Inline HTML pass-through | markdown-it `html: true` |
@@ -183,4 +183,4 @@ Errors are mapped to a one-line `mdview: …` message with a non-zero exit;
 ## Build artifacts
 
 - Server CLI bundle: `bin/mdview.mjs` (~26 KB minified). KaTeX is **not** bundled into the CLI — only into the lazy-loaded client chunk.
-- Client SPA bundle: `dist/client/` (initial JS small; mermaid + KaTeX + Shiki language packs split into separate lazy chunks; JetBrains Mono served via `@fontsource` with `unicode-range` so only the needed subset is fetched).
+- Client SPA bundle: `dist/client/` (initial JS small; pele diagram types + KaTeX + Shiki language packs split into separate lazy chunks; JetBrains Mono served via `@fontsource` with `unicode-range` so only the needed subset is fetched).

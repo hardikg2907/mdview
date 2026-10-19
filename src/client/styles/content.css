@@ -424,6 +424,18 @@
 
 /* ===== Mermaid ===== */
 .mermaid-block {
+  --pele-bg: var(--bg-elev);
+  --pele-fg: var(--fg);
+  --pele-muted: var(--fg-muted);
+  --pele-line: var(--fg-muted);
+  --pele-surface: var(--code-bg);
+  --pele-surface-alt: var(--bg-sidebar);
+  --pele-border: var(--border-strong);
+  --pele-accent: var(--accent);
+  --pele-font: var(--font-sans);
+  --pele-font-mono: var(--font-mono);
+  --pele-radius: var(--radius-sm);
+  font-family: var(--font-sans);
   margin: 1.4em 0;
   text-align: center;
   padding: 14px;
@@ -431,7 +443,9 @@
   border-radius: var(--radius);
   background: var(--bg-elev);
 }
-.mermaid-block svg { max-width: 100%; height: auto; }
+.mermaid-block svg { max-width: 100%; height: auto; margin-inline: auto; }
+/* The parser's caret line points at a column, so the message can't be centred. */
+.mermaid-block .mermaid-error { text-align: left; }
 
 /* ===== Collapsible sections ===== */
 .markdown-content .section-toggle {

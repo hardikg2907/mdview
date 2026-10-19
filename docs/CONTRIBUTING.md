@@ -34,7 +34,7 @@ Run all five before sending a change:
 ```bash
 npm run typecheck     # tsc --noEmit on both server and client tsconfigs
 npm run lint          # biome check (lint only — formatter disabled)
-npm test              # vitest run — 427 tests
+npm test              # vitest run — 436 tests
 npm run build         # vite + tsup must both succeed
 npm audit --omit=dev  # 0 vulnerabilities in shipped deps (release blocker, see CLAUDE.md §6)
 ```
@@ -234,7 +234,7 @@ Suppose you want to add a "back to top" button that appears after the user scrol
 - **Server-side issue?** Add `console.log` to the relevant `src/server/...` file, run `npm run build:server`, restart the server. Set `MDVIEW_DEBUG=1` for full stack traces. Or use `node --inspect bin/mdview.mjs ...` and attach Chrome DevTools.
 - **Client-side issue?** Use `npm run dev:client` for HMR + DevTools. The Preact DevTools browser extension works.
 - **Live reload not firing?** Check the `EventSource` in DevTools' Network tab — `/api/watch` should be open with a stream of events.
-- **Mermaid not rendering?** Check the browser console for the `import('mermaid')` chunk loading. The diagram's source is URL-decoded from `data-source` on the `.mermaid-block` div.
+- **Mermaid not rendering?** Check the browser console for the `pele` chunk (`import('pele/lazy')`) loading; the error text appears in the block as `Mermaid: …`. The diagram's source is URL-decoded from `data-source` on the `.mermaid-block` div.
 - **Math not rendering?** Same idea — check for the `katex` chunk loading and the `katex.min.css` `<link>` injection.
 - **Outline highlights wrong heading or focus mode lags?** Both are scroll-spy-related. The pure functions (`pickActiveId`, `nextSameLevelHeading`, `filterOutline`) are tested. The hooks themselves use bounding-rect deltas + `MutationObserver` on the **scroller subtree** (not `.markdown-content` directly — that doesn't exist at hook-mount because `<Content>` is gated on file-loaded).
 

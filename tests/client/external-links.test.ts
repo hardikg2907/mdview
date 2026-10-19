@@ -75,4 +75,15 @@ describe('markExternalLinks', () => {
     markExternalLinks(root);
     expect(root.querySelectorAll('a.is-external').length).toBe(2);
   });
+
+  it('skips SVG anchors without throwing and still marks HTML anchors', () => {
+    const root = setup(
+      '<svg><a href="https://example.com"><text>x</text></a></svg><a href="https://example.org">y</a>',
+    );
+    expect(root.querySelector('svg a')).not.toBeInstanceOf(HTMLAnchorElement);
+    expect(() => markExternalLinks(root)).not.toThrow();
+    const a = Array.from(root.querySelectorAll('a')).find((n) => n.getAttribute('href') === 'https://example.org')!;
+    expect(a.getAttribute('target')).toBe('_blank');
+    expect(a.classList.contains('is-external')).toBe(true);
+  });
 });

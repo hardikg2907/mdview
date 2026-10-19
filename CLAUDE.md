@@ -35,7 +35,7 @@ Skim these before exploring code. They will answer most "where does X live?" que
 
 ### 3.1 Security (these were each fixed deliberately — keep them)
 
-- `markdown-it` is configured with `html: true`. **Every HTML response must carry the CSP set in `src/server/index.ts`.** Do not add a `script-src` source, do not add `'unsafe-inline'` to `script-src`, do not weaken `connect-src 'self'`. If you need an inline script, find another way.
+- `markdown-it` is configured with `html: true`. **Every HTML response must carry the CSP set in `src/server/index.ts`.** Do not add a `script-src` source, do not add `'unsafe-inline'` to `script-src`, do not weaken `connect-src 'self'`. `img-src` has no `blob:`; do not add it back without a real user of it. If you need an inline script, find another way.
 - **`resolveSafePath` (`src/server/fs/resolve.ts`) is the only sanctioned way to map a `relPath` to an `absPath`.** Never `path.join(root, userInput)` directly.
 - **Paths on the wire are workspace-scoped (`<rootId>/<path>`), and `parseWorkspacePath` (`src/server/workspace.ts`) is the only sanctioned way to split one.** It is a lookup against the open-root set, never a parser: an unknown id falls back to the primary root, so it can never widen the filesystem boundary. It does *no* containment checking — the remainder it returns is still untrusted and must go to `resolveSafePath`. Note percent-encoded `../` reaches route params intact (Fastify only collapses raw `../`), so never skip that step.
 - **`/__asset/*` serves an allow-list of media extensions only.** Adding a new extension means adding a real MIME entry in `src/server/routes/api-asset.ts`. Do NOT restore the `octet-stream` fallback. Refusing dotfiles and source code through this route is the point.

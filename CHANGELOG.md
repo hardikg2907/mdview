@@ -11,9 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Front matter is now parsed as YAML only.** Previously a file that began `---js` (or `---javascript`) had its front matter evaluated as JavaScript inside the server process when you opened it, so an untrusted `.md` file could run code on your machine. That path is gone.
 - **YAML aliases can no longer expand a small front matter block into a huge response.** A few hundred bytes of nested aliases could produce hundreds of MB of JSON, or a cycle, and take the server down. The parsed front matter is now bounded at 10,000 nodes; a block over that is treated as plain text.
 - **`gray-matter` is replaced by `js-yaml` 4.** This drops `js-yaml` 3, `argparse` 1 and `sprintf-js`, which `npm audit` flagged, so `npm audit --omit=dev` reports 0 vulnerabilities again.
+- **`img-src` no longer allows `blob:`.** Only the old diagram output needed it.
 
 ### Changed
 - A `---js`, `---json` or `---yaml` opening line is no longer treated as front matter. Only a bare `---` line opens a block.
+- **Mermaid diagrams now render with pele instead of the mermaid library.** The lazy diagram code drops from about 899 kB to about 287 kB gzipped across all chunks, and a page loads only the diagram types it uses. Diagrams follow the active palette and light/dark through CSS variables, with no re-render on a switch. Diagrams look different, because pele has its own layout and visual style. A left-to-right flowchart too wide for the text column now switches to a top-down layout at full text size, where it used to shrink to fit.
+
+### Fixed
+- **External-link marking no longer breaks on SVG links.** An inline SVG anchor has read-only `target` and `rel` properties, so assigning them threw and stopped the marking of every later link. SVG anchors are now skipped.
 
 ## [0.9.1] — 2026-10-04
 

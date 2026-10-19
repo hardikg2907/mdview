@@ -75,7 +75,13 @@ node bin/mdview.mjs ./test-fixtures/showcase.md --no-open
 
 ### 7. Mermaid
 - Mermaid block renders as an SVG diagram.
-- Open DevTools → Network: the `mermaid.core` chunk only loads on a page that contains a mermaid block.
+- Open DevTools → Network: the `lazy-*.js` pele chunk (and per-diagram-type chunks) only load on a page that contains a mermaid block.
+- Switching palette and light/dark recolours diagrams instantly, with no flicker or re-render.
+- A syntax error shows a `Mermaid: …` message with line and column.
+- A doc with flowchart, sequence, class, state, ER, gantt and pie diagrams renders all of them.
+- A `click A "https://example.com"` link renders as a working link; a `javascript:` link renders none.
+- Diagrams sit centred in their box. A `flowchart LR` wider than the text column renders top-down at full text size; a short one stays left-to-right.
+- The `^` caret in a syntax error lines up under the bad column.
 
 ### 8. Math (KaTeX)
 - Open `test-fixtures/math.md`. Inline `$a^2 + b^2 = c^2$` and the two `$$...$$` block expressions render with KaTeX.
