@@ -45,9 +45,7 @@ export function parseFrontmatter(raw: string): FrontmatterResult {
 
   return {
     data: isPlainObject(loaded) ? loaded : null,
-    // CRLF-safe strip so the body and the bodyStartLine offset stay aligned for
-    // both LF- and CRLF-authored sources.
-    body: block.body.replace(/^(?:\r?\n)+/, ''),
+    body: block.body,
     bodyStartLine: block.bodyStartLine,
   };
 }
@@ -77,11 +75,14 @@ function locateBlock(
   }
   if (closingIdx < 0) return null;
 
-  // The body is a verbatim slice of `raw`, CRLF included.
-  const bodyStart = nextLineStart(raw, closingStart);
+  // Blank lines (LF or CRLF) after the closing fence are dropped, and the body
+  // is a verbatim slice of `raw` from the first line that is not blank. A regex
+  // strip here overflows the stack once there are millions of blank lines.
+  let bodyStart = nextLineStart(raw, closingStart);
   let bodyStartLine = closingIdx + 1;
-  for (let at = bodyStart; at >= 0 && lineEnd(raw, at) === at; at = nextLineStart(raw, at)) {
+  while (bodyStart >= 0 && lineEnd(raw, bodyStart) === bodyStart) {
     bodyStartLine++;
+    bodyStart = nextLineStart(raw, bodyStart);
   }
   return {
     yaml: raw

@@ -133,6 +133,8 @@ describe('parseFrontmatter line handling', () => {
     ['CRLF blank lines before the body', '---\r\na: 1\r\n---\r\n\r\n\r\nbody\r\n', { a: 1 }, 'body\r\n', 5],
     ['a lone CR does not end a line', '---\r\na: 1\r\n---\rbody', null, '---\r\na: 1\r\n---\rbody', 0],
     ['CR before CRLF stays in the line', '---\na: "x"\r\r\n---\nbody', { a: 'x' }, 'body', 3],
+    ['mixed LF and CRLF blank lines', '---\na: 1\n---\n\n\r\nbody', { a: 1 }, 'body', 5],
+    ['a blank-looking line holding a lone CR', '---\na: 1\n---\n\n\rbody', { a: 1 }, '\rbody', 4],
     ['no closing fence', '---\na: 1\nbody', null, '---\na: 1\nbody', 0],
     ['opening fence alone', '---', null, '---', 0],
   ])('%s', (_name, raw, data, body, bodyStartLine) => {
@@ -146,5 +148,13 @@ describe('parseFrontmatter line handling', () => {
     expect(performance.now() - start).toBeLessThan(200);
     expect(bodyStartLine).toBe(3);
     expect(body.length).toBe(4_000_000);
+  });
+
+  it('skips millions of blank lines after the closing fence', () => {
+    const blank = 12_000_000;
+    const lf = parseFrontmatter(`---\na: 1\n---\n${'\n'.repeat(blank)}body\n`);
+    expect(lf).toEqual({ data: { a: 1 }, body: 'body\n', bodyStartLine: 3 + blank });
+    const crlf = parseFrontmatter(`---\r\na: 1\r\n---\r\n${'\r\n'.repeat(blank)}`);
+    expect(crlf).toEqual({ data: { a: 1 }, body: '', bodyStartLine: 4 + blank });
   });
 });
