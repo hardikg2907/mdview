@@ -1,4 +1,6 @@
 import {
+  chmodSync,
+  closeSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
@@ -16,7 +18,10 @@ import { idleTimeoutMs } from '../../src/cli.js';
 import { findLiveDaemon } from '../../src/daemon/client.js';
 import {
   daemonLockPath,
+  daemonLogPath,
   daemonStatePath,
+  ensurePrivateDir,
+  openPrivateAppend,
   readDaemonState,
   readJsonSafe,
   releaseSpawnLock,
@@ -58,6 +63,32 @@ describe('state files', () => {
     // Mask off the file-type bits; only permissions matter here.
     expect(statSync(stateDir()).mode & 0o777).toBe(0o700);
     expect(statSync(daemonStatePath()).mode & 0o777).toBe(0o600);
+  });
+
+  it.skipIf(process.platform === 'win32')('tightens a state dir an older version made 0755', () => {
+    mkdirSync(stateDir(), { recursive: true, mode: 0o755 });
+    chmodSync(stateDir(), 0o755);
+    writeDaemonState({ pid: 111, port: 7331, startedAt: 5 });
+    expect(statSync(stateDir()).mode & 0o777).toBe(0o700);
+  });
+
+  it.skipIf(process.platform === 'win32')('creates the spawn lock 0600', () => {
+    expect(tryTakeSpawnLock()).toBe(true);
+    expect(statSync(daemonLockPath()).mode & 0o777).toBe(0o600);
+    releaseSpawnLock();
+  });
+
+  it.skipIf(process.platform === 'win32')('opens the daemon log 0600, tightening an old one', () => {
+    ensurePrivateDir(stateDir());
+    writeFileSync(daemonLogPath(), 'old\n', { mode: 0o644 });
+    chmodSync(daemonLogPath(), 0o644);
+    closeSync(openPrivateAppend(daemonLogPath()));
+    expect(statSync(daemonLogPath()).mode & 0o777).toBe(0o600);
+    expect(readFileSync(daemonLogPath(), 'utf8')).toBe('old\n');
+
+    rmSync(daemonLogPath());
+    closeSync(openPrivateAppend(daemonLogPath()));
+    expect(statSync(daemonLogPath()).mode & 0o777).toBe(0o600);
   });
 
   it('round-trips daemon state', () => {

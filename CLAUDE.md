@@ -164,7 +164,7 @@ If you're about to update code and your change makes a doc statement wrong, fix 
 
 - Don't add telemetry, analytics, or any outbound network call from the running CLI. It's a local viewer.
 - Don't bind the server to `0.0.0.0` or any non-loopback address without an auth story.
-- Don't introduce a database, file-backed state outside `~/.config/mdview/`, or hidden cache directories under the user's working folder. Inside `~/.config/mdview/` the sanctioned files are `config.json`, `workspace.json`, `daemon.json`, `daemon.log` and `daemon.lock` — nothing else without a reason.
+- Don't introduce a database, file-backed state outside `~/.config/mdview/`, or hidden cache directories under the user's working folder. Inside `~/.config/mdview/` the sanctioned files are `config.json`, `workspace.json`, `daemon.json`, `daemon.log` and `daemon.lock` — nothing else without a reason. The directory is `0700` and every file in it `0600`; create and tighten them through `ensurePrivateDir` / `openPrivateAppend` / `writeJsonAtomic` (`src/daemon/state.ts`), since a mode passed at creation does not fix an existing file.
 - Don't shell out to system tools (`grep`, `find`, `sed`, `lsof`). All file/text operations are pure Node.
 - Don't read or write outside the watched root from the server. `resolveSafePath` enforces this — keep it that way.
 - Don't add `// removed X` comments, dead exports kept "just in case," or commented-out code blocks. Delete confidently — git history is the archive.

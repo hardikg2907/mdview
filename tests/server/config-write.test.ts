@@ -1,4 +1,12 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -110,5 +118,23 @@ describe('listUserIgnoreEntries', () => {
   it('returns only string entries', async () => {
     writeFileSync(cfgPath, JSON.stringify({ ignore: ['a', 1, null, 'b'] }));
     expect(await listUserIgnoreEntries(cfgPath)).toEqual(['a', 'b']);
+  });
+});
+
+describe.skipIf(process.platform === 'win32')('config file modes', () => {
+  it('creates the directory 0700 and config.json 0600', async () => {
+    const nested = path.join(dir, 'mdview', 'config.json');
+    await addIgnoreEntries(['deps'], nested);
+    expect(statSync(path.dirname(nested)).mode & 0o777).toBe(0o700);
+    expect(statSync(nested).mode & 0o777).toBe(0o600);
+  });
+
+  it('tightens a directory and file an older version left world-readable', async () => {
+    chmodSync(dir, 0o755);
+    writeFileSync(cfgPath, '{}\n', { mode: 0o644 });
+    chmodSync(cfgPath, 0o644);
+    await addIgnoreEntries(['deps'], cfgPath);
+    expect(statSync(dir).mode & 0o777).toBe(0o700);
+    expect(statSync(cfgPath).mode & 0o777).toBe(0o600);
   });
 });

@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { globalConfigPath } from './config.js';
 
@@ -39,11 +39,17 @@ async function readGlobalRaw(filePath: string): Promise<Record<string, unknown>>
 }
 
 async function writeGlobalRaw(filePath: string, data: Record<string, unknown>): Promise<void> {
-  await mkdir(path.dirname(filePath), { recursive: true });
+  // Owner-only, like everything else in the state directory. Modes given to
+  // mkdir and writeFile apply on creation only, so an existing directory or
+  // file from an earlier version is tightened explicitly.
+  const dir = path.dirname(filePath);
+  await mkdir(dir, { recursive: true, mode: 0o700 });
+  await chmod(dir, 0o700);
   // 2-space indent + trailing newline — friendly to git diff and editors that
   // append a final newline on save.
   const json = JSON.stringify(data, null, 2) + '\n';
-  await writeFile(filePath, json, 'utf8');
+  await writeFile(filePath, json, { encoding: 'utf8', mode: 0o600 });
+  await chmod(filePath, 0o600);
 }
 
 function readIgnoreArray(cfg: Record<string, unknown>): string[] {

@@ -1,9 +1,10 @@
 import { type ChildProcess, spawn } from 'node:child_process';
-import { closeSync, openSync, statSync, truncateSync } from 'node:fs';
+import { closeSync, statSync, truncateSync } from 'node:fs';
 import {
   clearDaemonState,
   type DaemonState,
   daemonLogPath,
+  openPrivateAppend,
   readDaemonState,
   releaseSpawnLock,
   tryTakeSpawnLock,
@@ -69,7 +70,7 @@ function spawnDaemon(cliEntry: string): ChildProcess {
   } catch {
     // No log yet, or not truncatable. Either way, carry on.
   }
-  const log = openSync(daemonLogPath(), 'a');
+  const log = openPrivateAppend(daemonLogPath());
   try {
     const child = spawn(process.execPath, [cliEntry, '--daemon'], {
       detached: true,

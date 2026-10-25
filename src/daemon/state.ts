@@ -1,4 +1,15 @@
-import { mkdirSync, openSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  closeSync,
+  fchmodSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import path from 'node:path';
 import { globalConfigPath } from '../server/config.js';
 
@@ -40,11 +51,33 @@ export interface DaemonState {
 }
 
 /**
+ * Create a directory readable by its owner only, and tighten one that already
+ * exists: a mkdir mode applies on creation only, and earlier versions made the
+ * state directory 0755. Its files name every folder the user has opened.
+ */
+export function ensurePrivateDir(dir: string): void {
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  chmodSync(dir, 0o700);
+}
+
+/** Open a file for appending, owner-only, tightening a file that already exists. */
+export function openPrivateAppend(file: string): number {
+  const fd = openSync(file, 'a', 0o600);
+  try {
+    fchmodSync(fd, 0o600);
+  } catch (err) {
+    closeSync(fd);
+    throw err;
+  }
+  return fd;
+}
+
+/**
  * Write JSON so a reader never sees a half-written file: a fresh temp file gets
  * the content and the mode, then one rename swaps it in.
  */
 export function writeJsonAtomic(file: string, value: unknown): void {
-  mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
+  ensurePrivateDir(path.dirname(file));
   const tmp = `${file}.${process.pid}.tmp`;
   writeFileSync(tmp, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600 });
   renameSync(tmp, file);
@@ -88,11 +121,11 @@ export function clearDaemonState(): void {
  * someone else holds it — the caller should wait for their daemon instead.
  */
 export function tryTakeSpawnLock(staleAfterMs = 10_000): boolean {
-  mkdirSync(stateDir(), { recursive: true, mode: 0o700 });
+  ensurePrivateDir(stateDir());
   const file = daemonLockPath();
   try {
     // 'wx' fails if the file exists, which is what makes this a lock.
-    openSync(file, 'wx');
+    closeSync(openSync(file, 'wx', 0o600));
     return true;
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
@@ -102,7 +135,7 @@ export function tryTakeSpawnLock(staleAfterMs = 10_000): boolean {
   try {
     if (Date.now() - statSync(file).mtimeMs < staleAfterMs) return false;
     rmSync(file, { force: true });
-    openSync(file, 'wx');
+    closeSync(openSync(file, 'wx', 0o600));
     return true;
   } catch {
     return false;
