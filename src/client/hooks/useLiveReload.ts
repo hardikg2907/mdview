@@ -1,5 +1,6 @@
-import { useCallback } from 'preact/hooks';
+import { useEffect, useMemo } from 'preact/hooks';
 import type { RenderedFile, WatchEvent } from '../../shared/types.js';
+import { coalesce } from '../lib/coalesce.js';
 import { fileSignal, loadFile } from './useFile.js';
 import { useSSE } from './useSSE.js';
 import { fetchTree } from './useTree.js';
@@ -33,8 +34,15 @@ interface Args {
   scrollerRef: ScrollerRef;
 }
 
+// A branch switch can emit hundreds of add/unlink events, and every tree walk
+// returns the whole listing, so refetches are batched into one trailing fetch.
+const TREE_REFETCH_DELAY_MS = 150;
+
 export function useLiveReload({ currentPath, scrollerRef }: Args): void {
-  const onWatch = useCallback((e: WatchEvent) => {
+  const refreshTree = useMemo(() => coalesce(fetchTree, TREE_REFETCH_DELAY_MS), []);
+  useEffect(() => refreshTree.cancel, [refreshTree]);
+
+  const onWatch = (e: WatchEvent) => {
     if (shouldReloadFile(e, fileSignal.value, currentPath)) {
       const top = scrollerRef.current?.scrollTop ?? 0;
       void loadFile(currentPath).then(() => {
@@ -47,8 +55,8 @@ export function useLiveReload({ currentPath, scrollerRef }: Args): void {
     // A workspace event means a root was opened or closed, which only the tree
     // can reflect — same refetch as any other structural change.
     if (e.kind === 'add' || e.kind === 'unlink' || e.kind === 'config' || e.kind === 'workspace') {
-      void fetchTree();
+      refreshTree.request();
     }
-  }, [currentPath, scrollerRef]);
+  };
   useSSE(onWatch);
 }

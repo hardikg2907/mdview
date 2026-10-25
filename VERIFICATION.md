@@ -203,6 +203,8 @@ node bin/mdview.mjs ./test-fixtures/showcase.md --no-open
 - Edit `showcase.md` in another editor (add a heading or change a paragraph).
 - Save — view re-renders within ~100 ms.
 - Scroll position is preserved.
+- Open DevTools > Network and filter by `watch`. Click through several files in the tree, then use back/forward → `/api/watch` stays a single request, still pending, and is never closed and reopened.
+- In a second terminal run `mkdir -p test-fixtures/burst && for i in $(seq 1 300); do : > test-fixtures/burst/n$i.md; done; rm -r test-fixtures/burst` → the Network panel shows one or two `/api/tree` requests, not hundreds, and the tree ends with no `burst` folder.
 
 ### 23. Sidebar collapse
 - Click the panel-left icon (header left) → tree collapses to a thin "FILES" rail; click rail to re-expand.
