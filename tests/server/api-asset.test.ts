@@ -188,6 +188,14 @@ describe('GET /__asset/* response headers', () => {
     }
   });
 
+  it('sandboxes an asset reached through a percent-encoded route', async () => {
+    for (const url of ['/%5F%5Fasset/w/evil.svg', '/__%61sset/w/evil.svg']) {
+      const res = await app.inject({ url, headers: H });
+      expect(res.statusCode, url).toBe(200);
+      expectAssetHeaders(res, url);
+    }
+  });
+
   it('keeps the SPA policy off asset responses and on the shell', async () => {
     const shell = await app.inject({ url: '/', headers: H });
     const csp = String(shell.headers['content-security-policy']);

@@ -110,13 +110,19 @@ export async function createServer(opts: ServerOptions): Promise<MdviewServer> {
   //
   // Asset responses carry their own policy whatever their type: an SVG opened
   // as a document (a new tab, a frame) runs its scripts under its own response
-  // headers, not the SPA's. Keyed on the URL so error replies are covered too.
+  // headers, not the SPA's. The matched route is checked as well as the raw
+  // URL: the router decodes `/%5F%5Fasset/...` onto this route while the raw
+  // URL keeps the escapes. Any SVG is sandboxed whatever route sent it.
   app.addHook('onSend', async (req, reply, payload) => {
-    if (req.url.startsWith('/__asset/')) {
+    const ct = String(reply.getHeader('content-type') ?? '');
+    if (
+      req.routeOptions.url === '/__asset/*' ||
+      req.url.startsWith('/__asset/') ||
+      ct.startsWith('image/svg+xml')
+    ) {
       reply.headers(ASSET_SECURITY_HEADERS);
       return payload;
     }
-    const ct = String(reply.getHeader('content-type') ?? '');
     if (ct.startsWith('text/html')) {
       reply.header('content-security-policy', cspHtml);
       reply.header('x-content-type-options', 'nosniff');
