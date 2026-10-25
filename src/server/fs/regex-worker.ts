@@ -41,13 +41,19 @@ function regexFor(source: string, flags: string): RegExp {
 
 function matchFile(re: RegExp, text: string, maxLineLen: number, cap: number): FileMatches {
   const out: FileMatches = { total: 0, hits: [], skipped: false };
-  const lines = text.split(/\r?\n/);
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i] as string;
-    if (line.length > maxLineLen) {
+  // Lines are cut one at a time, LF or CRLF, as `split(/\r?\n/)` would: a
+  // 16 MB body of short lines split up front is hundreds of MB of strings.
+  let start = 0;
+  for (let i = 0; start >= 0; i++) {
+    const nl = text.indexOf('\n', start);
+    const end = nl < 0 ? text.length : nl > start && text.charCodeAt(nl - 1) === 13 ? nl - 1 : nl;
+    const lineStart = start;
+    start = nl < 0 ? -1 : nl + 1;
+    if (end - lineStart > maxLineLen) {
       out.skipped = true;
       continue;
     }
+    const line = text.slice(lineStart, end);
     re.lastIndex = 0;
     let m: RegExpExecArray | null = re.exec(line);
     while (m !== null) {

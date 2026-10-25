@@ -98,6 +98,59 @@ describe('grepFiles — CRLF line endings (B1)', () => {
     const out = await grepFiles([{ absPath: crlfDir, id: 'w' }], 'banana', { wholeWord: true });
     expect(out.results[0]!.hits.length).toBe(2);
   });
+
+  it('anchors a regex at the end of a CRLF line', async () => {
+    const out = await grepFiles([{ absPath: crlfDir, id: 'w' }], 'banana$', { regex: true });
+    expect(out.results[0]!.hits.map((h) => [h.line, h.snippet])).toEqual([
+      [1, 'line one banana'],
+      [3, 'line three banana'],
+    ]);
+  });
+});
+
+describe('grepFiles — literal search limits', () => {
+  let longDir: string;
+  let manyDir: string;
+  beforeAll(() => {
+    longDir = mkdtempSync(path.join(os.tmpdir(), 'mdview-grep-long-'));
+    // One 15 MB line: 15 million hits for `a`, every one of them kept before.
+    writeFileSync(path.join(longDir, 'long.md'), 'a'.repeat(15_000_000));
+    writeFileSync(path.join(longDir, 'short.md'), 'one a here\n');
+    manyDir = mkdtempSync(path.join(os.tmpdir(), 'mdview-grep-many-'));
+    writeFileSync(path.join(manyDir, 'many.md'), `${'a'.repeat(9_999)}\n`.repeat(300));
+  });
+  afterAll(() => {
+    rmSync(longDir, { recursive: true, force: true });
+    rmSync(manyDir, { recursive: true, force: true });
+  });
+
+  it('skips a line over the length cap and reports the search as truncated', async () => {
+    const start = performance.now();
+    const out = await grepFiles([{ absPath: longDir, id: 'w' }], 'a');
+    expect(performance.now() - start).toBeLessThan(2_000);
+    expect(out.results.map((r) => r.relPath)).toEqual(['w/short.md']);
+    expect(out.truncated).toBe(true);
+    expect(out.timedOut).toBe(false);
+  });
+
+  it('counts every hit on lines under the cap but keeps only the per-file cap', async () => {
+    const out = await grepFiles([{ absPath: manyDir, id: 'w' }], 'a');
+    const [file] = out.results;
+    expect(file?.total).toBe(9_999 * 300);
+    expect(file?.hits).toHaveLength(20);
+    expect(file?.truncated).toBe(true);
+    expect(file?.hits[19]).toMatchObject({ line: 1, col: 19 });
+  });
+
+  it('stops at its time budget with partial results, not a timeout', async () => {
+    const out = await grepFiles([{ absPath: manyDir, id: 'w' }], 'a', { literalBudgetMs: 0 });
+    const [file] = out.results;
+    expect(file?.hits).toHaveLength(20);
+    expect(file?.total).toBeLessThan(9_999 * 300);
+    expect(file?.truncated).toBe(true);
+    expect(out.truncated).toBe(true);
+    expect(out.timedOut).toBe(false);
+  });
 });
 
 describe('grepFiles — ReDoS mitigation (C4)', () => {
@@ -113,7 +166,7 @@ describe('grepFiles — ReDoS mitigation (C4)', () => {
 
   it('skips ultra-long lines in regex mode and reports truncated', async () => {
     const start = Date.now();
-    const out = await grepFiles([{ absPath: reDir, id: 'w' }], '(a+)+$', { regex: true, maxLineLenForRegex: 10_000 });
+    const out = await grepFiles([{ absPath: reDir, id: 'w' }], '(a+)+$', { regex: true, maxLineLen: 10_000 });
     const elapsed = Date.now() - start;
     // Without the line cap, this pattern would hang for many seconds.
     expect(elapsed).toBeLessThan(500);
@@ -127,7 +180,7 @@ describe('grepFiles — ReDoS mitigation (C4)', () => {
     const start = Date.now();
     const out = await grepFiles([{ absPath: reDir, id: 'w' }], 'a', {
       regex: true,
-      maxLineLenForRegex: 1_000_000,
+      maxLineLen: 1_000_000,
     });
     expect(Date.now() - start).toBeLessThan(2000);
     expect(out.results[0]?.total).toBe(50_000);

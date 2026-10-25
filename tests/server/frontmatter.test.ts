@@ -125,3 +125,26 @@ describe('parseFrontmatter hardening', () => {
     expect(parseFrontmatter(raw)).toEqual({ data: null, body: raw, bodyStartLine: 0 });
   });
 });
+
+describe('parseFrontmatter line handling', () => {
+  it.each([
+    ['closing fence as the last line', '---\na: 1\n---', { a: 1 }, '', 3],
+    ['blank lines then end of input', '---\na: 1\n---\n\n', { a: 1 }, '', 5],
+    ['CRLF blank lines before the body', '---\r\na: 1\r\n---\r\n\r\n\r\nbody\r\n', { a: 1 }, 'body\r\n', 5],
+    ['a lone CR does not end a line', '---\r\na: 1\r\n---\rbody', null, '---\r\na: 1\r\n---\rbody', 0],
+    ['CR before CRLF stays in the line', '---\na: "x"\r\r\n---\nbody', { a: 'x' }, 'body', 3],
+    ['no closing fence', '---\na: 1\nbody', null, '---\na: 1\nbody', 0],
+    ['opening fence alone', '---', null, '---', 0],
+  ])('%s', (_name, raw, data, body, bodyStartLine) => {
+    expect(parseFrontmatter(raw)).toEqual({ data, body, bodyStartLine });
+  });
+
+  it('does not split a large body into lines', () => {
+    const raw = `---\ntitle: x\n---\n${'a\n'.repeat(2_000_000)}`;
+    const start = performance.now();
+    const { body, bodyStartLine } = parseFrontmatter(raw);
+    expect(performance.now() - start).toBeLessThan(200);
+    expect(bodyStartLine).toBe(3);
+    expect(body.length).toBe(4_000_000);
+  });
+});

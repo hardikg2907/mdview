@@ -55,34 +55,59 @@ export function parseFrontmatter(raw: string): FrontmatterResult {
 // Front matter is only a literal `---` first line plus a literal `---` closing
 // line. Any other opening (`---js`, `---yaml`, a BOM) is body text, so no
 // language hint can select a different parser.
+//
+// Lines are walked by offset rather than split up front: splitting a 16 MB
+// body of short lines allocates millions of strings, hundreds of MB, on every
+// render and every search of the file.
 function locateBlock(
   raw: string,
 ): { yaml: string; body: string; bodyStartLine: number } | null {
-  // Capturing split keeps each line's real terminator, so the body is a
-  // verbatim slice of `raw`, CRLF included.
-  const parts = raw.split(/(\r?\n)/);
-  const lineAt = (i: number): string | undefined => parts[i * 2];
-  const lineCount = Math.ceil(parts.length / 2);
-  if (lineAt(0) !== '---') return null;
+  if (!isFenceLine(raw, 0)) return null;
+  let next = nextLineStart(raw, 0);
+  const yamlStart = next;
   let closingIdx = -1;
-  for (let i = 1; i < lineCount; i++) {
-    if (lineAt(i) === '---') {
+  let closingStart = -1;
+  for (let i = 1; next >= 0; i++) {
+    if (isFenceLine(raw, next)) {
       closingIdx = i;
+      closingStart = next;
       break;
     }
+    next = nextLineStart(raw, next);
   }
   if (closingIdx < 0) return null;
+
+  // The body is a verbatim slice of `raw`, CRLF included.
+  const bodyStart = nextLineStart(raw, closingStart);
   let bodyStartLine = closingIdx + 1;
-  while (bodyStartLine < lineCount && lineAt(bodyStartLine) === '') {
+  for (let at = bodyStart; at >= 0 && lineEnd(raw, at) === at; at = nextLineStart(raw, at)) {
     bodyStartLine++;
   }
-  const yaml: string[] = [];
-  for (let i = 1; i < closingIdx; i++) yaml.push(lineAt(i) ?? '');
   return {
-    yaml: yaml.join('\n'),
-    body: parts.slice((closingIdx + 1) * 2).join(''),
+    yaml: raw
+      .slice(yamlStart, closingStart)
+      .replace(/\r?\n$/, '')
+      .replace(/\r\n/g, '\n'),
+    body: bodyStart < 0 ? '' : raw.slice(bodyStart),
     bodyStartLine,
   };
+}
+
+/** End of the line starting at `start`, before its LF or CRLF. */
+function lineEnd(raw: string, start: number): number {
+  const nl = raw.indexOf('\n', start);
+  if (nl < 0) return raw.length;
+  return nl > start && raw.charCodeAt(nl - 1) === 13 ? nl - 1 : nl;
+}
+
+/** Start of the line after the one at `start`, or -1 if that line is the last. */
+function nextLineStart(raw: string, start: number): number {
+  const nl = raw.indexOf('\n', start);
+  return nl < 0 ? -1 : nl + 1;
+}
+
+function isFenceLine(raw: string, start: number): boolean {
+  return lineEnd(raw, start) - start === 3 && raw.startsWith('---', start);
 }
 
 function isBlank(yaml: string): boolean {

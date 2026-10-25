@@ -48,8 +48,13 @@ interface GrepOptions extends Partial<SearchOptions> {
   snippetRadius?: number;
   /** Wall-clock time a regex search may spend matching (defaults 3,000 ms). */
   regexBudgetMs?: number;
-  /** Skip lines longer than this in regex mode (defaults 10,000). */
-  maxLineLenForRegex?: number;
+  /**
+   * Main-thread time a literal search may spend matching (defaults 1,000 ms).
+   * Running out ends the search with `truncated` set; it is not a timeout.
+   */
+  literalBudgetMs?: number;
+  /** Skip lines longer than this, in both modes (defaults 10,000). */
+  maxLineLen?: number;
   /** Directory basenames to skip while walking. Forwarded to walkFolder. */
   ignore?: ReadonlySet<string>;
   /** Reuses file bodies across searches. */
@@ -137,6 +142,41 @@ function buildSnippet(line: string, start: number, end: number, radius: number):
   };
 }
 
+/**
+ * Visit each line of `body` as `[start, end)` offsets, split on LF and CRLF the
+ * way `split(/\r?\n/)` would. A 16 MB body of short lines would otherwise
+ * become millions of strings at once. Stops when `visit` returns false.
+ */
+function eachLine(
+  body: string,
+  visit: (index: number, start: number, end: number) => boolean,
+): void {
+  let start = 0;
+  for (let index = 0; ; index++) {
+    const nl = body.indexOf('\n', start);
+    if (nl < 0) {
+      visit(index, start, body.length);
+      return;
+    }
+    const end = nl > start && body.charCodeAt(nl - 1) === 13 ? nl - 1 : nl;
+    if (!visit(index, start, end)) return;
+    start = nl + 1;
+  }
+}
+
+/** The text of each line in `wanted` (ascending, repeats allowed). */
+function linesAt(body: string, wanted: readonly number[]): Map<number, string> {
+  const out = new Map<number, string>();
+  let w = 0;
+  if (wanted.length === 0) return out;
+  eachLine(body, (index, start, end) => {
+    if (wanted[w] === index) out.set(index, body.slice(start, end));
+    while (wanted[w] === index) w++;
+    return w < wanted.length;
+  });
+  return out;
+}
+
 /** One folder to search, plus the root id its results should be reported under. */
 export interface GrepRoot {
   absPath: string;
@@ -216,7 +256,7 @@ export async function grepFiles(
   const perFileCap = opts.perFileCap ?? 20;
   const globalCap = opts.globalCap ?? 200;
   const snippetRadius = opts.snippetRadius ?? 60;
-  const maxLineLenForRegex = opts.maxLineLenForRegex ?? 10_000;
+  const maxLineLen = opts.maxLineLen ?? 10_000;
   const regexMode = opts.regex ?? false;
   const cache = opts.cache ?? new ContentCache();
   const signal = opts.signal;
@@ -238,8 +278,11 @@ export async function grepFiles(
   // globalCap is a budget for the whole search, not per root — it exists to
   // bound the work and the response, and both are workspace-wide.
   const record = (t: Target, body: string, m: FileMatches): void => {
+    // A skipped line may hold matches, so the search as a whole is incomplete
+    // even when this file reports none.
+    if (m.skipped) truncated = true;
     if (m.total === 0) return;
-    const lines = body.split(/\r?\n/);
+    const lines = linesAt(body, m.hits.map(([lineIdx]) => lineIdx));
     const hits: SearchHit[] = [];
     let fileTruncated = m.skipped || m.total > m.hits.length;
     for (const [lineIdx, col, len] of m.hits) {
@@ -249,7 +292,7 @@ export async function grepFiles(
         break;
       }
       const { snippet, highlight } = buildSnippet(
-        lines[lineIdx] ?? '', col, col + len, snippetRadius,
+        lines.get(lineIdx) ?? '', col, col + len, snippetRadius,
       );
       hits.push({ line: lineIdx + 1, col, snippet, highlight });
       totalHits++;
@@ -266,18 +309,41 @@ export async function grepFiles(
   };
 
   // Literal queries are escaped before they become a regex, so they cannot
-  // backtrack and stay on this thread. Split on both LF and CRLF — a
-  // Windows-authored .md leaves a trailing \r on every line otherwise.
-  const matchLiteral = (body: string): FileMatches => {
+  // backtrack and stay on this thread. They still get the line cap and a time
+  // budget: one 15 MB line of `a` holds 15 million hits for `q=a`, and any page
+  // the user has open can ask for that search with an <img> tag. Hits past the
+  // per-file cap are counted, never stored.
+  const literalRe = regexMode ? null : new RegExp(pattern.source, pattern.flags);
+  let literalLeftMs = opts.literalBudgetMs ?? 1_000;
+  const matchLiteral = (re: RegExp, body: string): { m: FileMatches; outOfTime: boolean } => {
     const out: FileMatches = { total: 0, hits: [], skipped: false };
-    const lines = body.split(/\r?\n/);
-    for (let i = 0; i < lines.length; i++) {
-      for (const m of pattern.matchAll(lines[i] as string)) {
-        out.total++;
-        if (out.hits.length < perFileCap) out.hits.push([i, m.index, m.length]);
+    const started = performance.now();
+    const deadline = started + literalLeftMs;
+    let steps = 0;
+    let outOfTime = false;
+    // Reading the clock on every line and hit would cost more than the matching.
+    const overBudget = (): boolean => {
+      if ((++steps & 4095) !== 0) return false;
+      outOfTime = performance.now() > deadline;
+      return outOfTime;
+    };
+    eachLine(body, (index, start, end) => {
+      if (end - start > maxLineLen) {
+        out.skipped = true;
+        return !overBudget();
       }
-    }
-    return out;
+      const line = body.slice(start, end);
+      re.lastIndex = 0;
+      for (let m = re.exec(line); m !== null; m = re.exec(line)) {
+        out.total++;
+        if (out.hits.length < perFileCap) out.hits.push([index, m.index, m[0].length]);
+        if (overBudget()) return false;
+      }
+      return !overBudget();
+    });
+    if (outOfTime) out.skipped = true;
+    literalLeftMs -= performance.now() - started;
+    return { m: out, outOfTime };
   };
 
   const targets = await collectTargets(roots, opts);
@@ -289,7 +355,7 @@ export async function grepFiles(
     ? openRegexSession({
         source: pattern.source,
         flags: pattern.flags,
-        maxLineLen: maxLineLenForRegex,
+        maxLineLen,
         perFileCap,
         budgetMs: opts.regexBudgetMs ?? 3_000,
         ...(signal ? { signal } : {}),
@@ -314,8 +380,13 @@ export async function grepFiles(
     for await (const [t, body] of readAhead(targets, cache, READ_CONCURRENCY)) {
       if (signal?.aborted || totalHits >= globalCap) break;
       if (body === null) continue;
-      if (!session) {
-        record(t, body, matchLiteral(body));
+      if (literalRe) {
+        const { m, outOfTime } = matchLiteral(literalRe, body);
+        record(t, body, m);
+        if (outOfTime) {
+          truncated = true;
+          break;
+        }
         continue;
       }
       batch.push([t, body]);
