@@ -226,7 +226,7 @@ function detectRoot(target: string): RootSpec {
  * on argv, which any local user can read with `ps`. It is removed from the
  * environment once read, so nothing this process spawns inherits it.
  */
-export const EMBED_TOKEN_ENV = 'MDVIEW_EMBED_TOKEN';
+const EMBED_TOKEN_ENV = 'MDVIEW_EMBED_TOKEN';
 // base64url, and long enough that a short or empty value set by mistake is
 // refused rather than turned into a guessable gate.
 const EMBED_TOKEN_PATTERN = /^[A-Za-z0-9_-]{32,256}$/;

@@ -14,7 +14,7 @@ export interface ServerInfo {
 }
 
 /** Must match EMBED_TOKEN_ENV in the CLI. */
-export const EMBED_TOKEN_ENV = 'MDVIEW_EMBED_TOKEN';
+const EMBED_TOKEN_ENV = 'MDVIEW_EMBED_TOKEN';
 
 export interface ServerHandleOpts {
   cliEntryPath: string;
