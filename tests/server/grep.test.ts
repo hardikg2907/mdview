@@ -210,6 +210,36 @@ describe('grepFiles — regex runs in a worker with a time budget', () => {
     expect(out.timedOut).toBe(false);
   });
 
+  it('runs at most two regex searches at once and queues the rest', async () => {
+    const start = Date.now();
+    const outs = await Promise.all(
+      Array.from({ length: 4 }, () =>
+        grepFiles([{ absPath: rdir, id: 'w' }], CATASTROPHIC, { regex: true, regexBudgetMs: 300 }),
+      ),
+    );
+    // Two at a time means two rounds of the 300 ms budget; four threads at once
+    // would finish in one.
+    expect(Date.now() - start).toBeGreaterThanOrEqual(550);
+    expect(outs.every((o) => o.timedOut)).toBe(true);
+  });
+
+  it('drops a queued search when the caller aborts', async () => {
+    const busy = Array.from({ length: 2 }, () =>
+      grepFiles([{ absPath: rdir, id: 'w' }], CATASTROPHIC, { regex: true, regexBudgetMs: 1_500 }),
+    );
+    const ac = new AbortController();
+    setTimeout(() => ac.abort(), 100);
+    const start = Date.now();
+    const queued = await grepFiles([{ absPath: rdir, id: 'w' }], CATASTROPHIC, {
+      regex: true,
+      regexBudgetMs: 60_000,
+      signal: ac.signal,
+    });
+    expect(Date.now() - start).toBeLessThan(1_000);
+    expect(queued.timedOut).toBe(false);
+    await Promise.all(busy);
+  });
+
   it('never reports a timeout for a literal search', async () => {
     const out = await grepFiles([{ absPath: rdir, id: 'w' }], BAD_LINE);
     expect(out.timedOut).toBe(false);

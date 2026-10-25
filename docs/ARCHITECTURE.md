@@ -203,7 +203,7 @@ The renderer lives in `src/render/`, **outside** `src/server/`, because it has n
 
 - **`resolve.ts`** — `resolveSafePath(root, rel)` is the security boundary. Rejects absolute paths, normalizes the result, ensures it stays within `root`. Used by every fs read/write.
 - **`tree.ts`** — `walkFolder(root, { ignore, relBase })` recursively walks the directory, skipping dotfiles and any directory whose basename is in the supplied ignore set (defaults to `DEFAULT_IGNORED_DIRS`). Sorts dirs first then alpha. Marks markdown files with `isMarkdown: true`. `relBase` prefixes the emitted relPaths with the root id — it affects the wire path only, never which directory is read.
-- **`grep.ts`** — `grepFiles(roots, query, opts)` searches across roots. Reuses `walkFolder` + `flattenMdRelPaths` + the shared `compilePattern`. Walks each root unprefixed so paths stay resolvable against it, then prefixes on the way out. Caps per-file and global. Strips frontmatter before grepping. Keeps 8 reads in flight ahead of the matcher while still reporting files in walk order, and skips files over 16 MB. Front-matter-stripped bodies live in a `ContentCache` (32M characters, least-recently-used out first) keyed by path and checked against mtime and size; `createServer` also invalidates entries from watcher events. The route aborts the search when the client closes the request. Regex matching runs in `regex-worker.ts` (bundled to `bin/regex-worker.mjs`) through `regex-runner.ts`, which keeps one warm worker and terminates it at the search's time budget — see the security model.
+- **`grep.ts`** — `grepFiles(roots, query, opts)` searches across roots. Reuses `walkFolder` + `flattenMdRelPaths` + the shared `compilePattern`. Walks each root unprefixed so paths stay resolvable against it, then prefixes on the way out. Caps per-file and global. Strips frontmatter before grepping. Keeps 8 reads in flight ahead of the matcher while still reporting files in walk order, and skips files over 16 MB. Front-matter-stripped bodies live in a `ContentCache` (32M characters, least-recently-used out first) keyed by path and checked against mtime and size; `createServer` also invalidates entries from watcher events. The route aborts the search when the client closes the request. Regex matching runs in `regex-worker.ts` (bundled to `bin/regex-worker.mjs`) through `regex-runner.ts`, which keeps one warm worker, runs at most two at once with later searches queued, and terminates a worker at its search's time budget — see the security model.
 - **`ignore.ts`** — `DEFAULT_IGNORED_DIRS` (re-exported from `src/shared/ignore.ts` so the client tooltip can list the same names), `buildIgnoreSet(extra)` to union user-supplied basenames into the defaults, and `isPathIgnored(abs, root, set)` for the chokidar `ignored` callback. Plain basename equality — no globs, no regex.
 
 ### Config (`src/server/config.ts`)
@@ -392,7 +392,10 @@ author put there — including an SVG with a `<script>`. A policy on a subresour
 does not affect its use in `<img>`, `<video>` or `<audio>`; it only applies when
 the file is opened as a document (a new tab, a frame). Every response from the
 route, success or error, carries `ASSET_SECURITY_HEADERS`
-(`src/server/routes/api-asset.ts`), applied by URL in the same `onSend` hook:
+(`src/server/routes/api-asset.ts`), applied in the same `onSend` hook. The hook
+matches on the route as well as the raw URL, because the router decodes
+`/%5F%5Fasset/...` onto the asset route while `req.url` keeps the escapes, and it
+also covers any `image/svg+xml` response:
 
 | Header | Value | Why |
 |---|---|---|
