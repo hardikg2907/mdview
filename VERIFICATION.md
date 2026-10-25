@@ -198,6 +198,9 @@ node bin/mdview.mjs ./test-fixtures/showcase.md --no-open
 - Click → fullscreen lightbox with backdrop blur.
 - Esc or click outside → closes.
 
+### 19a. Raw HTML cannot move the tab
+- Add a file holding `<meta http-equiv="refresh" content="1;url=https://example.com">` and `<base href="https://example.com/">` on their own lines, plus a relative `.md` link. Open it and wait a few seconds: the tab stays on mdview, and the link still opens the local file. View source of the response (`/api/file?path=…`) shows neither tag.
+
 ### 20. External links
 - External links (e.g. https://vercel.com) get a small `↗` icon after the link text.
 - Click → opens in new tab.

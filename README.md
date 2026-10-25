@@ -192,7 +192,7 @@ Click the keyboard icon in the header anytime to see the full list.
 - Math via KaTeX (`$inline$` and `$$block$$`), lazy-loaded only when a doc contains math.
 - Custom-styled task list checkboxes (filled accent when checked, hollow when unchecked).
 - Front matter detected and shown as a small collapsible metadata block.
-- Inline HTML pass-through (your content, your trust).
+- Inline HTML pass-through (your content, your trust), except `<meta>` and `<base>`, which could send the tab to another site.
 - Images render via a safe `/__asset/*` route with relative-path resolution against the file's folder. Click any image to open in a lightbox.
 - External links get an `↗` icon and open in a new tab with `noopener noreferrer`.
 

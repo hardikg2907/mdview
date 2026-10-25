@@ -18,6 +18,10 @@ describe('GET /api/file (markdown-only)', () => {
       path.join(root, 'evil.md'),
       '---js\n{ ranInServer: typeof process === "object", pid: process.pid }\n---\n# Hello',
     );
+    writeFileSync(
+      path.join(root, 'redirect.md'),
+      '<meta http-equiv="refresh" content="1;url=http://evil.example">\n<base href="http://evil.example/">\n\n[home](README.md)\n',
+    );
     writeFileSync(path.join(root, 'anchors.md'), `<div>\n${'<a '.repeat(400_000)}\n`);
     writeFileSync(path.join(root, '.env'), 'SECRET=hunter2');
     writeFileSync(path.join(root, 'notes.txt'), 'plain text');
@@ -83,6 +87,14 @@ describe('GET /api/file (markdown-only)', () => {
     expect(res.statusCode).toBe(200);
     expect(res.json()).toMatchObject({ frontmatter: null });
     expect(res.body).not.toContain(`"pid":${process.pid}`);
+  });
+
+  it('serves raw HTML without meta or base tags, links still rewritten', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/file?path=redirect.md' });
+    expect(res.statusCode).toBe(200);
+    const { html } = res.json() as { html: string };
+    expect(html).not.toMatch(/<(?:meta|base)[\s/>]/i);
+    expect(html).toContain('data-internal-link="w/README.md"');
   });
 
   it('answers quickly for a large HTML block of unclosed anchors', async () => {

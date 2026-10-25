@@ -2,6 +2,7 @@ import MarkdownIt, { type Token } from 'markdown-it';
 import anchor from 'markdown-it-anchor';
 import taskLists from 'markdown-it-task-lists';
 import { DEFAULT_PALETTE, type Palette } from '../shared/types.js';
+import { stripMetaAndBase } from './html-tags.js';
 import { mathPlugin } from './math.js';
 import { highlightCode } from './shiki.js';
 
@@ -45,7 +46,17 @@ export async function renderMarkdown(
     if (token.type === 'heading_open' && token.map) {
       token.attrSet('data-source-line', String(token.map[0] + bodyStartLine));
     }
-    if (token.type === 'fence') {
+    // A <meta http-equiv="refresh"> in a document navigates the whole tab once
+    // the client inserts it, and no CSP directive covers that. <base> would
+    // retarget every relative link. Raw HTML tokens are the only place either
+    // can come from: markdown-it escapes `<` everywhere else.
+    if (token.type === 'html_block') {
+      token.content = stripMetaAndBase(token.content);
+    } else if (token.type === 'inline' && token.children) {
+      for (const child of token.children) {
+        if (child.type === 'html_inline') child.content = stripMetaAndBase(child.content);
+      }
+    } else if (token.type === 'fence') {
       const lang = token.info.trim().split(/\s+/)[0] || 'text';
       if (lang === 'mermaid') {
         token.type = 'html_block';

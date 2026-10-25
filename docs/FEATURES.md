@@ -38,7 +38,7 @@ Comprehensive catalog of what `mdview` does today.
 | Mermaid diagrams (lazy-loaded) | server emits `<div class="mermaid-block">`; `lib/mermaid-loader.ts` does dynamic `import('pele/lazy')` only when present; colours come from CSS variables, so palette and light/dark switches need no re-render |
 | **Math / LaTeX (KaTeX, lazy-loaded)** | custom `markdown-it` core rule in `render/math.ts` emits `<span class="math-inline">` and `<div class="math-block">`; `lib/katex-loader.ts` dynamic-imports KaTeX + injects its CSS only when math is present |
 | Front matter (YAML only, bounded) parsing & display | `render/frontmatter.ts` + `<details>` block in `Content.tsx` |
-| Inline HTML pass-through | markdown-it `html: true` |
+| Inline HTML pass-through | markdown-it `html: true`; `<meta>` and `<base>` are removed at render time (`render/html-tags.ts`) |
 | Images with relative-path resolution | `rewriteImageSrc` rewrites to `/__asset/<resolved>`; `api-asset.ts` serves with mime detection |
 | Image lightbox on click | `lib/image-lightbox.ts` + `Lightbox.tsx` |
 | External links → `↗` icon + `target="_blank"` + `rel="noopener noreferrer"` | `lib/external-links.ts` |

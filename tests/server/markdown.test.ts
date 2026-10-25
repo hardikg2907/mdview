@@ -58,3 +58,49 @@ describe('renderMarkdown', () => {
     expect(html).toContain('<a href="https://example.com/a">https://example.com/a</a>');
   });
 });
+
+describe('renderMarkdown — <meta> and <base> in raw HTML', () => {
+  const META_OR_BASE = /<(?:meta|base)(?=[\t\n\f\r />]|$)/i;
+
+  it('drops a meta refresh in an HTML block', async () => {
+    const { html } = await renderMarkdown(
+      '<meta http-equiv="refresh" content="1;url=http://evil.example">\n\n# After',
+    );
+    expect(html).not.toMatch(META_OR_BASE);
+    expect(html).toContain('id="after"');
+  });
+
+  it('drops inline meta and base tags in any case and keeps the text around them', async () => {
+    const { html } = await renderMarkdown(
+      'a <META HTTP-EQUIV=refresh CONTENT="0;url=http://evil.example"> b <base href="http://evil.example/"> c <meta/> d',
+    );
+    expect(html).not.toMatch(META_OR_BASE);
+    expect(html).toContain('<p>a  b  c  d</p>');
+  });
+
+  it('drops a meta tag that never closes, up to the end of its block', async () => {
+    const { html } = await renderMarkdown(
+      '<div>\n<meta http-equiv="refresh" content="0;url=http://evil.example"\n\nnext paragraph',
+    );
+    expect(html).not.toMatch(META_OR_BASE);
+    expect(html).toContain('<p>next paragraph</p>');
+  });
+
+  it('does not rebuild a meta tag from the text around a removed one', async () => {
+    const { html } = await renderMarkdown(
+      '<div>\n<<meta x>meta http-equiv="refresh" content="0;url=http://evil.example">\n</div>',
+    );
+    expect(html).not.toMatch(META_OR_BASE);
+  });
+
+  it('keeps elements whose names only start with meta or base', async () => {
+    const { html } = await renderMarkdown('<svg><metadata>m</metadata></svg>\n\n<basefont>');
+    expect(html).toContain('<metadata>m</metadata>');
+    expect(html).toContain('<basefont>');
+  });
+
+  it('keeps a meta tag shown as code', async () => {
+    const { html } = await renderMarkdown('`<meta charset="utf-8">`');
+    expect(html).toContain('<code>&lt;meta charset=&quot;utf-8&quot;&gt;</code>');
+  });
+});

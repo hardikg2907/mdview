@@ -173,3 +173,77 @@ export function rewriteTags(
   out.push(html.slice(copied));
   return out.join('');
 }
+
+function hasNameAt(s: string, at: number, name: string): boolean {
+  for (let k = 0; k < name.length; k++) {
+    // `| 32` lower-cases an ASCII letter and maps nothing else onto one.
+    if ((s.charCodeAt(at + k) | 32) !== name.charCodeAt(k)) return false;
+  }
+  return true;
+}
+
+const STRIPPED = ['meta', 'base'];
+const HAS_STRIPPED = /<(?:meta|base)/i;
+// A `<` followed by a prefix of a stripped name, at the very end of the output.
+const DANGLING_PREFIX = /<(?:m(?:e(?:ta?)?)?|b(?:a(?:se?)?)?)?$/i;
+
+/** Remove and return the last `count` characters of `out`, which holds no empty chunks. */
+function popChars(out: string[], count: number): string {
+  let taken = '';
+  while (taken.length < count && out.length > 0) {
+    const last = out.pop() as string;
+    const need = count - taken.length;
+    if (last.length > need) {
+      out.push(last.slice(0, last.length - need));
+      taken = last.slice(last.length - need) + taken;
+    } else {
+      taken = last + taken;
+    }
+  }
+  return taken;
+}
+
+/**
+ * Remove every `<meta>` and `<base>` start tag from a raw HTML fragment.
+ *
+ * Deliberately context-free: a fragment is one piece of a larger document, so
+ * whether a given `<meta` sits in text or inside a quoted attribute depends on
+ * pieces this function cannot see. Every occurrence goes, wherever it is. A tag
+ * that never closes takes the rest of the fragment with it.
+ */
+export function stripMetaAndBase(fragment: string): string {
+  if (!HAS_STRIPPED.test(fragment)) return fragment;
+
+  const out: string[] = [];
+  let i = 0;
+  const n = fragment.length;
+  while (i < n) {
+    const lt = fragment.indexOf('<', i);
+    if (lt < 0) break;
+    const after = lt + 5;
+    const c = fragment.charCodeAt(after);
+    const isTarget =
+      STRIPPED.some((name) => hasNameAt(fragment, lt + 1, name)) &&
+      (after >= n || isSpace(c) || c === SLASH || c === GT);
+    if (!isTarget) {
+      out.push(fragment.slice(i, lt + 1));
+      i = lt + 1;
+      continue;
+    }
+    if (lt > i) out.push(fragment.slice(i, lt));
+    const end = readAttrs(fragment, after, null);
+    i = end < 0 ? n : end;
+    // Cutting a tag out joins what was on either side of it: `<<meta>meta x>`
+    // would come out as `<meta x>`. A `<` left hanging before the cut becomes
+    // text, so no tag name can form across the gap.
+    const tail = popChars(out, 5);
+    const dangling = DANGLING_PREFIX.exec(tail);
+    if (dangling) {
+      out.push(`${tail.slice(0, dangling.index)}&lt;${tail.slice(dangling.index + 1)}`);
+    } else if (tail) {
+      out.push(tail);
+    }
+  }
+  if (i < n) out.push(fragment.slice(i));
+  return out.join('');
+}
