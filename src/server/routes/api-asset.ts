@@ -1,9 +1,10 @@
 import { createReadStream } from 'node:fs';
-import { stat } from 'node:fs/promises';
+import { realpath, stat } from 'node:fs/promises';
 import path from 'node:path';
 import type { FastifyInstance } from 'fastify';
-import { OutsideRootError, resolveSafePath } from '../fs/resolve.js';
+import { hasDotSegment, OutsideRootError, resolveSafePath } from '../fs/resolve.js';
 import { parseWorkspacePath, type RootState } from '../workspace.js';
+import { assetRefKey, documentAssetRefs } from './api-file.js';
 
 const MIME: Record<string, string> = {
   '.png': 'image/png',
@@ -36,15 +37,6 @@ export const ASSET_SECURITY_HEADERS: Readonly<Record<string, string>> = {
   'cross-origin-resource-policy': 'same-origin',
 };
 
-// Checked after containment, on the normalised path, so `a/../b.png` is judged
-// by where it lands rather than by the `..` it passed through.
-function hasDotSegment(rel: string): boolean {
-  return path
-    .normalize(rel)
-    .split(/[\\/]/)
-    .some((seg) => seg.startsWith('.') && seg !== '.');
-}
-
 export function registerApiAsset(app: FastifyInstance, roots: readonly RootState[]): void {
   app.get<{ Params: { '*': string } }>('/__asset/*', async (req, reply) => {
     const wsPath = (req.params['*'] ?? '').replace(/^\/+/, '');
@@ -52,18 +44,28 @@ export function registerApiAsset(app: FastifyInstance, roots: readonly RootState
     if (!resolved) {
       return reply.code(404).send({ error: 'Asset not found' });
     }
+    // A single-file root is a whole folder on disk (`mdview ~/README.md` makes
+    // it $HOME), but all it shows is one document, so it serves only what that
+    // document references.
+    if (resolved.state.root.kind === 'file') {
+      const refs = await documentAssetRefs(roots, resolved.state);
+      if (!refs.has(assetRefKey(resolved.rel))) {
+        return reply.code(404).send({ error: 'Asset not found' });
+      }
+    }
     let abs: string;
+    let realRoot: string;
     try {
-      abs = await resolveSafePath(resolved.state.absPath, resolved.rel);
+      realRoot = await realpath(resolved.state.absPath);
+      abs = await resolveSafePath(resolved.state.absPath, resolved.rel, { realRoot });
     } catch (err) {
       if (err instanceof OutsideRootError) {
         return reply.code(400).send({ error: err.message });
       }
       return reply.code(404).send({ error: 'Asset not found' });
     }
-    // Dot-directories hold tool state (.git, .ssh, .vscode), never content a
-    // document links to, whatever the extension of the file inside them.
-    if (hasDotSegment(resolved.rel)) {
+    // Whatever the extension of the file inside them.
+    if (hasDotSegment(resolved.rel) || hasDotSegment(path.relative(realRoot, abs))) {
       return reply.code(404).send({ error: 'Asset not found' });
     }
     let st: Awaited<ReturnType<typeof stat>>;

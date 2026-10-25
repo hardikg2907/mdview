@@ -18,7 +18,14 @@ node bin/mdview.mjs ./test-fixtures/showcase.md --no-open
 ```
 - Folder tree shows one item (the file).
 - Outline pulls headings from the doc.
-- Edit the file in another editor, save → view updates, scroll position preserved.
+- Edit the file in another editor, save → view updates, scroll position preserved. Repeat with an editor that saves by writing a temp file and renaming it (vim with `backupcopy=no`, most IDEs) → still updates, every save.
+- Put `![x](assets/star.svg)` in the file → the image shows. `curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:<port>/__asset/<id>/assets/star.svg` → `200`; any image in the folder the document does not reference → `404`. Remove the reference and save → the same URL → `404`.
+- `mdview --foreground ~/README.md` (any file in `$HOME`) → the startup line reads `watching: /Users/<you>/README.md`, not the folder. The process does not climb in open file count (`lsof -p <pid> | wc -l` stays small), and saving an unrelated file under `$HOME` sends no SSE event.
+
+### 1a. Dot-directories
+- `curl -s -o /dev/null -w '%{http_code}\n' "http://127.0.0.1:<port>/api/file?path=.github/PULL_REQUEST_TEMPLATE.md"` (any repo with one) → `404`; the same for `.claude/*.md`.
+- An in-root link into a dot-directory (`ln -s .git/description.md notes.md`, or `ln -s .cache/x.png shot.png`) → `/api/file` and `/__asset/*` both `404`.
+- `mdview ~/repo/.github/PULL_REQUEST_TEMPLATE.md` while `~/repo` is open → adds a separate root for `.github` and the file renders.
 
 ### 2. Folder mode
 - Folder tree shows nested structure (`assets/`, `linked-doc.md`, `math.md`, `showcase.md`).

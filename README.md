@@ -63,6 +63,7 @@ npm install -g ./hardikg-mdview-<version>.tgz
 
 ```bash
 mdview <path>              # open a file or folder; the shell comes straight back
+                           #   (a single file shows only that file and the media it references)
 mdview                     # current directory
 mdview ls                  # what's open, and where the server is
 mdview rm <name>           # stop serving a folder

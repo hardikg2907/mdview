@@ -156,7 +156,8 @@ to, and only the bare `mdview [path]` form changed.
 - **Folders are unrelated.** They don't have to be siblings, or share a parent, or be in the same tree at all. Each keeps its own `.mdview.json` `ignore` list and its own file watcher.
 - **The sidebar groups them.** One folder's contents sit at the top level exactly as before; two or more get a heading each. `⌘P` and folder-wide search span all of them.
 - **Persistent.** Folders stay open across restarts and reboots until `mdview rm`. Capped at 8, since each holds a live recursive watcher.
-- **Reuse over duplication.** Opening a file or subfolder inside an already-open folder reuses it and jumps to the file, instead of adding an overlapping root.
+- **Reuse over duplication.** Opening a file or subfolder inside an already-open folder reuses it and jumps to the file, instead of adding an overlapping root. A target under a dot-directory (`.github/x.md`) is the exception: folders hide those, so it gets a root of its own.
+- **A single file is just that file.** `mdview ~/README.md` watches only `README.md`, not the folder it sits in, and serves only the images and media the document references.
 - **Runs until stopped.** `mdview stop` ends it; otherwise it stays put, which keeps the URL reliable. `MDVIEW_IDLE_TIMEOUT` opts into exiting after N minutes with no tab connected, for anyone who'd rather it didn't sit there holding watchers.
 - **State** lives only in `~/.config/mdview/` — `daemon.json` (pid, port, start time), `workspace.json` (the open folders), `daemon.log` (truncated past 1 MB).
 - **The workspace file is the control plane.** The CLI writes it; the server watches it. There is deliberately no HTTP endpoint that changes what is served, so there is no request a page in your browser could forge — see Security & boundaries.
@@ -170,6 +171,9 @@ Errors are mapped to a one-line `mdview: …` message with a non-zero exit;
 ## Security & boundaries
 
 - All filesystem reads go through `resolveSafePath` (rejects absolute paths and traversal).
+- Dot-directories and dotfiles are hidden from the tree and refused by `/api/file` and `/__asset/*`, judged on both the requested and the real path.
+- Every response carries `x-content-type-options: nosniff`.
+- `--vscode` embed mode serves its page and API only to requests that carry the per-launch token the extension passes in the environment.
 - Server binds to `127.0.0.1` only.
 - Every request's `Host` must be a loopback name (`isAllowedHost`) or it is refused with a bare 403 — the DNS-rebinding guard.
 - No HTTP endpoint can change which folders are served. The CLI edits `workspace.json` and the server watches it, so adding a root needs filesystem access, which a web page does not have. Nothing to CSRF, and no shared token to store or leak.

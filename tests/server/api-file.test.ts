@@ -20,6 +20,11 @@ describe('GET /api/file (markdown-only)', () => {
     );
     writeFileSync(path.join(root, '.env'), 'SECRET=hunter2');
     writeFileSync(path.join(root, 'notes.txt'), 'plain text');
+    mkdirSync(path.join(root, '.github'));
+    writeFileSync(path.join(root, '.github', 'PR.md'), '# PR template');
+    mkdirSync(path.join(root, '.claude'));
+    writeFileSync(path.join(root, '.claude', 'CLAUDE.md'), '# Agent notes');
+    writeFileSync(path.join(root, '.draft.md'), '# Draft');
 
     app = Fastify({ logger: false });
     registerApiFile(app, [fakeRoot(root, { id: 'w' })]);
@@ -85,6 +90,22 @@ describe('GET /api/file (markdown-only)', () => {
     expect(res.json()).toMatchObject({ error: expect.stringMatching(/markdown/i) });
   });
 
+  it('404s on markdown inside a dot-directory or a dotfile', async () => {
+    for (const p of [
+      '.github/PR.md',
+      'w/.github/PR.md',
+      '.claude/CLAUDE.md',
+      '.draft.md',
+      'x/../.github/PR.md',
+      encodeURIComponent('./.claude/CLAUDE.md'),
+    ]) {
+      const res = await app.inject({ method: 'GET', url: `/api/file?path=${p}` });
+      expect(res.statusCode, p).toBe(404);
+      expect(res.body, p).not.toContain('template');
+      expect(res.body, p).not.toContain('Agent notes');
+    }
+  });
+
   it('400s on .txt', async () => {
     const res = await app.inject({ method: 'GET', url: '/api/file?path=notes.txt' });
     expect(res.statusCode).toBe(400);
@@ -124,6 +145,9 @@ describe.skipIf(process.platform === 'win32')('GET /api/file (symlinks)', () => 
     symlinkSync('/etc/hosts', path.join(root, 'hosts.md'));
     symlinkSync('README.md', path.join(root, 'alias.md'));
     symlinkSync('.env', path.join(root, 'env.md'));
+    mkdirSync(path.join(root, '.claude'));
+    writeFileSync(path.join(root, '.claude', 'CLAUDE.md'), '# Agent notes');
+    symlinkSync(path.join('.claude', 'CLAUDE.md'), path.join(root, 'agent.md'));
 
     app = Fastify({ logger: false });
     registerApiFile(app, [fakeRoot(root, { id: 'w' })]);
@@ -147,6 +171,12 @@ describe.skipIf(process.platform === 'win32')('GET /api/file (symlinks)', () => 
     const res = await app.inject({ method: 'GET', url: '/api/file?path=alias.md' });
     expect(res.statusCode).toBe(200);
     expect(res.json().title).toBe('Real');
+  });
+
+  it('refuses an in-root link whose target sits in a dot-directory', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/file?path=agent.md' });
+    expect(res.statusCode).toBe(404);
+    expect(res.body).not.toContain('Agent notes');
   });
 
   it('refuses an in-root link whose target is not markdown', async () => {

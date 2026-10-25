@@ -15,6 +15,23 @@ function isWithin(absRoot: string, candidate: string): boolean {
   return rel !== '..' && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel);
 }
 
+/**
+ * True when any segment of `rel` starts with `.`. Dot-directories and dotfiles
+ * hold tool state (.git, .ssh, .vscode, .env), never content a document links
+ * to. Checked on the normalised path, so `a/../b.png` is judged by where it
+ * lands rather than by the `..` it passed through.
+ *
+ * Callers check both the requested path and `relative(realRoot, realTarget)`:
+ * the requested name alone misses an in-root link into `.git`, and on Windows
+ * an 8.3 short name (`GIT~1`) that names `.git` without a leading dot.
+ */
+export function hasDotSegment(rel: string): boolean {
+  return path
+    .normalize(rel)
+    .split(/[\\/]/)
+    .some((seg) => seg.startsWith('.') && seg !== '.');
+}
+
 export interface ResolveOptions {
   /** `realpath(root)`, when the caller resolves many paths under one root. */
   realRoot?: string;

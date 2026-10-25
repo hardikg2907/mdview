@@ -1,4 +1,5 @@
-import { readFile, stat } from 'node:fs/promises';
+import { readFile, realpath, stat } from 'node:fs/promises';
+import path from 'node:path';
 import type { FastifyInstance } from 'fastify';
 import { parseFrontmatter } from '../../render/frontmatter.js';
 import { rewriteImageSrc, tagInternalLinks } from '../../render/links.js';
@@ -10,10 +11,97 @@ import {
   type Palette,
   type RenderedFile,
 } from '../../shared/types.js';
-import { MAX_MARKDOWN_BYTES, OutsideRootError, resolveSafePath } from '../fs/resolve.js';
+import { hasDotSegment, MAX_MARKDOWN_BYTES, OutsideRootError, resolveSafePath } from '../fs/resolve.js';
 import { parseWorkspacePath, type RootState, toWorkspacePath } from '../workspace.js';
 
 const MD_FILE_RE = /\.(md|markdown|mdx)$/i;
+
+/** Every `/__asset/<path>` URL in rendered HTML, up to the end of the attribute value. */
+const ASSET_URL_RE = /\/__asset\/([^"'<>\s]*)/g;
+
+const ENTITY: Record<string, string> = {
+  '&amp;': '&',
+  '&lt;': '<',
+  '&gt;': '>',
+  '&quot;': '"',
+  '&#39;': "'",
+};
+
+/** The form a referenced path and a requested one are compared in. */
+export function assetRefKey(rel: string): string {
+  return path.posix.normalize(rel.replace(/^\/+/, ''));
+}
+
+/**
+ * The within-root paths `html` references through `/__asset/`, for `state`.
+ *
+ * Mirrors what the browser will ask for: the attribute is HTML-unescaped, the
+ * query and fragment never reach the route, and the route parameter arrives
+ * percent-decoded. A reference this misreads only makes its asset 404.
+ */
+function collectAssetRefs(html: string, roots: readonly RootState[], state: RootState): Set<string> {
+  const refs = new Set<string>();
+  for (const m of html.matchAll(ASSET_URL_RE)) {
+    const raw = (m[1] ?? '').replace(/&(?:amp|lt|gt|quot|#39);/g, (e) => ENTITY[e] ?? e);
+    const bare = raw.split(/[?#]/, 1)[0] ?? '';
+    let decoded: string;
+    try {
+      decoded = decodeURIComponent(bare);
+    } catch {
+      continue;
+    }
+    const target = parseWorkspacePath(roots, decoded);
+    if (target?.state === state) refs.add(assetRefKey(target.rel));
+  }
+  return refs;
+}
+
+interface Rendered {
+  html: string;
+  outline: RenderedFile['outline'];
+  frontmatter: RenderedFile['frontmatter'];
+  title: string | null;
+}
+
+async function renderDocument(raw: string, wsRel: string, palette: Palette): Promise<Rendered> {
+  const { data, body, bodyStartLine } = parseFrontmatter(raw);
+  const { html: rawHtml, tokens } = await renderMarkdown(body, bodyStartLine, palette);
+  // Link and image rewriting run against the workspace-scoped path, so
+  // relative targets resolve within the same root and the ?file= and
+  // /__asset/ URLs they emit come out already root-qualified.
+  const html = rewriteImageSrc(tagInternalLinks(rawHtml, wsRel), wsRel);
+  const outline = extractOutline(tokens);
+  const title =
+    (typeof data?.title === 'string' ? data.title : null) ?? outline[0]?.text ?? null;
+  return { html, outline, frontmatter: data, title };
+}
+
+/**
+ * The assets a single-file root may serve. Normally recorded by the last
+ * /api/file render; rendered here when there is none yet, as after a restart
+ * with a tab still open. A document that can't be read references nothing.
+ */
+export async function documentAssetRefs(
+  roots: readonly RootState[],
+  state: RootState,
+): Promise<ReadonlySet<string>> {
+  if (state.assetRefs) return state.assetRefs;
+  let refs = new Set<string>();
+  try {
+    const absPath = await resolveSafePath(state.absPath, state.root.filePath);
+    const st = await stat(absPath);
+    if (st.isFile() && st.size <= MAX_MARKDOWN_BYTES && MD_FILE_RE.test(absPath)) {
+      const raw = await readFile(absPath, 'utf8');
+      const wsRel = toWorkspacePath(state.root.id, state.root.filePath);
+      const { html } = await renderDocument(raw, wsRel, DEFAULT_PALETTE);
+      refs = collectAssetRefs(html, roots, state);
+    }
+  } catch {
+    // Unreadable or gone: nothing is referenced.
+  }
+  state.assetRefs = refs;
+  return refs;
+}
 
 export function registerApiFile(app: FastifyInstance, roots: readonly RootState[]): void {
   app.get<{ Querystring: { path?: string; palette?: string } }>(
@@ -48,8 +136,9 @@ export function registerApiFile(app: FastifyInstance, roots: readonly RootState[
       return reply.code(404).send({ error: 'File not found' });
     }
     const { state, rel } = resolved;
+    const pinned = state.root.kind === 'file';
 
-    if (state.root.kind === 'file' && rel !== state.root.filePath) {
+    if (pinned && rel !== state.root.filePath) {
       return reply.code(404).send({ error: 'File not found in single-file mode' });
     }
 
@@ -61,8 +150,10 @@ export function registerApiFile(app: FastifyInstance, roots: readonly RootState[
     }
 
     let absPath: string;
+    let realRoot: string;
     try {
-      absPath = await resolveSafePath(state.absPath, rel);
+      realRoot = await realpath(state.absPath);
+      absPath = await resolveSafePath(state.absPath, rel, { realRoot });
     } catch (err) {
       if (err instanceof OutsideRootError) {
         return reply.code(400).send({ error: err.message });
@@ -73,6 +164,11 @@ export function registerApiFile(app: FastifyInstance, roots: readonly RootState[
     // the link's target, so the target has to be markdown too.
     if (!MD_FILE_RE.test(absPath)) {
       return reply.code(400).send({ error: 'Only markdown files are supported' });
+    }
+    // The tree and the asset route hide dot-directories, so this route does
+    // too. A single-file root's own file is exempt: the user named it.
+    if (!pinned && (hasDotSegment(rel) || hasDotSegment(path.relative(realRoot, absPath)))) {
+      return reply.code(404).send({ error: 'File not found' });
     }
 
     let raw: string;
@@ -91,24 +187,15 @@ export function registerApiFile(app: FastifyInstance, roots: readonly RootState[
       return reply.code(404).send({ error: 'File not found' });
     }
 
-    const { data, body, bodyStartLine } = parseFrontmatter(raw);
-    const { html: rawHtml, tokens } = await renderMarkdown(body, bodyStartLine, palette);
-    // Link and image rewriting run against the workspace-scoped path, so
-    // relative targets resolve within the same root and the ?file= and
-    // /__asset/ URLs they emit come out already root-qualified.
     const wsRel = toWorkspacePath(state.root.id, rel);
-    const html = rewriteImageSrc(tagInternalLinks(rawHtml, wsRel), wsRel);
-    const outline = extractOutline(tokens);
-    const title =
-      (typeof data?.title === 'string' ? data.title : null) ??
-      outline[0]?.text ??
-      null;
+    const { html, outline, frontmatter, title } = await renderDocument(raw, wsRel, palette);
+    if (pinned) state.assetRefs = collectAssetRefs(html, roots, state);
 
     const result: RenderedFile = {
       relPath: wsRel,
       html,
       outline,
-      frontmatter: data,
+      frontmatter,
       title,
       lastModified: mtimeMs,
     };

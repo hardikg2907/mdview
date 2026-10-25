@@ -99,6 +99,10 @@ describe.skipIf(process.platform === 'win32')('GET /__asset/* (symlinks)', () =>
     symlinkSync(path.join(base, 'outside'), path.join(root, 'outdir'));
     symlinkSync('pic.png', path.join(root, 'alias.png'));
     symlinkSync('key.pem', path.join(root, 'logo.png'));
+    mkdirSync(path.join(root, '.git'));
+    writeFileSync(path.join(root, '.git', 'shot.png'), Buffer.from([0x89, 0x50]));
+    symlinkSync(path.join('.git', 'shot.png'), path.join(root, 'shot.png'));
+    symlinkSync('.git', path.join(root, 'gitdir'));
 
     app = Fastify({ logger: false });
     registerApiAsset(app, [fakeRoot(root, { id: 'w' })]);
@@ -123,6 +127,15 @@ describe.skipIf(process.platform === 'win32')('GET /__asset/* (symlinks)', () =>
     const res = await app.inject({ method: 'GET', url: '/__asset/alias.png' });
     expect(res.statusCode).toBe(200);
     expect(res.headers['content-type']).toBe('image/png');
+  });
+
+  it('refuses an in-root link that lands in a dot-directory', async () => {
+    // The requested names have no dot segment; the real path does. This is
+    // also how an 8.3 short name for .git (GIT~1) is caught on Windows.
+    for (const url of ['/__asset/shot.png', '/__asset/gitdir/shot.png']) {
+      const res = await app.inject({ method: 'GET', url });
+      expect(res.statusCode, url).toBe(404);
+    }
   });
 
   it('refuses an in-root link whose target is not media', async () => {

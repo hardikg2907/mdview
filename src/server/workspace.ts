@@ -25,6 +25,12 @@ export interface RootState {
   ignoreSet: ReadonlySet<string>;
   config: ProjectConfig | null;
   watcher: Watcher;
+  /**
+   * Single-file roots only: the within-root paths the document's latest render
+   * references through `/__asset/`, which are the only assets the root serves.
+   * Undefined until the document has been rendered, and again after it changes.
+   */
+  assetRefs?: ReadonlySet<string>;
 }
 
 // Same shape as the `ignore` entry allow-list: a single path segment, no

@@ -20,6 +20,12 @@ export interface CreateWatcherOptions {
    * distinguishable on the one SSE stream.
    */
   prefix?: string;
+  /**
+   * Watch only this one file, a basename within the root, instead of the whole
+   * tree. A single-file root's folder can be as large as $HOME, and the file is
+   * all it shows.
+   */
+  only?: string;
 }
 
 /**
@@ -52,10 +58,20 @@ export function createWatcher(rootAbsPath: string, opts: CreateWatcherOptions = 
   emitter.setMaxListeners(0);
   const ignore = opts.ignore ?? DEFAULT_IGNORED_DIRS;
   const prefix = opts.prefix ?? '';
+  const only = opts.only === undefined ? undefined : path.join(rootAbsPath, opts.only);
+
+  // A single file is watched through its folder, one level deep, rather than
+  // directly: a direct watch follows the file's inode, and editors that save by
+  // writing a temp file and renaming it over the original replace that inode.
+  // The folder sees the rename, and the filter keeps every other entry out.
+  const scope =
+    only === undefined
+      ? { ignored: (p: string) => isPathIgnored(p, rootAbsPath, ignore) }
+      : { ignored: (p: string) => p !== rootAbsPath && p !== only, depth: 0 };
 
   const watcher: FSWatcher = chokidar.watch(rootAbsPath, {
     ignoreInitial: true,
-    ignored: (p: string) => isPathIgnored(p, rootAbsPath, ignore),
+    ...scope,
     persistent: true,
     // chokidar follows links by default, so a repo holding `link -> /` would
     // have it walk and watch the whole disk. The server serves nothing through

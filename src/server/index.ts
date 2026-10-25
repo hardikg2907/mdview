@@ -206,14 +206,24 @@ export async function createServer(opts: ServerOptions): Promise<MdviewServer> {
   async function openRoot(spec: RootSpec, id: string): Promise<RootState> {
     const config = await loadEffectiveConfig(spec.absPath);
     const ignoreSet = buildIgnoreSet(config?.ignore ?? []);
+    const root = describeRoot(spec, id);
     const state: RootState = {
-      root: describeRoot(spec, id),
+      root,
       absPath: spec.absPath,
       ignoreSet,
       config,
-      watcher: createWatcher(spec.absPath, { ignore: ignoreSet, prefix: id }),
+      watcher: createWatcher(spec.absPath, {
+        ignore: ignoreSet,
+        prefix: id,
+        ...(root.kind === 'file' ? { only: root.filePath } : {}),
+      }),
     };
-    state.watcher.on('event', (e) => hub.emitSynthetic(e));
+    state.watcher.on('event', (e) => {
+      // The document changed, so what it references may have too; the next
+      // render or asset request recomputes it.
+      if (root.kind === 'file') state.assetRefs = undefined;
+      hub.emitSynthetic(e);
+    });
 
     // Dedicated chokidar watch for .mdview.json — the main watcher ignores
     // dotfiles, so we'd never see it otherwise. One per root, because each root

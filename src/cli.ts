@@ -388,7 +388,9 @@ async function runForeground(args: Args): Promise<void> {
     process.stdout.write(`${JSON.stringify({ event: 'ready', url, port: boundPort })}\n`);
   } else {
     console.log(`mdview → ${url}`);
-    console.log(`watching: ${root.absPath}`);
+    console.log(
+      `watching: ${root.kind === 'file' ? path.join(root.absPath, root.filePath ?? '') : root.absPath}`,
+    );
   }
 
   // After the ready line: the warm-up holds the event loop for tens of
