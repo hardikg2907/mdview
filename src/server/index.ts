@@ -146,6 +146,9 @@ export async function createServer(opts: ServerOptions): Promise<MdviewServer> {
     const configWatcher: FSWatcher = chokidar.watch(path.join(spec.absPath, CONFIG_FILENAME), {
       ignoreInitial: true,
       persistent: true,
+      // A `.mdview.json` that links to a directory would otherwise be walked
+      // and watched recursively.
+      followSymlinks: false,
       awaitWriteFinish: { stabilityThreshold: 60, pollInterval: 30 },
     });
     const reloadConfig = async (): Promise<void> => {

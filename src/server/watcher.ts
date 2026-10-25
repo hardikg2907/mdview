@@ -57,6 +57,10 @@ export function createWatcher(rootAbsPath: string, opts: CreateWatcherOptions = 
     ignoreInitial: true,
     ignored: (p: string) => isPathIgnored(p, rootAbsPath, ignore),
     persistent: true,
+    // chokidar follows links by default, so a repo holding `link -> /` would
+    // have it walk and watch the whole disk. The server serves nothing through
+    // a link that leaves the root anyway.
+    followSymlinks: false,
     awaitWriteFinish: { stabilityThreshold: 60, pollInterval: 30 },
   });
 
