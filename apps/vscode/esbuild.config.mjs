@@ -24,7 +24,7 @@ const ctx = await esbuild.context({
   outfile: 'dist/extension.js',
   bundle: true,
   platform: 'node',
-  target: 'node20',
+  target: 'node22',
   format: 'cjs',
   external: ['vscode', '@hardikg/mdview'],
   define: buildDefine(nodeEnv),

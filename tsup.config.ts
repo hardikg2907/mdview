@@ -9,7 +9,7 @@ export default defineConfig({
   format: ['esm'],
   outDir: 'bin',
   outExtension: () => ({ js: '.mjs' }),
-  target: 'node20',
+  target: 'node22',
   sourcemap: true,
   // Several test files rebuild bin/ at the same moment, and a clean in one
   // build would delete chunks another is about to spawn. Stale chunks are

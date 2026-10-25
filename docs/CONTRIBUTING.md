@@ -14,7 +14,7 @@ npm install
 
 **Node versions.** Two floors apply, and they differ on purpose.
 
-- The published CLI runs on Node `>=20` (`engines.node`). Do not take a runtime dependency that needs a newer Node.
+- The published CLI runs on Node `>=22` (`engines.node`). Do not take a runtime dependency that needs a newer Node. The VS Code extension runs the CLI on VS Code's own Node, so its `engines.vscode` floor (`^1.101.0`, the first release on Node 22) moves with this one.
 - Developing the repo needs Node `>=22.18` (`devEngines` in `package.json`; npm warns on an older Node). The dev toolchain sets that floor: tsup 9 needs `^22.18`, and vitest 5 needs `^22.12`.
 
 Vitest runs two projects from `vitest.config.ts`: `server` (Node environment, everything outside `tests/client/`) and `client` (happy-dom, `tests/client/`). Run one with `npx vitest run --project client`.

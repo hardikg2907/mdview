@@ -4,8 +4,12 @@
   "description": "Editorial-quality local markdown preview with live reload, outline, and editor integration.",
   "version": "0.1.0",
   "publisher": "hardikgurg",
-  "engines": { "vscode": "^1.78.0" },
-  "extensionKind": ["workspace"],
+  "engines": {
+    "vscode": "^1.101.0"
+  },
+  "extensionKind": [
+    "workspace"
+  ],
   "capabilities": {
     "virtualWorkspaces": false,
     "untrustedWorkspaces": {
@@ -20,37 +24,66 @@
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
-      { "command": "mdview.openPreview", "title": "mdview: Open Preview" },
-      { "command": "mdview.openInBrowser", "title": "mdview: Open in Browser" }
+      {
+        "command": "mdview.openPreview",
+        "title": "mdview: Open Preview"
+      },
+      {
+        "command": "mdview.openInBrowser",
+        "title": "mdview: Open in Browser"
+      }
     ],
     "configuration": {
       "title": "mdview",
       "properties": {
         "mdview.preview.openIn": {
-          "type": "string", "enum": ["webview", "browser"], "default": "webview",
+          "type": "string",
+          "enum": [
+            "webview",
+            "browser"
+          ],
+          "default": "webview",
           "description": "Where 'mdview: Open Preview' should display the rendered markdown."
         },
         "mdview.palette": {
           "type": "string",
-          "enum": ["auto", "flexoki", "paper", "solarized", "everforest", "rose-pine", "kanagawa", "catppuccin", "high-contrast"],
+          "enum": [
+            "auto",
+            "flexoki",
+            "paper",
+            "solarized",
+            "everforest",
+            "rose-pine",
+            "kanagawa",
+            "catppuccin",
+            "high-contrast"
+          ],
           "default": "auto",
           "description": "'auto' follows the VS Code theme."
         },
         "mdview.port": {
-          "type": "number", "default": 0,
+          "type": "number",
+          "default": 0,
           "description": "Preferred starting port for the mdview server (0 = ephemeral)."
         }
       }
     }
   },
-  "categories": ["Other"],
-  "keywords": ["markdown", "preview", "md", "viewer"],
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "markdown",
+    "preview",
+    "md",
+    "viewer"
+  ],
   "dependencies": {
     "@hardikg/mdview": "^0.10.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "@types/vscode": "^1.78.0",
+    "@types/vscode": "~1.101.0",
     "@vscode/vsce": "^3.0.0",
     "esbuild": "^0.28.2",
     "typescript": "^7.0.0",

@@ -28,7 +28,7 @@ Reading long markdown docs is hard:
 npm install -g @hardikg/mdview
 ```
 
-Requires Node >= 20. The `mdview` binary lands on your `PATH`.
+Requires Node >= 22. The `mdview` binary lands on your `PATH`.
 
 ## Install from source
 
@@ -240,7 +240,7 @@ mdview config ignore rm  deps       # remove one or more basenames
 
 ## Stack
 
-Node 20+, TypeScript 7, Fastify 5, markdown-it 15, Shiki 4, js-yaml 5, chokidar 4, Preact 11 + @preact/signals, KaTeX 0.19, pele (lazy), JetBrains Mono via @fontsource, Vite 8, tsup 9, vitest 5.
+Node 22+, TypeScript 7, Fastify 5, markdown-it 15, Shiki 4, js-yaml 5, chokidar 4, Preact 11 + @preact/signals, KaTeX 0.19, pele (lazy), JetBrains Mono via @fontsource, Vite 8, tsup 9, vitest 5.
 
 ## Documentation
 
