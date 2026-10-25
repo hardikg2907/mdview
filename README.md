@@ -68,6 +68,7 @@ mdview                     # current directory
 mdview ls                  # what's open, and where the server is
 mdview rm <name>           # stop serving a folder
 mdview stop                # stop the background server
+mdview update              # is there a newer release? prints the install command
 mdview --foreground        # run in this terminal instead (Ctrl-C to stop)
 mdview --no-open           # don't auto-launch the browser
 mdview --port 9000         # one-off server on a specific port (implies --foreground)
@@ -109,7 +110,12 @@ rather it stood down on its own, set `MDVIEW_IDLE_TIMEOUT` to a number of
 minutes and it will exit that long after the last browser tab disconnects; the
 next `mdview` starts it again.
 
-Its state lives in `~/.config/mdview/` (`daemon.json`, `workspace.json`,
+After you upgrade mdview, the next `mdview <path>` notices that the background
+server runs an older version, restarts it and prints one line
+(`mdview: restarted the background server (0.10.0 → 0.11.0)`). Your open folders
+stay open. `mdview ls` only reports the mismatch.
+
+Its state lives in `~/.config/mdview/` (`daemon.json`, `workspace.json`, `update-check.json`,
 `daemon.log`) and nowhere else. `workspace.json` is also how the CLI talks to
 the server: `mdview <path>` writes the file and the server picks the change up,
 which is why there is no HTTP endpoint that can change what's being served.
@@ -227,6 +233,8 @@ Two layered files, both optional, same schema:
 }
 ```
 
+The global file also takes `"updateCheck": true` (see [Updates](#updates)). A per-project file ignores it.
+
 All fields optional. Validated on load — invalid values fall back silently with a warning. Edit the per-project file while the server is running and the SPA picks up palette/font/lineWidth changes live; `ignore` is read once at startup (the file watcher's skip list is frozen — restart mdview after editing).
 
 `ignore` extends the built-in skip list (which already covers `node_modules`, `dist`, `build`, `out`, `target`, `coverage`, `vendor`, `__pycache__`, `venv`, `Pods`, `DerivedData`, `_build`, plus every dotfile/dotdir). Add your own basenames here — handy when running mdview at a repo root with non-standard build dirs to avoid `EMFILE: too many open files` from the OS file-watch limit.
@@ -238,7 +246,39 @@ mdview config path                  # print the global config path
 mdview config ignore list           # show built-in + user-added entries
 mdview config ignore add deps _site # add one or more basenames
 mdview config ignore rm  deps       # remove one or more basenames
+mdview config update-check on       # daily check for a newer release (off by default)
 ```
+
+## Updates
+
+`mdview update` asks `registry.npmjs.org` for the latest version. When it is
+newer than the one you run, it prints the install command. It does not run it.
+
+```
+$ mdview update
+mdview 0.11.0 → 0.12.0 is available.
+Install it with:
+
+  /Users/you/.nvm/versions/node/v22.20.0/bin/npm install -g @hardikg/mdview@0.12.0
+
+The background server restarts itself on the next `mdview` run.
+```
+
+The command uses the `npm` that sits next to the Node running mdview, so the
+upgrade lands in the install you use. On Windows the line is written for `cmd`;
+in PowerShell, put `&` in front of a quoted path. The request carries nothing
+about you: no identifier, cookie or custom header.
+
+A daily notice is available and **off by default**:
+
+```bash
+mdview config update-check on     # `off` to disable, no argument to show
+```
+
+While it is on, the background server checks once a day. `mdview <path>` then
+prints one line to stderr, at most once a day per version, and only in a
+terminal: ``mdview 0.12.0 is available — run `mdview update` for the install command.``
+Only the global config can turn it on. A `.mdview.json` in a cloned repo cannot.
 
 ## Stack
 

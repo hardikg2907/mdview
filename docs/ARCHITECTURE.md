@@ -39,7 +39,10 @@ build/
 src/
 ├── cli.ts                          ← CLI entry, args, port fallback, graceful shutdown; loads the server on demand
 ├── cli-config.ts / cli-workspace.ts ← `config` and `ls` / `rm` / `stop` subcommands
-├── daemon/                          ← background-server state, workspace file, CLI-side client
+├── cli-update.ts                    ← `mdview update`: fetch, compare, print the install command
+├── version.ts                       ← readVersion, the one source of the package version
+├── update/                          ← semver.ts (strict parse/compare), latest.ts (hardened registry fetch), cache.ts (update-check.json), notice.ts (CLI stderr line)
+├── daemon/                          ← background-server state, workspace file, CLI-side client, update-check.ts (daily check loop)
 ├── shared/                          ← cross-runtime modules (no Node-only or DOM-only deps)
 │   ├── types.ts
 │   ├── search-pattern.ts            ← compilePattern (case/word/regex) used by client + server
@@ -112,7 +115,9 @@ immediately and one process serves every folder you ever open.
 |---|---|
 | `daemon/state.ts` | Where state lives (`~/.config/mdview/`), and `daemon.json` — pid, port, start time. Atomic writes (temp file + rename), `0600` in a `0700` dir. Also the spawn lock. |
 | `daemon/workspace-file.ts` | `workspace.json`: the open folders, their persisted ids, add/remove, the 8-root cap, and defensive validation on read. |
-| `daemon/client.ts` | The CLI's side: probe `/api/health`, decide whether the recorded daemon is really ours, spawn one under the lock, wait for a root to appear, stop one. |
+| `daemon/client.ts` | The CLI's side: probe `/api/health`, decide whether the recorded daemon is really ours, spawn one under the lock (replacing one on a different version), wait for a root to appear, stop one. |
+| `daemon/update-check.ts` | The opt-in daily registry check, run inside the daemon. Polls hourly, re-reads the global config each time, fetches only when enabled and the cache is a day old, and records the answer in `update-check.json`. Failures go to `daemon.log` only. |
+| `update/` | `semver.ts` is the strict version parser every outside version string passes through. `latest.ts` is the only code that opens a network connection. `cache.ts` reads and writes `update-check.json` (`0600`, atomic, re-validated on read). `notice.ts` decides whether the CLI prints its one line. |
 | `cli-workspace.ts` | `ls` / `rm` / `stop`, following the `cli-config.ts` subcommand pattern. |
 | `cli.ts` | Three run modes: `runAttach` (default), `runForeground` (`--foreground`, `--port`, `--palette`, `--vscode`), `runDaemon` (`--daemon`, internal). |
 
@@ -126,6 +131,23 @@ in the user's browser cannot write files; their shell can.
 pid, and `/api/health` reports both. The CLI treats a daemon as its own only when
 both match. Pids get recycled, so a stale record can name a live process that has
 nothing to do with mdview — and `mdview stop` must never signal that one.
+
+**A daemon on another version is replaced.** `/api/health` also reports the
+package `version`. After `npm i -g` the old daemon would keep serving old code,
+so a security fix would not take effect until the user ran `mdview stop`. When
+`ensureDaemon` finds a verified live daemon whose version differs from the CLI's
+(or is missing: 0.10.0 and older report none), it takes the spawn lock and looks
+again, because a rival may have finished the swap. It then stops the daemon
+through `stopDaemon` (the same pid-plus-`startedAt` check, so a recycled pid is
+never signalled), spawns a new one and prints
+`mdview: restarted the background server (old → new)` on stderr. The open folders
+live in `workspace.json`, which the new daemon reads at boot, so nothing is lost.
+A CLI that loses the lock waits for a daemon other than the one being replaced,
+never for the old one. Only the attach path acts: `ls` reports the mismatch,
+`stop` just stops, `rm` only edits the workspace file, and `--foreground` and
+`--vscode` have no daemon. Two installs on different versions take turns
+replacing each other's daemon, each time with the line above, so the flapping is
+visible and not silent.
 
 **One daemon, not several.** Two shells running `mdview` at the same moment would
 otherwise both spawn. The spawn is serialised through an `openSync(…, 'wx')` lock
@@ -187,7 +209,7 @@ applied in that root's own walk and watcher.
 | `GET /api/search?q=...&case=...&word=...&regex=...` | Grep across every folder root; hits come back root-qualified. Caps per-file (20) and global (200) — the global cap is a budget for the whole search, not per root. Lines over 10,000 characters are skipped in both modes, and a literal search stops after 1 s of matching; either sets `truncated`. Single-file roots are skipped. Returns `{ query, results, truncated, timedOut }`; `timedOut` means a regex search hit its time budget and `results` is partial. |
 | `GET /api/watch` | One Server-Sent Events stream carrying every root's `WatchEvent`s, with root-scoped `relPath`s. Includes a synthetic `config` event when a root's `.mdview.json` changes, and a `workspace` event when the set of open roots changes. |
 | `GET /__asset/*` | Serve user content assets (images, etc.). The splat is workspace-scoped, so the URL shape is unchanged: `/__asset/<rootId>/<path>`. Resolved via `parseWorkspacePath` then `resolveSafePath`. A single-file root serves only what its document references. |
-| `GET /api/health` | Registered only when `createServer` is given an `identity` (i.e. in daemon mode). Reports `{ok, pid, startedAt, roots: [id]}` — ids only, never absolute paths. |
+| `GET /api/health` | Registered only when `createServer` is given an `identity` (i.e. in daemon mode). Reports `{ok, pid, startedAt, version, roots: [id]}` — ids only, never absolute paths. |
 | `GET /*` | Falls through to the static SPA bundle; SPA fallback for unknown routes (so client routing works on refresh). |
 
 All request paths that touch the filesystem go through `resolveSafePath(rootAbsPath, rel)` — see `src/server/fs/resolve.ts` — which rejects absolute paths and traversal attempts.
@@ -357,7 +379,8 @@ Sequence shortcuts (e.g. `gg`) use a module-scoped timestamp + `resetPendingSequ
 - **Same machine:** the server listens on `127.0.0.1`, which keeps the network out but not other accounts on the same machine; any local process can connect. Browser routes carry no token outside embed mode, so bookmarks and pasted URLs keep working. Other origins in the browser still cannot read responses (no CORS headers), cannot rebind DNS onto the port (Host check), and cannot embed assets (CORP).
 - **External boundary:** `resolveSafePath` is called on every filesystem read. Absolute paths and traversal are rejected. Containment is then checked again on real paths — `realpath` of both the root and the target — so a symlink committed into a repo (`notes.png -> ~/.ssh/id_ed25519`, `x.md -> /etc/hosts`) cannot lead out of the root; a link that stays inside still works. Callers read the real path it returns and check the extension on it as well as on the requested name. A missing target surfaces as `ENOENT` (404); an escape as `OutsideRootError` (400). A single-file root whose file is itself a link is opened at the link's target folder, so the file it names is inside its own root. `/api/file` refuses markdown over 16 MB with a 413 before reading it. With several roots open, `parseWorkspacePath` chooses *which* root's absolute path is the base — it is a lookup against the open set, so an unknown id can only fall back to the primary root, never widen the boundary. Note that percent-encoded `../` survives Fastify's router and arrives in a route param intact, so `resolveSafePath` is genuinely the only thing standing between it and the file; raw `../` is collapsed by the router first and 404s.
 - **Front matter:** parsed as YAML only, by `parseFrontmatter`, with js-yaml's YAML 1.2 core schema plus merge keys. Only a literal `---` opening line starts front matter, so `---js` cannot select a code-evaluating engine. The loaded value is walked against a 10,000-node budget and a 1,000,000-character budget over every key and string it reaches (revisited shared references count again). The node budget bounds alias fan-out and cycles; the character budget bounds aliases to one long string, which stay under the node count but serialize to megabytes. An over-budget block is treated as a parse failure.
-- **State directory:** `~/.config/mdview/` is owner-only. `ensurePrivateDir` (`src/daemon/state.ts`) creates it `0700` and chmods it if it already exists; `config.json`, `workspace.json`, `daemon.json`, `daemon.lock` and `daemon.log` are written `0600`, and existing files are tightened, because a mode passed at creation does not change an existing file. These files name every folder the user has opened. On Windows the modes are a no-op.
+- **State directory:** `~/.config/mdview/` is owner-only. `ensurePrivateDir` (`src/daemon/state.ts`) creates it `0700` and chmods it if it already exists; `config.json`, `workspace.json`, `daemon.json`, `daemon.lock`, `daemon.log` and `update-check.json` are written `0600`, and existing files are tightened, because a mode passed at creation does not change an existing file. These files name every folder the user has opened. On Windows the modes are a no-op.
+- **Outbound network:** the only code that opens a connection is `fetchLatestVersion` (`src/update/latest.ts`). It is reached from `mdview update` (run by the user) and from the daemon's opt-in daily check (`updateCheck: true` in the global config). `validateConfig` ignores that key in a `.mdview.json`, and `mergeConfigs` never copies it, so a cloned repo cannot turn it on and the browser never sees it. The request is a bare `GET` of one fixed `https://registry.npmjs.org/…/dist-tags` URL: no custom header, no body, no identifier, no cookie (Node's `fetch` keeps no jar). It uses `redirect: 'error'`, a 5 s timeout that also covers the body, and a stream read that stops at 64 KB. The answer is untrusted: it must parse as JSON, and its `latest` must match the strict semver pattern in `src/update/semver.ts` before it is compared, cached or printed, so no control character or escape sequence reaches the terminal. Errors never echo the response. `update-check.json` is re-validated on every read for the same reason. mdview never runs npm or any other process for an update. `mdview update` only prints a command, built from a version that passed the pattern and the quoted path of the `npm` beside the running Node.
 - **Regex search:** a user's folder-search regex never runs on the main thread. One `exec()` of a backtracking pattern (`^(\w+\s?)*$` on a line of words ending in `!`) can run for minutes, and nothing interrupts a running `exec()` short of ending its thread. `grepFiles` sends file bodies in batches to a `worker_threads` worker and terminates it once the search's 3 s wall-clock budget is spent; the response keeps what was found before that and sets `timedOut` and `truncated`. Literal queries are escaped, cannot backtrack, and stay on the main thread, but any page the user visits can fire them through `<img src="http://127.0.0.1:…/api/search?q=a">`, so their work is bounded too: lines over 10,000 characters are skipped (one 15 MB line of `a` holds 15 million hits), hits past the per-file cap are only counted, lines are walked by offset rather than split into millions of strings, and matching stops after 1 s with `truncated` set. The in-document search in the client still runs the user's regex on the page's main thread; that is the user's own tab and input, so a slow pattern there only stalls the tab that typed it.
 - **Single-file roots:** `mdview ~/README.md` serves the folder the file lives in, which can be `$HOME`. The root is scoped to the one document anyway. `/api/file` and the tree are pinned to the file; the watcher watches only it (see Watcher); and `/__asset/*` serves only the paths the document references. `api-file.ts` collects every `/__asset/` URL that appears anywhere in the final HTML of each render — `rewriteImageSrc`'s `<img>` sources, an explicit `/__asset/` URL in inline HTML (`<video>`, `<audio>`), or the same text in the body — unescaped, stripped of query and fragment, percent-decoded and normalised the way the route receives them, and stores them on `RootState.assetRefs`. A watcher event clears the set; the next render, or an asset request with no set, recomputes it. A reference this misreads only makes its asset 404. Every other check (containment, dot segments, media types) still applies to referenced paths.
 - **Dot paths:** `/__asset/*` refuses any path with a segment starting with `.`, judged by `hasDotSegment` (`src/server/fs/resolve.ts`) on the requested path and on the real path relative to the real root. The second check catches an in-root link into `.git`, and on Windows an 8.3 short name (`GIT~1`) that names `.git` without a dot. `/api/file` does not apply it: it returns markdown only, other origins cannot read it, and a README may link to `.github/CONTRIBUTING.md`.

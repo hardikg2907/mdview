@@ -127,7 +127,8 @@ Implementation: shortcuts live in a single registry at `src/client/shortcuts.ts`
 | `mdview ls` (or `status`) | The open folders, which the server has actually loaded, its port and pid, and the log path. |
 | `mdview rm <name\|path>…` | Stop serving a folder. Open tabs update themselves. |
 | `mdview stop` | Stop the background server. Folders stay in the workspace. |
-| `mdview config <…>` | Read or edit the global config. |
+| `mdview update` | Ask `registry.npmjs.org` for the latest release and print the install command, pinned to that version and to the `npm` beside the running Node. Never installs. Exits 1 with one line if the registry cannot be reached or answers with anything but a plain version. |
+| `mdview config <…>` | Read or edit the global config, including `update-check [on\|off]`. |
 
 | Flag | Behavior |
 |---|---|
@@ -159,10 +160,12 @@ to, and only the bare `mdview [path]` form changed.
 - **Reuse over duplication.** Opening a file or subfolder inside an already-open folder reuses it and jumps to the file, instead of adding an overlapping root. This includes a file under a dot-directory (`.github/x.md`), which the tree hides but the folder still serves.
 - **A single file is just that file.** `mdview ~/README.md` watches only `README.md`, not the folder it sits in, and serves only the images and media the document references.
 - **Runs until stopped.** `mdview stop` ends it; otherwise it stays put, which keeps the URL reliable. `MDVIEW_IDLE_TIMEOUT` opts into exiting after N minutes with no tab connected, for anyone who'd rather it didn't sit there holding watchers.
-- **State** lives only in `~/.config/mdview/` — `daemon.json` (pid, port, start time), `workspace.json` (the open folders), `daemon.log` (truncated past 1 MB).
+- **Upgrades take effect.** `/api/health` reports the daemon's version. When `mdview <path>` finds a daemon on a different version (or one that reports none, as 0.10.0 and older do) it stops it, starts a new one and prints one `mdview: restarted the background server (old → new)` line to stderr. Open folders survive because they live in `workspace.json`. `mdview ls` reports a mismatch without acting; `stop` and `rm` ignore versions.
+- **Optional daily update notice.** Off by default; `mdview config update-check on`, global config only. The background server checks the registry about daily and writes `update-check.json`. The CLI reads that file (no network) and prints one stderr line, at most once a day per version, in a terminal.
+- **State** lives only in `~/.config/mdview/` — `daemon.json` (pid, port, start time), `workspace.json` (the open folders), `daemon.log` (truncated past 1 MB), `update-check.json` (latest known version; written only while the update check is on).
 - **The workspace file is the control plane.** The CLI writes it; the server watches it. There is deliberately no HTTP endpoint that changes what is served, so there is no request a page in your browser could forge — see Security & boundaries.
 
-Subcommand: `mdview config path`, `mdview config ignore list|add|rm` — see
+Subcommand: `mdview config path`, `mdview config ignore list|add|rm`, `mdview config update-check [on|off]` — see
 Themes & palettes.
 
 Errors are mapped to a one-line `mdview: …` message with a non-zero exit;

@@ -385,6 +385,40 @@ cd /some/other/repo && mdview .
 - `mdview --port 9000 ./test-fixtures` and `mdview --palette kanagawa ./test-fixtures` → both block in the terminal, exactly as before the daemon existed.
 - `mdview --vscode --port 0 ./test-fixtures` → still one JSON line with a `http://127.0.0.1:<port>/` URL, still exits on stdin close.
 
+### 37a. Upgrading with an old server running
+
+Use a scratch config so the real one stays untouched. Start the **published** 0.10.0 daemon, then run this build.
+
+```bash
+export XDG_CONFIG_HOME=/tmp/mdv-iso PORT=7391
+npx -y @hardikg/mdview@0.10.0 ./docs --no-open
+npx -y @hardikg/mdview@0.10.0 ./test-fixtures --no-open
+mdview ls                       # this build: both folders, plus a `note:` that the server runs a version that reports none
+mdview ./docs --no-open
+mdview ls
+mdview stop
+```
+
+- `mdview ./docs` prints `mdview: restarted the background server (unknown → <this version>)` on stderr, once.
+- `mdview ls` before it changed nothing (same pid). After it, the pid differs and **both** folders are still listed, marked `●`.
+- Running `mdview ./docs` again prints no restart line and keeps the same pid.
+- `mdview stop` leaves no `--daemon` process behind (`pgrep -fl "mdview.mjs --daemon"`).
+
+### 37b. `mdview update`
+
+- `mdview update` with network → `mdview X is up to date.`, or `X → Y is available.` followed by an `npm install -g @hardikg/mdview@Y` line. The path in that line is the `npm` beside `which node` (check with nvm active), and nothing is installed.
+- Offline (Wi-Fi off) → one line `mdview: could not check for updates: …`, exit code 1, no stack. `MDVIEW_DEBUG=1` adds the cause.
+
+### 37c. Opt-in update notice
+
+Use the scratch config again.
+
+- `mdview config update-check` → `update-check: off`. With it off, start the server and wait: no `update-check.json` appears.
+- `mdview config update-check on`, `mdview stop`, `mdview ./docs --no-open` → within a few seconds `update-check.json` exists (`ls -l` shows `-rw-------`) holding `checkedAt` and `latest`. `daemon.log` has no error.
+- Edit `latest` in that file to a higher version, then run `mdview ./docs --no-open` **in a terminal**: one stderr line starting `mdview <that> is available — run`, naming `mdview update`. Run it again: no line. Piped (`mdview ./docs --no-open 2>&1 | cat`): no line.
+- Put `{"updateCheck": true}` in a repo's `.mdview.json`, with the global setting off: opening that folder logs a warning and no `update-check.json` is written.
+- `mdview config update-check off` stops further checks without a restart (within an hour).
+
 ### 38. Untrusted content stays contained
 
 Use a scratch folder you can throw away:
