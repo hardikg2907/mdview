@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Removed
-- **Node 20 is no longer supported; mdview now needs Node 22 or later.** Node 20 reached end of life on 2026-04-30, and a fresh install of 0.10.0 already failed to start a server on Node 20.0–20.18, because a dependency of `@fastify/static` now ships ESM only and needs Node 22. Run `node --version` before upgrading. The VS Code extension now needs VS Code 1.101 or later, the first release that runs on Node 22.
+- **Node 20 is no longer supported; mdview now needs Node 22.12 or later.** Node 20 reached end of life on 2026-04-30, and a fresh install of 0.10.0 already failed to start a server on Node 20.0–20.18: `@fastify/static` 10.1.7 pulls `content-disposition` 3, which ships ES modules only, and Node loads those through `require()` without a flag only from 22.12. Run `node --version` before upgrading. The VS Code extension now needs VS Code 1.101 or later, the first release that runs on Node 22.
 
 ### Security
 - **KaTeX is updated to 0.19, which fixes a prototype-pollution advisory** that could bypass its `trust` restrictions. KaTeX ships inside the client bundle, so `npm audit --omit=dev` never reported it.
@@ -20,14 +20,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`~/.config/mdview` is now private to your user.** The folder is `0700` and its files `0600`, and existing ones are tightened. They list every folder you have opened.
 - **A link with `%22` in its path can no longer add attributes to the page.**
 - **Front matter is now also bounded by characters.** Aliases to one long string stayed under the 10,000-node limit but expanded to about 100 MB; over 1,000,000 characters is now treated as plain text.
-- **Highlighted code blocks are cached with a hard memory cap** that counts the cache keys too, since a key includes the language name from the file.
 - **VS Code preview:** the webview now forwards only the extension's own messages into the preview.
-- - Bumped shipped dependencies to clear advisories: `markdown-it` 14.3.2 → 14.3.3 (quadratic-time parsing of inline HTML when `html` is enabled, and of a multi-line link reference definition), `fastify` 5.12.5 → 5.12.7 (header validation bypass via case-sensitive `propertyNames`), and `fast-uri` 3.1.8 → 3.1.9 and 4.2.1 → 4.2.3 (scheme spoofing, path equivalence and host confusion in URI handling). The `markdown-it` ones were reachable: the renderer enables `html`, so a crafted markdown file could block the server. The others were not reachable as mdview is configured (no route declares a headers schema), but they ship in the install.
+- - **Shipped dependencies are updated to clear advisories:** `markdown-it` 14.3.2 → 15.0.3 (quadratic-time parsing of inline HTML when `html` is enabled, of a multi-line link reference definition, and further quadratic paths fixed in 15.0.1–15.0.3), `fastify` 5.12.5 → 5.12.7 (header validation bypass via case-sensitive `propertyNames`), and `fast-uri` 3.1.8 → 3.1.9 and 4.2.1 → 4.2.3 (scheme spoofing, path equivalence and host confusion in URI handling). The `markdown-it` ones were reachable: the renderer enables `html`, so a crafted markdown file could block the server. The others were not reachable as mdview is configured (no route declares a schema), but they ship in the install. `shiki` 4, `js-yaml` 5 and `open` 11 are also taken.
 
 ### Changed
 - **`mdview --version`, `ls`, `rm` and `stop` start about five times faster.** They took about 0.2 s because every command loaded the web server, syntax highlighter and file watcher first; they now take about 0.04 s. The server code loads only when a command starts one.
 - **The first document opens faster** (about 250 ms → 80 ms for a page of code). The syntax highlighter warms up right after the server starts listening and loads only the default palette's themes up front. Other palettes load the first time you pick them.
-- **Live reload no longer re-highlights unchanged code blocks.** Highlighted blocks are cached (up to 8 MB), so saving a document with many large code blocks re-renders only what changed.
+- **Live reload no longer re-highlights unchanged code blocks.** Highlighted blocks are cached (up to 8 MB, keys included, since a key holds the language name from the file), so saving a document with many large code blocks re-renders only what changed.
 - **Folder search is faster.** Files are read eight at a time and kept in a cache that the file watcher keeps current: a repeated search over 4,000 files drops from about 1 s to about 70 ms. A search stops when you change the query.
 - **The package is about 43% smaller (1.4 MB → 0.8 MB).** JetBrains Mono and KaTeX now ship as woff2 only, which every supported browser already used.
 - **Markdown files over 16 MB are no longer rendered or searched.** Rendering is synchronous, so one huge file stalled every other request.

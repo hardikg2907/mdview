@@ -10,7 +10,7 @@ Operating instructions for any Claude session (or other agent) working on this r
 
 A **local CLI markdown viewer**. The CLI spawns a Fastify server bound to `127.0.0.1`, opens the browser to a Preact SPA, and streams file-change events over SSE for live reload. It is published to npm and installed globally (`npm i -g <pkg>`); users run it against folders or single `.md` files on their own machine.
 
-Target platforms: **macOS, Linux, Windows.** Node `>=22`.
+Target platforms: **macOS, Linux, Windows.** Node `>=22.12`.
 
 ---
 

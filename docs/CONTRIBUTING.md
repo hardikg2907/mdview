@@ -8,13 +8,13 @@ Practical guide for someone (human or agent) about to make changes.
 
 ```bash
 git clone <repo>
-cd md-to-html
+cd mdview
 npm install
 ```
 
 **Node versions.** Two floors apply, and they differ on purpose.
 
-- The published CLI runs on Node `>=22` (`engines.node`). Do not take a runtime dependency that needs a newer Node. The VS Code extension runs the CLI on VS Code's own Node, so its `engines.vscode` floor (`^1.101.0`, the first release on Node 22) moves with this one.
+- The published CLI runs on Node `>=22.12` (`engines.node`), the first 22.x where `require()` of an ES module works without a flag; a shipped dependency relies on it. Do not take a runtime dependency that needs a newer Node. The VS Code extension runs the CLI on VS Code's own Node, so its `engines.vscode` floor (`^1.101.0`, the first release on Node 22) moves with this one.
 - Developing the repo needs Node `>=22.18` (`devEngines` in `package.json`; npm warns on an older Node). The dev toolchain sets that floor: tsup 9 needs `^22.18`, and vitest 5 needs `^22.12`.
 
 Vitest runs two projects from `vitest.config.ts`: `server` (Node environment, everything outside `tests/client/`) and `client` (happy-dom, `tests/client/`). Run one with `npx vitest run --project client`.
@@ -47,7 +47,7 @@ Run all five before sending a change:
 ```bash
 npm run typecheck     # tsc --noEmit on both server and client tsconfigs
 npm run lint          # biome check (lint only — formatter disabled)
-npm test              # vitest run — 530 tests (Node 22.18+: the regex worker runs from its .ts source)
+npm test              # vitest run — 531 tests (Node 22.18+: the regex worker runs from its .ts source)
 npm run build         # vite + tsup must both succeed
 npm audit --omit=dev  # 0 vulnerabilities in shipped deps (release blocker, see CLAUDE.md §6)
 ```

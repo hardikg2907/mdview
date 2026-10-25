@@ -2,14 +2,15 @@ import { describe, it, expect } from 'vitest';
 import { isSupportedNodeVersion } from '../../src/nodeProbe';
 
 describe('isSupportedNodeVersion', () => {
-  it('rejects below 22', () => {
+  it('rejects below 22.12', () => {
+    expect(isSupportedNodeVersion('22.11.0')).toBe(false);
     expect(isSupportedNodeVersion('20.18.1')).toBe(false);
     expect(isSupportedNodeVersion('18.19.0')).toBe(false);
     expect(isSupportedNodeVersion('16.20.2')).toBe(false);
     expect(isSupportedNodeVersion('0.10.0')).toBe(false);
   });
-  it('accepts 22 and above', () => {
-    expect(isSupportedNodeVersion('22.0.0')).toBe(true);
+  it('accepts 22.12 and above', () => {
+    expect(isSupportedNodeVersion('22.12.0')).toBe(true);
     expect(isSupportedNodeVersion('22.15.1')).toBe(true);
     expect(isSupportedNodeVersion('24.5.1')).toBe(true);
   });

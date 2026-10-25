@@ -77,7 +77,7 @@
     "ws": ">=8.20.1"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=22.12"
   },
   "devEngines": {
     "runtime": {
