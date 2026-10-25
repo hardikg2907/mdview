@@ -61,7 +61,7 @@ describe('runWires', () => {
       { name: 'breaker', run: () => { throw new Error('boom'); } },
     ];
     await runWires(root, ctx, wires);
-    const args = consoleSpy.mock.calls[0]!;
+    const args = consoleSpy.mock.calls[0]! as unknown[];
     const joined = args.map((a) => String(a)).join(' ');
     expect(joined).toContain('breaker');
   });
