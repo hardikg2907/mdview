@@ -62,7 +62,11 @@ describe('ServerHandle — happy path', () => {
     const p = handle.start();
     emitReady(fake, 9000);
     await p;
-    expect(handle.currentInfo).toEqual({ port: 9000, url: 'http://127.0.0.1:9000/' });
+    expect(handle.currentInfo).toEqual({
+      port: 9000,
+      url: 'http://127.0.0.1:9000/',
+      token: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/),
+    });
   });
 
   it('uses process.execPath and shell:false when spawning', async () => {
@@ -75,6 +79,51 @@ describe('ServerHandle — happy path', () => {
       ['/fake/mdview.mjs', '--port', '0'],
       expect.objectContaining({ shell: false }),
     );
+  });
+});
+
+describe('ServerHandle — embed token', () => {
+  function spawnEnv(): NodeJS.ProcessEnv {
+    const opts = spawnMock.mock.calls[0]?.[2] as { env?: NodeJS.ProcessEnv } | undefined;
+    if (!opts?.env) throw new Error('spawn was not given an env');
+    return opts.env;
+  }
+
+  it('passes a fresh 32-byte base64url token in the env, never on argv', async () => {
+    const { handle, fake } = makeHandle({ args: ['/ws', '--vscode', '--port', '0'] });
+    const p = handle.start();
+    emitReady(fake);
+    const info = await p;
+
+    const env = spawnEnv();
+    expect(env.MDVIEW_EMBED_TOKEN).toBe(info.token);
+    expect(Buffer.from(info.token, 'base64url')).toHaveLength(32);
+    const argv = spawnMock.mock.calls[0]?.[1] as string[];
+    expect(argv.join(' ')).not.toContain(info.token);
+  });
+
+  it('keeps the rest of the extension host environment', async () => {
+    process.env.MDVIEW_TEST_PASSTHROUGH = 'kept';
+    try {
+      const { handle, fake } = makeHandle();
+      const p = handle.start();
+      emitReady(fake);
+      await p;
+      expect(spawnEnv().MDVIEW_TEST_PASSTHROUGH).toBe('kept');
+    } finally {
+      delete process.env.MDVIEW_TEST_PASSTHROUGH;
+    }
+  });
+
+  it('uses a different token for every spawn', async () => {
+    const a = makeHandle();
+    const pa = a.handle.start();
+    emitReady(a.fake);
+    const b = makeHandle();
+    const pb = b.handle.start();
+    emitReady(b.fake);
+    const [ia, ib] = await Promise.all([pa, pb]);
+    expect(ia.token).not.toBe(ib.token);
   });
 });
 

@@ -1,6 +1,7 @@
 import { signal } from '@preact/signals';
 import { useEffect } from 'preact/hooks';
 import type { ProjectConfig, TreeNode, WorkspaceRoot } from '../../shared/types.js';
+import { apiHeaders } from '../lib/embed.js';
 
 interface TreeResponse {
   /** Open roots in display order; the first supplies the window-level config. */
@@ -18,7 +19,7 @@ export const treeSignal = signal<TreeResponse | null>(null);
 export const configSignal = signal<ProjectConfig | null>(null);
 
 async function fetchTree(): Promise<void> {
-  const res = await fetch('/api/tree');
+  const res = await fetch('/api/tree', { headers: apiHeaders() });
   if (!res.ok) return;
   const data = (await res.json()) as TreeResponse;
   treeSignal.value = data;

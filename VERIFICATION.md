@@ -250,29 +250,38 @@ node bin/mdview.mjs ./test-fixtures/showcase.md --no-open
 - `mdview --port 0 --no-open ./test-fixtures` → server binds on a kernel-assigned port. The actual port appears in the `mdview → http://127.0.0.1:<port>/` line so you can navigate manually.
 
 ### 30. `--vscode` embed mode (CLI side)
+Set a token first: `export MDVIEW_EMBED_TOKEN=$(node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))")`.
+- `env -u MDVIEW_EMBED_TOKEN mdview --vscode --port 0 ./test-fixtures` → exits non-zero at once with `mdview: Embed mode (--vscode) needs MDVIEW_EMBED_TOKEN …`. `MDVIEW_EMBED_TOKEN=short mdview --vscode …` → the same error, and the value `short` is not echoed.
 - `mdview --vscode --port 0 ./test-fixtures` → **single line** of JSON on stdout: `{"event":"ready","url":"http://127.0.0.1:<port>/","port":<port>}`. No "mdview → …" / "watching: …" human lines. No browser tab opens (`--vscode` implies `--no-open`).
-- `curl -s -D - http://127.0.0.1:<port>/ | grep -i content-security-policy` → the header has **no** `frame-ancestors` directive at all. Run the same `curl` against a default-mode instance → header contains `frame-ancestors 'none'`. (0.7.1 dropped the directive under `--vscode` rather than widening it to `*`; Chromium 142 rejects the webview origin against a wildcard.)
+- The token appears nowhere in the ready line, on stderr, or in `ps -o args= -p <pid>`.
+- `curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:<port>/` → `403`; the same with `?token=wrong` → `403`; with `?token=$MDVIEW_EMBED_TOKEN` → `200`. `curl … /api/tree` → `403`; with `-H "x-mdview-embed-token: $MDVIEW_EMBED_TOKEN"` → `200`. `curl … /bootstrap.js` → `200` without a token.
+- `curl -s -D - "http://127.0.0.1:<port>/?token=$MDVIEW_EMBED_TOKEN" | grep -i content-security-policy` → the header has **no** `frame-ancestors` directive at all. Run the same `curl` against a default-mode instance → header contains `frame-ancestors 'none'`. (0.7.1 dropped the directive under `--vscode` rather than widening it to `*`; Chromium 142 rejects the webview origin against a wildcard.)
 - `(echo "" ; sleep 1) | node bin/mdview.mjs --vscode --port 0 ./test-fixtures` → the CLI prints its ready JSON, then exits cleanly on its own (exit code 0) when stdin closes. Default-mode invocations are unaffected by stdin close.
 
 ### 31. SPA embed mode (`?embed=vscode`)
 Set up a small iframe harness (the SPA's embed mode requires both the `?embed=vscode` query *and* being framed; opening the URL directly in a browser tab won't activate it):
 
 ```bash
-# Terminal 1 — server with --vscode so framing is allowed (no frame-ancestors)
+# Terminal 1 — server with --vscode so framing is allowed (no frame-ancestors),
+# with a token you also put in the harness below
+export MDVIEW_EMBED_TOKEN=$(node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))")
+echo "$MDVIEW_EMBED_TOKEN"
 mdview --vscode --port 7331 ./test-fixtures
 
 # Terminal 2 — serve a one-page harness over HTTP (file:// can't frame http:// in Chrome)
+TOKEN=<the token printed in terminal 1>
 mkdir -p /tmp/mdview-harness && cd /tmp/mdview-harness
-cat > index.html <<'EOF'
+cat > index.html <<EOF
 <!doctype html>
 <html><body style="margin:0">
-<iframe id="f" src="http://127.0.0.1:7331/?file=showcase.md&embed=vscode"
+<iframe id="f" src="http://127.0.0.1:7331/?file=showcase.md&embed=vscode&token=$TOKEN"
         style="width:100vw;height:100vh;border:0"></iframe>
 <script>
+window.addEventListener('message', (e) => console.log('from SPA', e.data));
 document.getElementById('f').addEventListener('load', () => {
   setTimeout(() => {
     document.getElementById('f').contentWindow.postMessage(
-      { type: 'mdview/init', webviewPort: 7331 },
+      { type: 'mdview/init', webviewPort: 7331, token: '$TOKEN' },
       'http://127.0.0.1:7331'
     );
   }, 100);
@@ -284,8 +293,10 @@ python3 -m http.server 8000
 # open http://localhost:8000/ in a browser
 ```
 
-- The iframe loads `showcase.md` rendered by mdview.
+- The iframe loads `showcase.md` rendered by mdview, and the console logs `from SPA {type: 'mdview/ready'}`.
 - **The left-hand file-tree pane is hidden** — only content + outline are visible.
+- Click an outline heading, then reload the iframe (right-click → Reload frame) → it reloads into the same file, still embedded: the URL kept `embed` and `token`.
+- Remove `&token=$TOKEN` from the iframe `src` → the frame shows `Forbidden` and no `mdview/ready` arrives. Keep the `src` token but send `token: 'wrong'` in the init → the page loads but no `mdview/ready` arrives.
 - DevTools → Console (iframe context): `window.parent === window` → `false`; `new URLSearchParams(location.search).get('embed')` → `'vscode'`.
 - (Stream B will exercise the postMessage routing for internal-link / outline-heading clicks; the harness only sends the `mdview/init` handshake.)
 

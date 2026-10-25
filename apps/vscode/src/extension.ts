@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { ServerPool } from './server/ServerPool';
-import { bundledCliEntry } from './server/ServerHandle';
-import { PreviewPanel } from './webview/PreviewPanel';
+import { bundledCliEntry, type ServerInfo } from './server/ServerHandle';
+import { buildEmbedUrl, PreviewPanel } from './webview/PreviewPanel';
 import { WEBVIEW_PORT } from './webview/host.html';
 import { readConfig, buildCliArgs, type PaletteSetting } from './config/loader';
 import { resolvePalette, themeKindToPalette } from './theme/palette';
@@ -70,7 +70,7 @@ async function openPreview(
   const cfg = readConfig(folder.uri);
   const palette = resolvePalette(cfg.palette, vscode.window.activeColorTheme.kind);
 
-  let info: { port: number; url: string };
+  let info: ServerInfo;
   try {
     const result = await pool.getOrStart(folder.uri, () => ({
       cliEntryPath: bundledCliEntry(context.extensionPath),
@@ -89,7 +89,11 @@ async function openPreview(
   }
 
   if (opts.forceBrowser || cfg.preview.openIn === 'browser') {
-    void vscode.env.openExternal(vscode.Uri.parse(`${info.url}?file=${encodeURIComponent(relPath)}`));
+    // The server only answers requests that carry its token, so the browser tab
+    // needs it too. It stays on this machine: the server is loopback-only and
+    // its pages send no referrer.
+    const url = buildEmbedUrl(info.port, info.token, relPath, false);
+    void vscode.env.openExternal(vscode.Uri.parse(url));
     return;
   }
 
@@ -102,7 +106,7 @@ async function openPreview(
     return;
   }
 
-  const panel = new PreviewPanel(context.extensionUri, info.port, relPath);
+  const panel = new PreviewPanel(info.port, info.token, relPath);
   const ctx: PreviewContext = {
     panel,
     folder,
@@ -120,7 +124,7 @@ async function openPreview(
     previews.delete(folderKey);
   });
 
-  panel.postToSpa({ type: 'mdview/init', webviewPort: WEBVIEW_PORT });
+  panel.postToSpa({ type: 'mdview/init', webviewPort: WEBVIEW_PORT, token: info.token });
 }
 
 // ---------------------------------------------------------------------------

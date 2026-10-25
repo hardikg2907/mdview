@@ -1,6 +1,8 @@
+import { timingSafeEqual } from 'node:crypto';
 import path from 'node:path';
+import type { Readable } from 'node:stream';
 import chokidar, { type FSWatcher } from 'chokidar';
-import Fastify, { type FastifyInstance } from 'fastify';
+import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify';
 import type { Palette, WatchEvent } from '../shared/types.js';
 import { CONFIG_FILENAME, loadEffectiveConfig } from './config.js';
 import { ContentCache } from './fs/grep.js';
@@ -37,11 +39,12 @@ export interface ServerOptions {
    */
   paletteOverride?: Palette;
   /**
-   * When true, the server is running inside a VS Code webview iframe (spawned
-   * via --vscode). Omits frame-ancestors entirely — see the comment at the CSP
-   * assembly site below for the full security argument.
+   * Set when the server runs inside a VS Code webview iframe (spawned via
+   * --vscode). Turns on embed mode: frame-ancestors is omitted, and every HTML
+   * response and every /api/* request must present this token. See
+   * buildCspHtml for why the token, not the CSP, keeps other origins out.
    */
-  embedMode?: boolean;
+  embedToken?: string;
   /** Reported by /api/health so the CLI can tell our daemon from a stranger. */
   identity?: { pid: number; startedAt: number };
   /** Called whenever the number of connected SSE clients changes. */
@@ -63,12 +66,9 @@ export interface MdviewServer {
 // (shipped in VS Code 1.126) narrowed `frame-ancestors *` to match only network
 // schemes (http/https/ws/wss), so no frame-ancestors value short of naming the
 // dynamic `vscode-webview://<uuid>` origin will permit the webview to frame us.
-// We therefore OMIT the directive entirely in embed mode — framing is
-// intentionally unrestricted there. The loopback bind (127.0.0.1) is the real
-// network boundary; frame-ancestors is only defense-in-depth, and the
-// relaxation is gated by the explicit --vscode flag (default browser users keep
-// `frame-ancestors 'none'`). Deliberate, audited exception to CLAUDE.md §3.1.
-// See docs/superpowers/specs/2026-05-24-vscode-extension-design.md §18.1.
+// Embed mode therefore omits the directive. What keeps other origins from
+// framing the page instead is the per-launch embed token: the shell is only
+// served to a request that carries it, and only the extension knows it.
 function buildCspHtml(embedMode: boolean): string {
   const directives = [
     "default-src 'self'",
@@ -90,16 +90,50 @@ function buildCspHtml(embedMode: boolean): string {
   return directives.join('; ');
 }
 
+/** Header the SPA sends the embed token in; EventSource cannot set one, so it uses ?token=. */
+export const EMBED_TOKEN_HEADER = 'x-mdview-embed-token';
+
+function tokenMatcher(expected: string): (presented: unknown) => boolean {
+  const want = Buffer.from(expected, 'utf8');
+  return (presented) => {
+    if (typeof presented !== 'string') return false;
+    const got = Buffer.from(presented, 'utf8');
+    // The length is not secret (every token is the same size); the bytes are.
+    return got.length === want.length && timingSafeEqual(got, want);
+  };
+}
+
+function queryToken(req: FastifyRequest): unknown {
+  return (req.query as Record<string, unknown> | undefined)?.token;
+}
+
 export async function createServer(opts: ServerOptions): Promise<MdviewServer> {
   const app = Fastify({ logger: false });
-  const cspHtml = buildCspHtml(opts.embedMode ?? false);
+  const embedToken = opts.embedToken;
+  if (embedToken !== undefined && embedToken.length === 0) {
+    throw new Error('Embed mode needs a non-empty token');
+  }
+  const embedMode = embedToken !== undefined;
+  const embedTokenMatches = embedMode ? tokenMatcher(embedToken) : () => true;
+  const cspHtml = buildCspHtml(embedMode);
 
   // Rejected before routing, so it covers the API, /__asset/*, the SSE stream
   // and the SPA shell alike. See src/server/hosts.ts for why the hostname is
   // the whole check and the port is not part of it.
   app.addHook('onRequest', async (req, reply) => {
-    if (isAllowedHost(req.headers.host)) return;
-    return reply.code(403).type('text/plain; charset=utf-8').send('Forbidden');
+    if (!isAllowedHost(req.headers.host)) {
+      return reply.code(403).type('text/plain; charset=utf-8').send('Forbidden');
+    }
+    // The matched route is checked as well as the raw URL: the router decodes
+    // `/%61pi/...` onto an API route while the raw URL keeps the escapes.
+    if (
+      embedMode &&
+      (req.url.startsWith('/api/') || req.routeOptions.url?.startsWith('/api/')) &&
+      !embedTokenMatches(req.headers[EMBED_TOKEN_HEADER]) &&
+      !embedTokenMatches(queryToken(req))
+    ) {
+      return reply.code(403).type('text/plain; charset=utf-8').send('Forbidden');
+    }
   });
 
   // Threat model: a user opens an untrusted .md file. markdown-it is configured
@@ -115,6 +149,20 @@ export async function createServer(opts: ServerOptions): Promise<MdviewServer> {
   // URL keeps the escapes. Any SVG is sandboxed whatever route sent it.
   app.addHook('onSend', async (req, reply, payload) => {
     const ct = String(reply.getHeader('content-type') ?? '');
+    // Gated on the response type rather than on paths, so the shell at `/`,
+    // `/index.html` and the SPA fallback for any unknown path are all covered.
+    // The token rides in the query because a frame navigation cannot carry a
+    // header.
+    if (embedMode && ct.startsWith('text/html') && !embedTokenMatches(queryToken(req))) {
+      (payload as Partial<Readable> | null)?.destroy?.();
+      for (const h of ['content-length', 'etag', 'last-modified', 'accept-ranges']) {
+        reply.removeHeader(h);
+      }
+      reply.code(403);
+      reply.header('content-type', 'text/plain; charset=utf-8');
+      reply.header('cache-control', 'no-store');
+      return 'Forbidden';
+    }
     if (
       req.routeOptions.url === '/__asset/*' ||
       req.url.startsWith('/__asset/') ||
@@ -274,10 +322,17 @@ export async function createServer(opts: ServerOptions): Promise<MdviewServer> {
     if (/\.(md|markdown|mdx)$/i.test(rawPath)) {
       // Strip the leading slash; the file endpoint expects a root-relative path.
       const relPath = rawPath.replace(/^\/+/, '');
-      // Same-origin redirect only: we control the path entirely; encodeURIComponent
-      // prevents the user-controlled segment from breaking out of the query value
-      // or smuggling CR/LF into the Location header.
-      const location = `/?file=${encodeURIComponent(relPath)}`;
+      // Same-origin redirect only: we control the path entirely, and
+      // URLSearchParams encoding keeps the user-controlled values from breaking
+      // out of the query or smuggling CR/LF into the Location header.
+      const params = new URLSearchParams({ file: relPath });
+      // Carried over so an embedded page lands back in embed mode, past the
+      // token gate, instead of on a 403.
+      for (const key of ['embed', 'token']) {
+        const value = (req.query as Record<string, unknown>)[key];
+        if (typeof value === 'string') params.set(key, value);
+      }
+      const location = `/?${params.toString()}`;
       reply.code(302).header('Location', location).send();
       return;
     }

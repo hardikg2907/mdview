@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import * as vscode from 'vscode';
-import { PreviewPanel } from '../../src/webview/PreviewPanel';
+import { buildEmbedUrl, PreviewPanel } from '../../src/webview/PreviewPanel';
+
+const TOKEN = 'Zm9vYmFyYmF6cXV4MTIzNDU2Nzg5MGFiY2RlZmdoaWo';
 
 // Capture the underlying mock panel a PreviewPanel creates, so a test can drive
 // its lifecycle (simulate the user closing the webview).
@@ -21,7 +23,7 @@ describe('PreviewPanel disposal', () => {
 
   it('fires onDispose to consumers when the webview is closed', () => {
     const captured = capturePanel();
-    const p = new PreviewPanel(vscode.Uri.file('/ws'), 4321, 'a.md');
+    const p = new PreviewPanel(4321, TOKEN, 'a.md');
 
     let disposedFired = false;
     p.onDispose(() => {
@@ -36,5 +38,45 @@ describe('PreviewPanel disposal', () => {
     // keeps a disposed panel, and the next "open preview" throws
     // "Webview is disposed" when it reuses the stale entry.
     expect(disposedFired).toBe(true);
+  });
+});
+
+describe('PreviewPanel webview setup', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('frames the server with the embed flag and the token', () => {
+    const captured = capturePanel();
+    new PreviewPanel(4321, TOKEN, 'docs/a b.md');
+    const html = (captured.get() as unknown as { webview: { html: string } }).webview.html;
+    const src = JSON.parse(/var src = ("[^"]*");/.exec(html)?.[1] ?? '""') as string;
+    const url = new URL(src);
+    expect(url.origin).toBe('http://127.0.0.1:4321');
+    expect(url.searchParams.get('file')).toBe('docs/a b.md');
+    expect(url.searchParams.get('embed')).toBe('vscode');
+    expect(url.searchParams.get('token')).toBe(TOKEN);
+  });
+
+  it('allows no local resource roots', () => {
+    const spy = vi.spyOn(vscode.window, 'createWebviewPanel');
+    new PreviewPanel(4321, TOKEN, 'a.md');
+    const options = spy.mock.calls[0]?.[3] as { localResourceRoots?: unknown[] };
+    expect(options.localResourceRoots).toEqual([]);
+  });
+});
+
+describe('buildEmbedUrl', () => {
+  it('carries the token on a browser URL but leaves embed mode off', () => {
+    const url = new URL(buildEmbedUrl(5555, TOKEN, 'README.md', false));
+    expect(url.origin).toBe('http://127.0.0.1:5555');
+    expect(url.searchParams.get('file')).toBe('README.md');
+    expect(url.searchParams.get('token')).toBe(TOKEN);
+    expect(url.searchParams.has('embed')).toBe(false);
+  });
+
+  it('encodes the path so it cannot add parameters of its own', () => {
+    const url = new URL(buildEmbedUrl(5555, TOKEN, 'a&token=evil#x.md', true));
+    expect(url.searchParams.get('file')).toBe('a&token=evil#x.md');
+    expect(url.searchParams.getAll('token')).toEqual([TOKEN]);
+    expect(url.hash).toBe('');
   });
 });

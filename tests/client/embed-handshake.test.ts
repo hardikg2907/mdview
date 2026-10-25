@@ -1,11 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { pushPath } from '../../src/client/hooks/usePathRouting.js';
 import {
   __resetForTests,
+  apiHeaders,
+  embedToken,
   type IncomingMessage,
   isEmbedded,
   onIncoming,
   postToParent,
+  withEmbedToken,
 } from '../../src/client/lib/embed.js';
+
+const TOKEN = 'Zm9vYmFyYmF6cXV4MTIzNDU2Nzg5MGFiY2RlZmdoaWo';
+
+function setSearch(search: string): void {
+  Object.defineProperty(window, 'location', { value: { search }, configurable: true });
+}
 
 // happy-dom provides window, window.parent, location, etc.
 // We augment / mock as needed per test.
@@ -21,6 +31,7 @@ function dispatchMessage(
 
 beforeEach(() => {
   __resetForTests();
+  setSearch(`?file=README.md&embed=vscode&token=${TOKEN}`);
 });
 
 afterEach(() => {
@@ -97,7 +108,7 @@ describe('postToParent — buffering', () => {
     expect(postMessageMock).not.toHaveBeenCalled();
 
     const origin = 'https://vscode-webview.net';
-    dispatchMessage({ type: 'mdview/init', webviewPort: 7331 }, origin);
+    dispatchMessage({ type: 'mdview/init', webviewPort: 7331, token: TOKEN }, origin);
 
     // Both buffered messages flushed with the captured origin
     expect(postMessageMock).toHaveBeenCalledTimes(2);
@@ -112,7 +123,7 @@ describe('postToParent — buffering', () => {
 
     onIncoming(() => {});
     const origin = 'https://vscode-webview.net';
-    dispatchMessage({ type: 'mdview/init', webviewPort: 7331 }, origin);
+    dispatchMessage({ type: 'mdview/init', webviewPort: 7331, token: TOKEN }, origin);
 
     postMessageMock.mockClear();
     postToParent({ type: 'mdview/heading-clicked', line: 5, file: 'README.md' });
@@ -152,11 +163,11 @@ describe('onIncoming — handshake', () => {
 
     onIncoming((m) => received.push(m));
     const origin = 'https://0.vscode-cdn.net';
-    dispatchMessage({ type: 'mdview/init', webviewPort: 7331 }, origin);
+    dispatchMessage({ type: 'mdview/init', webviewPort: 7331, token: TOKEN }, origin);
 
     // Handler was called with the init message
     expect(received).toHaveLength(1);
-    expect(received[0]).toMatchObject({ type: 'mdview/init', webviewPort: 7331 });
+    expect(received[0]).toMatchObject({ type: 'mdview/init', webviewPort: 7331, token: TOKEN });
 
     // Subsequent postToParent uses the captured origin
     postToParent({ type: 'mdview/ready' });
@@ -172,7 +183,7 @@ describe('onIncoming — handshake', () => {
     onIncoming((m) => received.push(m));
     // A different window object posing as the parent — first arriver attack.
     const imposter = { postMessage: vi.fn() } as unknown as Window;
-    dispatchMessage({ type: 'mdview/init', webviewPort: 7331 }, 'https://evil.com', imposter);
+    dispatchMessage({ type: 'mdview/init', webviewPort: 7331, token: TOKEN }, 'https://evil.com', imposter);
 
     expect(received).toHaveLength(0);
     // parentOrigin should still be null — confirm by buffering behavior.
@@ -195,12 +206,12 @@ describe('onIncoming — parentOrigin is one-shot', () => {
     const goodOrigin = 'https://vscode-webview.net';
     const evilOrigin = 'https://evil.com';
 
-    dispatchMessage({ type: 'mdview/init', webviewPort: 7331 }, goodOrigin);
+    dispatchMessage({ type: 'mdview/init', webviewPort: 7331, token: TOKEN }, goodOrigin);
     expect(received).toHaveLength(1);
 
     // A second init from a different origin should be DROPPED (it would only
     // be delivered to the handler if origin matched the captured one).
-    dispatchMessage({ type: 'mdview/init', webviewPort: 9999 }, evilOrigin);
+    dispatchMessage({ type: 'mdview/init', webviewPort: 9999, token: TOKEN }, evilOrigin);
     expect(received).toHaveLength(1); // unchanged
 
     // Outbound still goes to the original origin.
@@ -221,7 +232,7 @@ describe('onIncoming — post-handshake', () => {
     const fakeParent = { postMessage: vi.fn() } as unknown as Window;
     Object.defineProperty(window, 'parent', { value: fakeParent, configurable: true });
     onIncoming((m) => received.push(m));
-    dispatchMessage({ type: 'mdview/init', webviewPort: 7331 }, GOOD_ORIGIN);
+    dispatchMessage({ type: 'mdview/init', webviewPort: 7331, token: TOKEN }, GOOD_ORIGIN);
     received.length = 0; // clear the init message from collected
     return received;
   }
@@ -275,5 +286,106 @@ describe('onIncoming — post-handshake', () => {
     dispatchMessage({ type: 'mdview/palette-changed', palette: 'nord' }, GOOD_ORIGIN);
     expect(received).toHaveLength(1);
     expect(received[0]).toMatchObject({ type: 'mdview/palette-changed', palette: 'nord' });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// onIncoming — the init message must carry this page's token
+// ---------------------------------------------------------------------------
+describe('onIncoming — init token', () => {
+  function setup(): { received: IncomingMessage[]; postMessageMock: ReturnType<typeof vi.fn> } {
+    const received: IncomingMessage[] = [];
+    const postMessageMock = vi.fn();
+    const fakeParent = { postMessage: postMessageMock } as unknown as Window;
+    Object.defineProperty(window, 'parent', { value: fakeParent, configurable: true });
+    onIncoming((m) => received.push(m));
+    return { received, postMessageMock };
+  }
+
+  it.each([
+    ['no token', { type: 'mdview/init', webviewPort: 7331 }],
+    ['a wrong token', { type: 'mdview/init', webviewPort: 7331, token: `${TOKEN.slice(0, -1)}x` }],
+    ['an empty token', { type: 'mdview/init', webviewPort: 7331, token: '' }],
+    ['a non-string token', { type: 'mdview/init', webviewPort: 7331, token: 42 }],
+  ])('drops an init from the parent with %s, and does not complete the handshake', (_label, init) => {
+    const { received, postMessageMock } = setup();
+    postToParent({ type: 'mdview/ready' });
+    dispatchMessage(init);
+    expect(received).toHaveLength(0);
+    expect(postMessageMock).not.toHaveBeenCalled();
+
+    // The real init still completes it afterwards.
+    dispatchMessage({ type: 'mdview/init', webviewPort: 7331, token: TOKEN });
+    expect(received).toHaveLength(1);
+    expect(postMessageMock).toHaveBeenCalledWith({ type: 'mdview/ready' }, 'https://vscode-webview.net');
+  });
+
+  it('accepts no init at all when the page booted without a token', () => {
+    setSearch('?file=README.md&embed=vscode');
+    const { received, postMessageMock } = setup();
+    postToParent({ type: 'mdview/ready' });
+    dispatchMessage({ type: 'mdview/init', webviewPort: 7331 });
+    dispatchMessage({ type: 'mdview/init', webviewPort: 7331, token: '' });
+    dispatchMessage({ type: 'mdview/init', webviewPort: 7331, token: null });
+    expect(received).toHaveLength(0);
+    expect(postMessageMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps the boot token even if the URL changes later', () => {
+    const { received } = setup();
+    expect(embedToken()).toBe(TOKEN);
+    setSearch('?file=README.md&embed=vscode&token=attacker-chosen-value-that-is-long');
+    dispatchMessage({ type: 'mdview/init', webviewPort: 7331, token: 'attacker-chosen-value-that-is-long' });
+    expect(received).toHaveLength(0);
+    dispatchMessage({ type: 'mdview/init', webviewPort: 7331, token: TOKEN });
+    expect(received).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// API requests carry the token
+// ---------------------------------------------------------------------------
+describe('embed token on API requests', () => {
+  it('sends the token as a header for fetch and as a query parameter for EventSource', () => {
+    expect(apiHeaders()).toEqual({ 'x-mdview-embed-token': TOKEN });
+    expect(withEmbedToken('/api/watch')).toBe(`/api/watch?token=${TOKEN}`);
+    expect(withEmbedToken('/api/search?q=x')).toBe(`/api/search?q=x&token=${TOKEN}`);
+  });
+
+  it('adds nothing when the page has no token', () => {
+    setSearch('?file=README.md');
+    expect(apiHeaders()).toEqual({});
+    expect(withEmbedToken('/api/watch')).toBe('/api/watch');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// pushPath keeps embed and token, so a reload after navigating still works
+// ---------------------------------------------------------------------------
+describe('pushPath', () => {
+  it('keeps embed and token on the new history entry', () => {
+    const pushState = vi.spyOn(history, 'pushState').mockImplementation(() => undefined);
+    try {
+      pushPath('docs/intro.md', '#setup');
+      const url = String(pushState.mock.calls[0]?.[2]);
+      expect(url.endsWith('#setup')).toBe(true);
+      const params = new URLSearchParams(url.slice(1, url.indexOf('#')));
+      expect(params.get('file')).toBe('docs/intro.md');
+      expect(params.get('embed')).toBe('vscode');
+      expect(params.get('token')).toBe(TOKEN);
+    } finally {
+      pushState.mockRestore();
+    }
+  });
+
+  it('adds neither when the page has neither', () => {
+    setSearch('?file=README.md');
+    const pushState = vi.spyOn(history, 'pushState').mockImplementation(() => undefined);
+    try {
+      pushPath('docs/intro.md');
+      expect(pushState.mock.calls[0]?.[2]).toBe('?file=docs%2Fintro.md');
+    } finally {
+      pushState.mockRestore();
+    }
   });
 });

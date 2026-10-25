@@ -383,10 +383,48 @@ hook to `text/html` responses, alongside `x-content-type-options: nosniff` and
 | `connect-src` | `'self'` | Confines `fetch` and the SSE stream to this origin. |
 | `frame-src` / `object-src` | `'none'` | Nothing in the SPA frames or embeds a document. A same-origin `<iframe>` in a `.md` would otherwise load an `/__asset/*` SVG as a page of its own. |
 | `base-uri` / `form-action` | `'none'` | No `<base>` hijack, no form posts anywhere. |
-| `frame-ancestors` | `'none'`, **omitted** under `--vscode` | Blocks framing by default. Under `--vscode` the directive is dropped entirely rather than widened to `*`: Chromium 142 (VS Code 1.126) rejects the webview's `vscode-webview://` origin against a wildcard, so an omitted directive is the only thing that both frames correctly and stays honest about what is being allowed. |
+| `frame-ancestors` | `'none'`, **omitted** under `--vscode` | Blocks framing by default. Under `--vscode` the directive is dropped entirely rather than widened to `*`: Chromium 142 (VS Code 1.126) rejects the webview's `vscode-webview://` origin against a wildcard, so no value frames correctly. The embed token (below) is what keeps other origins out instead. |
 
 Adding a `script-src` source, adding `'unsafe-inline'` to `script-src`, or
 weakening `connect-src` are all regressions — see `CLAUDE.md` §3.1.
+
+### Embed mode (`--vscode`)
+
+The VS Code extension spawns the CLI with `--vscode` and frames the SPA in a
+webview. With `frame-ancestors` omitted, any page could frame
+`127.0.0.1:<port>/?embed=vscode` and talk to the SPA, so the server needs a
+gate of its own: a **per-launch token**.
+
+- `ServerHandle` (`apps/vscode/src/server/ServerHandle.ts`) generates 32 bytes
+  from `crypto.randomBytes` for every spawn, base64url-encoded, and passes them in
+  the `MDVIEW_EMBED_TOKEN` environment variable. Never argv: any local user can
+  read another process's argv with `ps`. The extension runs on the workspace
+  side (`extensionKind: workspace`), so under Remote, WSL and SSH the variable
+  reaches the CLI on the same host as the files.
+- The CLI refuses `--vscode` without a well-formed token, removes it from its
+  own environment once read (nothing it spawns inherits it), and never prints
+  it: the ready line carries only the URL and port.
+- `createServer({ embedToken })` turns embed mode on. Every `text/html`
+  response needs `?token=`; the `onSend` hook checks the response type rather
+  than the path, so `/`, `/index.html` and the SPA fallback for any unknown path
+  are all covered. Every `/api/*` request needs the `x-mdview-embed-token`
+  header, or `?token=` for `EventSource`, which cannot send headers. The
+  comparison is `crypto.timingSafeEqual` over equal-length buffers; a miss is a
+  plain-text 403. `/__asset/*` and the static bundle stay open: `<img>` cannot
+  carry a header, the bundle is public code, and CORP `same-origin` already stops
+  another site from loading the user's assets.
+- The token travels in the page URL. The extension puts it on the iframe `src`
+  (`buildEmbedUrl`, `PreviewPanel.ts`); VS Code's webview proxy swaps only the
+  origin of a localhost request and keeps the path and query. The SPA reads it
+  once at boot (`embedToken()`, `src/client/lib/embed.ts`), sends it on every API
+  call, and `pushPath` keeps it with `embed` so a reload after navigating still
+  passes the gate. `Referrer-Policy: no-referrer` keeps it out of the `Referer`
+  of any link the user follows, and permalinks copy only `?file=`.
+- "Open in Browser" opens the same server in a normal tab, so its URL carries
+  the token too, without `embed=vscode`.
+- The SPA completes the `mdview/init` handshake only when the message comes from
+  `window.parent` and its `token` equals the one in the page's boot URL. The
+  extension sends the token in its init message.
 
 ### Asset responses
 

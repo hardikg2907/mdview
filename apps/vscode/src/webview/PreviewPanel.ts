@@ -7,6 +7,18 @@ import { log } from '../output';
 
 const VIEW_TYPE = 'mdview.preview';
 
+/**
+ * A URL on the CLI's server. The token is what lets the page past the server's
+ * embed gate; `embed=vscode` switches the SPA into its webview layout, so it is
+ * left off for a normal browser tab.
+ */
+export function buildEmbedUrl(port: number, token: string, relPath: string, embed: boolean): string {
+  const params = new URLSearchParams({ file: relPath });
+  if (embed) params.set('embed', 'vscode');
+  params.set('token', token);
+  return `http://127.0.0.1:${port}/?${params.toString()}`;
+}
+
 export class PreviewPanel {
   private readonly panel: vscode.WebviewPanel;
   private readonly nonce: string;
@@ -20,9 +32,10 @@ export class PreviewPanel {
   readonly onDispose: vscode.Event<void> = this.disposeEmitter.event;
 
   constructor(
-    private readonly extensionUri: vscode.Uri,
     /** The actual port the CLI is listening on. */
     private readonly actualPort: number,
+    /** The server's per-launch embed token; see ServerInfo.token. */
+    private readonly embedToken: string,
     /** The initial file to display (relative path from workspace root). */
     initialRelPath: string,
   ) {
@@ -38,10 +51,10 @@ export class PreviewPanel {
         retainContextWhenHidden: true,
         // No portMapping: VS Code 1.126 (Chromium 142) no longer routes iframe
         // navigations through it. The iframe loads the CLI's real port via the
-        // webview resource proxy instead (see host.html.ts). localResourceRoots
-        // is left at the extension root (matching VS Code's Simple Browser); we
-        // serve no vscode-resource:// content ourselves.
-        localResourceRoots: [extensionUri],
+        // webview resource proxy instead (see host.html.ts). The host page is
+        // inline and its CSP allows no webview resources, so nothing needs to
+        // load from disk.
+        localResourceRoots: [],
       },
     );
 
@@ -110,8 +123,7 @@ export class PreviewPanel {
   // ---------------------------------------------------------------------------
 
   private setHtml(relPath: string): void {
-    const iframeUrl =
-      `http://127.0.0.1:${this.actualPort}/?file=${encodeURIComponent(relPath)}&embed=vscode`;
+    const iframeUrl = buildEmbedUrl(this.actualPort, this.embedToken, relPath, true);
 
     this.panel.webview.html = buildHostHtml({
       iframeUrl,

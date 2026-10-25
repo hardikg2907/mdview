@@ -37,12 +37,16 @@ interface Ready {
 // Why: --vscode emits a single-line JSON ready record, which gives us a
 // deterministic port without parsing the human-readable URL line. The
 // --palette behavior is independent of --vscode, so using it here only
-// changes how we *discover* the bound port.
+// changes how we *discover* the bound port. Embed mode gates the API on its
+// token, so the requests below carry it.
+const EMBED_TOKEN = 'cGFsZXR0ZS1mbGFnLXRlc3QtdG9rZW4tMDEyMzQ1Njc4OQ';
+const EMBED_HEADERS = { 'x-mdview-embed-token': EMBED_TOKEN };
+
 function spawnCliReady(args: string[]): Promise<Ready> {
   return new Promise((resolveResult, reject) => {
     const child = spawn(process.execPath, [BIN, '--vscode', '--no-open', '--port', '0', ...args], {
       cwd: REPO_ROOT,
-      env: { ...process.env, XDG_CONFIG_HOME: xdgRoot },
+      env: { ...process.env, XDG_CONFIG_HOME: xdgRoot, MDVIEW_EMBED_TOKEN: EMBED_TOKEN },
     });
     let stdoutBuf = '';
     let stderrBuf = '';
@@ -119,7 +123,7 @@ describe('--palette flag', () => {
   it('overrides .mdview.json palette with rose-pine', async () => {
     const { child, port } = await spawnCliReady(['--palette', 'rose-pine', fixtureRoot]);
     try {
-      const res = await fetch(`http://127.0.0.1:${port}/api/tree`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/tree`, { headers: EMBED_HEADERS });
       expect(res.ok).toBe(true);
       const body = (await res.json()) as { config: { palette?: string } | null };
       expect(body.config?.palette).toBe('rose-pine');
@@ -131,7 +135,7 @@ describe('--palette flag', () => {
   it('overrides .mdview.json palette with paper', async () => {
     const { child, port } = await spawnCliReady(['--palette', 'paper', fixtureRoot]);
     try {
-      const res = await fetch(`http://127.0.0.1:${port}/api/tree`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/tree`, { headers: EMBED_HEADERS });
       expect(res.ok).toBe(true);
       const body = (await res.json()) as { config: { palette?: string } | null };
       expect(body.config?.palette).toBe('paper');
@@ -151,7 +155,7 @@ describe('--palette flag', () => {
   it('without --palette, returns whatever the loaded config has (a real palette)', async () => {
     const { child, port } = await spawnCliReady([fixtureRoot]);
     try {
-      const res = await fetch(`http://127.0.0.1:${port}/api/tree`);
+      const res = await fetch(`http://127.0.0.1:${port}/api/tree`, { headers: EMBED_HEADERS });
       expect(res.ok).toBe(true);
       const body = (await res.json()) as { config: { palette?: string } | null };
       // .mdview.json supplies a palette in the fixture. Don't pin to a

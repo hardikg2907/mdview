@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'preact/hooks';
 import type { WatchEvent } from '../../shared/types.js';
+import { withEmbedToken } from '../lib/embed.js';
 
 export function useSSE(onEvent: (e: WatchEvent) => void): void {
   // Handlers are rebuilt on every navigation. Reading the newest one through a
@@ -9,7 +10,7 @@ export function useSSE(onEvent: (e: WatchEvent) => void): void {
   latest.current = onEvent;
 
   useEffect(() => {
-    const es = new EventSource('/api/watch');
+    const es = new EventSource(withEmbedToken('/api/watch'));
     const handler = (msg: MessageEvent<string>) => {
       try {
         const data = JSON.parse(msg.data) as WatchEvent;

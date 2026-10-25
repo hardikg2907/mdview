@@ -16,14 +16,15 @@ function readPathFromUrl(): string | null {
 }
 
 export function pushPath(relPath: string, hash = ''): void {
-  // Why: the ?embed=vscode query must survive SPA-internal navigation so that a
-  // hard reload (or any new history entry the extension intercepts) keeps the
-  // page in embed mode. The extension contract requires this param to be
-  // present whenever the SPA is running inside the VS Code webview.
+  // Why: ?embed=vscode and ?token= must survive SPA-internal navigation. A
+  // hard reload without `embed` drops out of embed mode, and one without
+  // `token` is refused by an embed-mode server.
   const current = new URLSearchParams(window.location.search);
-  const embed = current.get('embed');
   const params = new URLSearchParams({ file: relPath });
-  if (embed !== null) params.set('embed', embed);
+  for (const key of ['embed', 'token']) {
+    const value = current.get(key);
+    if (value !== null) params.set(key, value);
+  }
   const url = `?${params.toString()}${hash}`;
   history.pushState({ file: relPath }, '', url);
 }

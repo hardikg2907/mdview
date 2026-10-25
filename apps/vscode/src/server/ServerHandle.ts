@@ -1,11 +1,20 @@
 import * as cp from 'node:child_process';
+import * as crypto from 'node:crypto';
 import * as path from 'node:path';
 import { log } from '../output';
 
 export interface ServerInfo {
   port: number;
   url: string;
+  /**
+   * The per-launch embed token. The server refuses its page and its API to
+   * any request without it, which is what stops another site framing it.
+   */
+  token: string;
 }
+
+/** Must match EMBED_TOKEN_ENV in the CLI. */
+export const EMBED_TOKEN_ENV = 'MDVIEW_EMBED_TOKEN';
 
 export interface ServerHandleOpts {
   cliEntryPath: string;
@@ -27,11 +36,15 @@ export class ServerHandle {
 
   start(): Promise<ServerInfo> {
     return new Promise((resolve, reject) => {
+      // New per spawn, so a restarted server never accepts an old page. Passed
+      // in the environment because argv is readable by every local user.
+      const token = crypto.randomBytes(32).toString('base64url');
       let child: cp.ChildProcess;
       try {
         child = cp.spawn(process.execPath, [this.opts.cliEntryPath, ...this.opts.args], {
           stdio: ['pipe', 'pipe', 'pipe'],
           shell: false,
+          env: { ...process.env, [EMBED_TOKEN_ENV]: token },
         });
       } catch (err) {
         reject(err instanceof Error ? err : new Error(String(err)));
@@ -115,7 +128,7 @@ export class ServerHandle {
           reject(new Error(`mdview emitted unexpected ready payload: ${line}`));
           return;
         }
-        this.info = { port: parsed.port, url: parsed.url };
+        this.info = { port: parsed.port, url: parsed.url, token };
         this.readyResolved = true;
         clearReadyTimer();
         resolve(this.info);

@@ -65,7 +65,7 @@ describe('useLiveReload tree refresh', () => {
     await vi.advanceTimersByTimeAsync(150);
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock).toHaveBeenCalledWith('/api/tree');
+    expect(fetchMock).toHaveBeenCalledWith('/api/tree', { headers: {} });
   });
 
   it('does not refetch after unmount', async () => {

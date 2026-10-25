@@ -27,7 +27,7 @@ export function escapeHtmlAttr(s: string): string {
 // ---------------------------------------------------------------------------
 
 export interface BuildHostHtmlOptions {
-  /** Full iframe URL at the CLI's real port, e.g. http://127.0.0.1:54732/?file=README.md&embed=vscode */
+  /** Full iframe URL at the CLI's real port, e.g. http://127.0.0.1:54732/?file=README.md&embed=vscode&token=… */
   iframeUrl: string;
   /** Per-panel CSPRNG nonce (base64). */
   nonce: string;

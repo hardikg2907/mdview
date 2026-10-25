@@ -47,7 +47,7 @@ Run all five before sending a change:
 ```bash
 npm run typecheck     # tsc --noEmit on both server and client tsconfigs
 npm run lint          # biome check (lint only — formatter disabled)
-npm test              # vitest run — 531 tests (Node 22.18+: the regex worker runs from its .ts source)
+npm test              # vitest run — 563 tests (Node 22.18+: the regex worker runs from its .ts source)
 npm run build         # vite + tsup must both succeed
 npm audit --omit=dev  # 0 vulnerabilities in shipped deps (release blocker, see CLAUDE.md §6)
 ```
@@ -124,10 +124,11 @@ apps/vscode/                        ← VS Code extension: separate package, own
 `apps/vscode` is its own npm package with its own lockfile, tsconfig and vitest
 config. The root gate above does **not** touch it — run its checks separately
 when you change it, or when you change a CLI contract it depends on (the
-`--vscode` ready line, the `?file=` URL shape, the embed-mode CSP):
+`--vscode` ready line, the `?file=` URL shape, the embed-mode CSP, the embed
+token):
 
 ```bash
-cd apps/vscode && npm run typecheck && npm run test:unit   # 163 tests
+cd apps/vscode && npm run typecheck && npm run test:unit   # 170 tests
 ```
 
 ### Where to add a new feature

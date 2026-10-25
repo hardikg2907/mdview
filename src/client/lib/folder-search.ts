@@ -1,4 +1,5 @@
 import type { SearchOptions } from '../../shared/search-pattern.js';
+import { apiHeaders } from './embed.js';
 
 export interface FolderSearchHit {
   line: number;
@@ -31,7 +32,7 @@ export async function fetchFolderSearch(
   if (opts.caseSensitive) params.set('case', '1');
   if (opts.wholeWord) params.set('word', '1');
   if (opts.regex) params.set('regex', '1');
-  const res = await fetch(`/api/search?${params.toString()}`, { signal });
+  const res = await fetch(`/api/search?${params.toString()}`, { signal, headers: apiHeaders() });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return (await res.json()) as FolderSearchResults;
 }

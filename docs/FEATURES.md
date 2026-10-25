@@ -135,7 +135,7 @@ Implementation: shortcuts live in a single registry at `src/client/shortcuts.ts`
 | `--port <n>` | Bind a specific port; implies `--foreground`. Default 7331, which auto-falls-back through 10 consecutive ports; an explicit `--port` does not fall back and fails loudly instead. `--port 0` takes a kernel-assigned port. |
 | `--no-open` | Don't launch a browser. |
 | `--palette <name>` | `flexoki` / `paper` / `solarized` / `everforest` / `rose-pine` / `kanagawa` / `catppuccin` / `high-contrast`; implies `--foreground`. Applied at API-response time, so it overrides `.mdview.json` and the global config without modifying either on disk. |
-| `--vscode` | Sidecar mode for the VS Code extension: implies `--no-open`, emits one JSON ready line (`{"event":"ready","url":…,"port":…}`) instead of human output, drops `frame-ancestors` so a webview can frame the SPA, and shuts down when stdin closes. |
+| `--vscode` | Sidecar mode for the VS Code extension: implies `--no-open`, emits one JSON ready line (`{"event":"ready","url":…,"port":…}`) instead of human output, drops `frame-ancestors` so a webview can frame the SPA, and shuts down when stdin closes. Requires the per-launch token in `MDVIEW_EMBED_TOKEN`; the page and API answer only requests that carry it. |
 | `--help` / `--version` | Usage and version. |
 
 The URL printed and opened is `http://mdview.localhost:7331/`. `*.localhost` is reserved to loopback by RFC 6761 and resolves with no setup and no `/etc/hosts` entry; the server still binds `127.0.0.1` only. If the local resolver doesn't answer the name with a loopback address, the CLI falls back to `http://127.0.0.1:<port>/` rather than printing a URL that might leave the machine.

@@ -7,6 +7,9 @@ export type IncomingMessage = { type: string; [k: string]: unknown };
 // --- module-level handshake state (one module = one listener pattern) ---
 // Not exported: all callers go through the public API so the invariants hold.
 let parentOrigin: string | null = null;
+// Read once, from the URL the page booted with, so later history edits cannot
+// change which token the handshake and the API calls use.
+let bootToken: string | null | undefined;
 let buffer: unknown[] = [];
 // Only one handler is ever registered. Multiple calls to onIncoming() are
 // idempotent because the extension only ever calls it once at bootstrap;
@@ -27,6 +30,38 @@ export function isEmbedded(): boolean {
   if (typeof window === 'undefined') return false;
   if (window.parent === window) return false;
   return new URLSearchParams(window.location.search).get('embed') === 'vscode';
+}
+
+// --- embed token ---
+
+/**
+ * The per-launch token the server requires in embed mode, or null when the
+ * page was opened without one (a normal browser tab on a non-embed server).
+ */
+export function embedToken(): string | null {
+  if (bootToken === undefined) {
+    bootToken =
+      typeof window === 'undefined'
+        ? null
+        : new URLSearchParams(window.location.search).get('token') || null;
+  }
+  return bootToken;
+}
+
+/** Must match EMBED_TOKEN_HEADER in src/server/index.ts. */
+const EMBED_TOKEN_HEADER = 'x-mdview-embed-token';
+
+/** Headers for an /api/* fetch: the embed token when the page has one. */
+export function apiHeaders(): Record<string, string> {
+  const token = embedToken();
+  return token ? { [EMBED_TOKEN_HEADER]: token } : {};
+}
+
+/** An /api/* URL with the embed token in the query, for EventSource, which cannot send headers. */
+export function withEmbedToken(url: string): string {
+  const token = embedToken();
+  if (!token) return url;
+  return `${url}${url.includes('?') ? '&' : '?'}token=${encodeURIComponent(token)}`;
 }
 
 // --- postToParent ---
@@ -54,7 +89,10 @@ export function postToParent(msg: unknown): void {
  * Install the window `message` listener for embed-mode inbound messages.
  *
  * Handshake rules (before parentOrigin is known):
- *   - Only the first message of type `mdview/init` is accepted.
+ *   - Only the first message of type `mdview/init` is accepted, and only when
+ *     its `token` equals the token in this page's own URL. The server already
+ *     refuses the page to anyone without the token, so this holds even if
+ *     that gate is ever bypassed.
  *   - On receipt, `e.origin` is captured as `parentOrigin`.
  *   - Buffered outbound messages are flushed with that origin.
  *   - The handler is then called with the init message.
@@ -81,11 +119,14 @@ export function onIncoming(h: (msg: IncomingMessage) => void): void {
       // immediate parent window. The e.source check defends against a third
       // party that races a postMessage into the iframe before VS Code does —
       // without it the first arriver would permanently capture parentOrigin.
+      const token = embedToken();
       if (
         e.source === window.parent &&
         e.data !== null &&
         typeof e.data === 'object' &&
-        (e.data as Record<string, unknown>).type === 'mdview/init'
+        (e.data as Record<string, unknown>).type === 'mdview/init' &&
+        token !== null &&
+        (e.data as Record<string, unknown>).token === token
       ) {
         parentOrigin = e.origin;
         // Flush buffered outbound messages now that we know the target origin.
@@ -130,6 +171,7 @@ export function __resetForTests(): void {
     installedListener = null;
   }
   parentOrigin = null;
+  bootToken = undefined;
   buffer = [];
   handler = null;
 }

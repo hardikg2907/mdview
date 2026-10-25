@@ -39,6 +39,8 @@ export type KnownIncomingMessage =
 export interface MsgInit {
   type: 'mdview/init';
   webviewPort: number;
+  /** The SPA completes the handshake only when this equals the token in its own URL. */
+  token: string;
 }
 
 export interface MsgSetFile {

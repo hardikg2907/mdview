@@ -125,8 +125,9 @@ entirely.
 `kanagawa`, `catppuccin`, or `high-contrast`.
 It wins over both `.mdview.json` and the global config, and never writes to
 either. There is also a `--vscode` flag, used by the VS Code extension to run
-mdview as a sidecar; it implies `--no-open` and prints a single JSON ready line
-instead of the human-readable output.
+mdview as a sidecar; it implies `--no-open`, prints a single JSON ready line
+instead of the human-readable output, and needs the per-launch token the
+extension passes in `MDVIEW_EMBED_TOKEN`.
 
 `--port` and `--palette` both override a setting that belongs to a whole server,
 and the background one is shared with every other folder you have open — so each

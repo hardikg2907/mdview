@@ -221,6 +221,28 @@ function detectRoot(target: string): RootSpec {
   throw new Error(`Unsupported path type: ${abs}`);
 }
 
+/**
+ * The extension hands the per-launch embed token over in the environment, never
+ * on argv, which any local user can read with `ps`. It is removed from the
+ * environment once read, so nothing this process spawns inherits it.
+ */
+export const EMBED_TOKEN_ENV = 'MDVIEW_EMBED_TOKEN';
+// base64url, and long enough that a short or empty value set by mistake is
+// refused rather than turned into a guessable gate.
+const EMBED_TOKEN_PATTERN = /^[A-Za-z0-9_-]{32,256}$/;
+
+function takeEmbedToken(): string {
+  const token = process.env[EMBED_TOKEN_ENV];
+  delete process.env[EMBED_TOKEN_ENV];
+  if (token === undefined || !EMBED_TOKEN_PATTERN.test(token)) {
+    throw new Error(
+      `Embed mode (--vscode) needs ${EMBED_TOKEN_ENV} set to a random base64url token of at least 32 characters. ` +
+        '--vscode is meant to be started by the mdview VS Code extension; use --foreground to run a server yourself.',
+    );
+  }
+  return token;
+}
+
 function portFinderHint(port: number): string {
   switch (process.platform) {
     case 'darwin':
@@ -339,6 +361,7 @@ function warmHighlighterInBackground(): void {
  * what --foreground, --port, --palette and --vscode all get.
  */
 async function runForeground(args: Args): Promise<void> {
+  const embedToken = args.embedMode ? takeEmbedToken() : undefined;
   const root = detectRoot(args.target);
   const clientDir = requireClientDir();
 
@@ -347,7 +370,7 @@ async function runForeground(args: Args): Promise<void> {
     roots: [root],
     clientDir,
     ...(args.palette === undefined ? {} : { paletteOverride: args.palette }),
-    embedMode: args.embedMode,
+    ...(embedToken === undefined ? {} : { embedToken }),
   });
   const boundPort = await listen(app, args.port, args.portExplicit);
 
@@ -569,6 +592,7 @@ function formatError(err: unknown): { message: string; code: number } | null {
     'Unsupported path type',
     'Could not bind a port',
     'Unexpected argument',
+    'Embed mode',
     'Workspace is full',
     'Timed out waiting for the mdview background server',
     'The mdview background server did not start',
