@@ -9,7 +9,3 @@ export function openShortcutsPanel(): void {
 export function closeShortcutsPanel(): void {
   shortcutsPanelSignal.value = false;
 }
-
-export function toggleShortcutsPanel(): void {
-  shortcutsPanelSignal.value = !shortcutsPanelSignal.value;
-}

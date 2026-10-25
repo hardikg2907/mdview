@@ -38,7 +38,3 @@ export function closeSearch(): void {
 export function setSearchScope(scope: SearchScope): void {
   searchScopeSignal.value = scope;
 }
-
-export function toggleSearch(): void {
-  searchOpenSignal.value = !searchOpenSignal.value;
-}

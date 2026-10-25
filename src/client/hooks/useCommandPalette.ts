@@ -9,7 +9,3 @@ export function openPalette(): void {
 export function closePalette(): void {
   paletteOpenSignal.value = false;
 }
-
-export function togglePalette(): void {
-  paletteOpenSignal.value = !paletteOpenSignal.value;
-}

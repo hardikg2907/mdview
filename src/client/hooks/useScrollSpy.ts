@@ -4,7 +4,6 @@ import { useEffect } from 'preact/hooks';
 export interface HeadingPos { id: string; top: number; }
 
 export const activeHeadingId = signal<string | null>(null);
-export const breadcrumbPath = signal<string[]>([]);
 
 /**
  * Heading anchor used for focus-mode dimming. Distinct from `activeHeadingId`:
