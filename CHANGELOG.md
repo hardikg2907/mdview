@@ -8,7 +8,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Security
-- Bumped shipped dependencies to clear advisories: `markdown-it` 14.3.2 → 14.3.3 (quadratic-time parsing of inline HTML when `html` is enabled, and of a multi-line link reference definition), `fastify` 5.12.5 → 5.12.7 (header validation bypass via case-sensitive `propertyNames`), and `fast-uri` 3.1.8 → 3.1.9 and 4.2.1 → 4.2.3 (scheme spoofing, path equivalence and host confusion in URI handling). The `markdown-it` ones were reachable: the renderer enables `html`, so a crafted markdown file could block the server. The others were not reachable as mdview is configured (no route declares a headers schema), but they ship in the install.
+- **A markdown file can no longer run script through an SVG beside it.** A document could frame `/__asset/…/evil.svg`, or link to it, and the SVG's script ran with no policy and could read other files and send them off the machine. Every `/__asset/*` response and every SVG response now carries a sandbox CSP, `nosniff` and `Cross-Origin-Resource-Policy: same-origin`, including when the route is reached through a percent-encoded URL. The page policy adds `frame-src 'none'` and `object-src 'none'`.
+- **Symlinks can no longer lead out of an open folder.** A link committed into a repo (`notes.md -> /etc/hosts`, `logo.png -> ~/.ssh/id_ed25519`) was served as if it lived in the folder. Paths are now checked again after resolving every link. Links that stay inside the folder still work.
+- **A regex folder search can no longer freeze the server.** A backtracking pattern could block every request for minutes. Regex search now runs in a worker thread that is stopped after 3 s, and the panel shows what it found so far. At most two searches run at once; the rest wait their turn.
+- **`.txt` and `.pdf` are no longer served as assets, and nothing under a dot-folder is.** Only image, video and audio types are served.
+- **The file watcher no longer follows symlinks**, so a repo holding `link -> /` no longer walks the whole disk.
+- **`~/.config/mdview` is now private to your user.** The folder is `0700` and its files `0600`, and existing ones are tightened. They list every folder you have opened.
+- **A link with `%22` in its path can no longer add attributes to the page.**
+- **Front matter is now also bounded by characters.** Aliases to one long string stayed under the 10,000-node limit but expanded to about 100 MB; over 1,000,000 characters is now treated as plain text.
+- **Highlighted code blocks are cached with a hard memory cap** that counts the cache keys too, since a key includes the language name from the file.
+- **VS Code preview:** the webview now forwards only the extension's own messages into the preview.
+- - Bumped shipped dependencies to clear advisories: `markdown-it` 14.3.2 → 14.3.3 (quadratic-time parsing of inline HTML when `html` is enabled, and of a multi-line link reference definition), `fastify` 5.12.5 → 5.12.7 (header validation bypass via case-sensitive `propertyNames`), and `fast-uri` 3.1.8 → 3.1.9 and 4.2.1 → 4.2.3 (scheme spoofing, path equivalence and host confusion in URI handling). The `markdown-it` ones were reachable: the renderer enables `html`, so a crafted markdown file could block the server. The others were not reachable as mdview is configured (no route declares a headers schema), but they ship in the install.
+
+### Changed
+- **`mdview --version`, `ls`, `rm` and `stop` start about five times faster.** They took about 0.2 s because every command loaded the web server, syntax highlighter and file watcher first; they now take about 0.04 s. The server code loads only when a command starts one.
+- **The first document opens faster** (about 250 ms → 80 ms for a page of code). The syntax highlighter warms up right after the server starts listening and loads only the default palette's themes up front. Other palettes load the first time you pick them.
+- **Live reload no longer re-highlights unchanged code blocks.** Highlighted blocks are cached (up to 8 MB), so saving a document with many large code blocks re-renders only what changed.
+- **Folder search is faster.** Files are read eight at a time and kept in a cache that the file watcher keeps current: a repeated search over 4,000 files drops from about 1 s to about 70 ms. A search stops when you change the query.
+- **The package is about 43% smaller (1.4 MB → 0.8 MB).** JetBrains Mono and KaTeX now ship as woff2 only, which every supported browser already used.
+- **Markdown files over 16 MB are no longer rendered or searched.** Rendering is synchronous, so one huge file stalled every other request.
+- **A single-file target that is itself a symlink is served from the folder its link points into.**
+- **Diagrams render with pele 1.10.** Labels and links in diagrams are sanitised more strictly (entity codes decode once; stray non-characters are stripped before the link scheme check), subgraph diagrams have fewer edge crossings, class diagrams wrap into rows instead of shrinking, CJK labels wrap, and `List<T>` in a label no longer renders as `List`. A `%%` comment no longer deletes the character before it, so a diagram that only parsed because of that now shows a syntax error.
+
+### Fixed
+- **Navigating between files no longer drops and reopens the live-reload connection.** The watch stream reconnected on every navigation, so a file change could fall into the gap, and the server's connected-tab count briefly dropped to zero, which matters with `MDVIEW_IDLE_TIMEOUT`. One connection now lasts for the life of the page.
+- **A burst of file changes no longer refetches the file tree hundreds of times.** Switching git branches fired one full tree request per added or removed file. Refreshes now wait 150 ms after the last change and run once, and the tree still ends up current.
 
 ## [0.10.0] — 2026-10-19
 
