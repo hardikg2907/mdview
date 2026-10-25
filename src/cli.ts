@@ -185,7 +185,7 @@ export function parseArgs(argv: string[], defaultPort: number = DEFAULT_PORT): P
  * Turn a CLI target into a root spec. The id is assigned here rather than left
  * to the server because the URL we print and open has to contain it.
  */
-function detectRoot(target: string): RootSpec {
+export function detectRoot(target: string): RootSpec {
   const abs = path.resolve(target);
   if (!existsSync(abs)) throw new Error(`Path does not exist: ${abs}`);
   const st = statSync(abs);
@@ -196,17 +196,19 @@ function detectRoot(target: string): RootSpec {
     // A linked file is served from the folder its target lives in: the target
     // usually sits outside the link's folder, and the server refuses to follow
     // a link out of a root. A file only reached through a linked folder (macOS
-    // /tmp) is not itself a link, so it keeps the path it was given.
-    const target = realpathSync(abs);
-    const linked = target !== path.join(realpathSync(path.dirname(abs)), path.basename(abs));
-    const real = linked ? target : abs;
-    const dir = path.dirname(real);
+    // /tmp) is not itself a link, so it keeps the folder it was given. Either
+    // way the file name takes its on-disk case, which `.native` reports: the
+    // watcher matches events by exact name, and on a case-insensitive disk
+    // `README.MD` as typed would never match `README.md`.
+    const target = realpathSync.native(abs);
+    const linked = path.dirname(target) !== realpathSync.native(path.dirname(abs));
+    const dir = linked ? path.dirname(target) : path.dirname(abs);
     return {
       absPath: dir,
       id: deriveRootId(dir, new Set()),
       name: path.basename(abs),
       kind: 'file',
-      filePath: path.basename(real),
+      filePath: path.basename(target),
     };
   }
   throw new Error(`Unsupported path type: ${abs}`);

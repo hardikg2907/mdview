@@ -19,6 +19,7 @@ node bin/mdview.mjs ./test-fixtures/showcase.md --no-open
 - Folder tree shows one item (the file).
 - Outline pulls headings from the doc.
 - Edit the file in another editor, save → view updates, scroll position preserved. Repeat with an editor that saves by writing a temp file and renaming it (vim with `backupcopy=no`, most IDEs) → still updates, every save.
+- macOS or Windows: `node bin/mdview.mjs ./test-fixtures/SHOWCASE.MD --no-open` → the URL names `showcase.md` in its on-disk case, and saving `showcase.md` in another editor updates the view. Repeat through the background server with `mdview ./test-fixtures/SHOWCASE.MD`.
 - Put `![x](assets/star.svg)` in the file → the image shows. `curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:<port>/__asset/<id>/assets/star.svg` → `200`; any image in the folder the document does not reference → `404`. Remove the reference and save → the same URL → `404`.
 - `mdview --foreground ~/README.md` (any file in `$HOME`) → the startup line reads `watching: /Users/<you>/README.md`, not the folder. The process does not climb in open file count (`lsof -p <pid> | wc -l` stays small), and saving an unrelated file under `$HOME` sends no SSE event.
 

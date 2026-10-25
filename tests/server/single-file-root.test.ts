@@ -1,8 +1,18 @@
-import { mkdirSync, mkdtempSync, realpathSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { detectRoot } from '../../src/cli.js';
+import { resolveTarget } from '../../src/daemon/workspace-file.js';
 import { createServer } from '../../src/server/index.js';
 import { registerApiAsset } from '../../src/server/routes/api-asset.js';
 import { registerApiFile } from '../../src/server/routes/api-file.js';
@@ -215,6 +225,55 @@ describe('createWatcher with only: one file, not the folder', () => {
     mkdirSync(path.join(home, 'newdir'));
     await sleep(600);
     expect(paths().filter((p) => !p.endsWith(':home/README.md'))).toEqual([]);
+  });
+});
+
+// macOS and Windows disks usually ignore case, so `mdview readme.MD` opens
+// `README.md`. Only there can the typed name and the on-disk name differ.
+function caseInsensitive(dir: string): boolean {
+  writeFileSync(path.join(dir, 'Probe.md'), '');
+  try {
+    return existsSync(path.join(dir, 'pROBE.MD'));
+  } finally {
+    rmSync(path.join(dir, 'Probe.md'));
+  }
+}
+
+describe('single-file root named in a different case than on disk', () => {
+  let home: string;
+  let insensitive = false;
+
+  beforeAll(() => {
+    home = mkdtempSync(path.join(tmpdir(), 'mdview-single-case-'));
+    insensitive = caseInsensitive(home);
+    writeFileSync(path.join(home, 'Notes.md'), '# one');
+  });
+
+  afterAll(() => {
+    rmSync(home, { recursive: true, force: true });
+  });
+
+  it('takes the on-disk file name and keeps the folder as given', (ctx) => {
+    if (!insensitive) ctx.skip();
+    const typed = path.join(home, 'nOTES.md');
+    expect(detectRoot(typed)).toMatchObject({ absPath: home, kind: 'file', filePath: 'Notes.md' });
+    expect(resolveTarget(typed)).toMatchObject({ absPath: home, kind: 'file', filePath: 'Notes.md' });
+  });
+
+  it('gets live reload events for the file', async (ctx) => {
+    if (!insensitive) ctx.skip();
+    const root = detectRoot(path.join(home, 'NOTES.MD'));
+    const watcher = createWatcher(root.absPath, { prefix: 'home', only: root.filePath });
+    const events: WatchEvent[] = [];
+    watcher.on('event', (e) => events.push(e));
+    try {
+      await sleep(400);
+      writeFileSync(path.join(home, 'Notes.md'), '# two');
+      const seen = () => events.some((e) => 'relPath' in e && e.relPath === 'home/Notes.md');
+      expect(await waitFor(seen, 3000)).toBe(true);
+    } finally {
+      await watcher.close();
+    }
   });
 });
 

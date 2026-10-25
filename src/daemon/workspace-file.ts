@@ -98,8 +98,12 @@ export function resolveTarget(target: string): ResolvedTarget {
   if (st.isFile()) {
     // A linked file is served from the folder its target lives in: the target
     // usually sits outside the link's folder, and the server refuses to follow
-    // a link out of a root.
-    const real = lstatSync(abs).isSymbolicLink() ? realpathSync(abs) : abs;
+    // a link out of a root. The file name takes its on-disk case (`.native`), so
+    // the watcher's exact-name match fires on a case-insensitive disk.
+    const onDisk = realpathSync.native(abs);
+    const real = lstatSync(abs).isSymbolicLink()
+      ? onDisk
+      : path.join(path.dirname(abs), path.basename(onDisk));
     return {
       absPath: path.dirname(real),
       kind: 'file',
