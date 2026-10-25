@@ -7,7 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+- **Node 20 is no longer supported; mdview now needs Node 22 or later.** Node 20 reached end of life on 2026-04-30, and a fresh install of 0.10.0 already failed to start a server on Node 20.0–20.18, because a dependency of `@fastify/static` now ships ESM only and needs Node 22. Run `node --version` before upgrading. The VS Code extension now needs VS Code 1.101 or later, the first release that runs on Node 22.
+
 ### Security
+- **KaTeX is updated to 0.19, which fixes a prototype-pollution advisory** that could bypass its `trust` restrictions. KaTeX ships inside the client bundle, so `npm audit --omit=dev` never reported it.
 - **A markdown file can no longer run script through an SVG beside it.** A document could frame `/__asset/…/evil.svg`, or link to it, and the SVG's script ran with no policy and could read other files and send them off the machine. Every `/__asset/*` response and every SVG response now carries a sandbox CSP, `nosniff` and `Cross-Origin-Resource-Policy: same-origin`, including when the route is reached through a percent-encoded URL. The page policy adds `frame-src 'none'` and `object-src 'none'`.
 - **Symlinks can no longer lead out of an open folder.** A link committed into a repo (`notes.md -> /etc/hosts`, `logo.png -> ~/.ssh/id_ed25519`) was served as if it lived in the folder. Paths are now checked again after resolving every link. Links that stay inside the folder still work.
 - **A regex folder search can no longer freeze the server.** A backtracking pattern could block every request for minutes. Regex search now runs in a worker thread that is stopped after 3 s, and the panel shows what it found so far. At most two searches run at once; the rest wait their turn.
@@ -28,9 +32,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The package is about 43% smaller (1.4 MB → 0.8 MB).** JetBrains Mono and KaTeX now ship as woff2 only, which every supported browser already used.
 - **Markdown files over 16 MB are no longer rendered or searched.** Rendering is synchronous, so one huge file stalled every other request.
 - **A single-file target that is itself a symlink is served from the folder its link points into.**
+- **Front matter dates display as written** (`2024-01-02`) instead of as timestamps (`2024-01-02T00:00:00.000Z`). Front matter is now parsed as YAML 1.2 with merge keys (`<<: *defaults`) still applied.
 - **Diagrams render with pele 1.10.** Labels and links in diagrams are sanitised more strictly (entity codes decode once; stray non-characters are stripped before the link scheme check), subgraph diagrams have fewer edge crossings, class diagrams wrap into rows instead of shrinking, CJK labels wrap, and `List<T>` in a label no longer renders as `List`. A `%%` comment no longer deletes the character before it, so a diagram that only parsed because of that now shows a syntax error.
 
 ### Fixed
+- **A front matter block holding only whitespace or comments is still recognised as front matter** and removed from the page.
 - **Navigating between files no longer drops and reopens the live-reload connection.** The watch stream reconnected on every navigation, so a file change could fall into the gap, and the server's connected-tab count briefly dropped to zero, which matters with `MDVIEW_IDLE_TIMEOUT`. One connection now lasts for the life of the page.
 - **A burst of file changes no longer refetches the file tree hundreds of times.** Switching git branches fired one full tree request per added or removed file. Refreshes now wait 150 ms after the last change and run once, and the tree still ends up current.
 
