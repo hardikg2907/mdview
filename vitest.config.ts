@@ -6,12 +6,6 @@ export default defineConfig({
     include: ['tests/**/*.{test,spec}.{ts,tsx}'],
     environmentMatchGlobs: [['tests/client/**', 'happy-dom']],
   },
-  resolve: {
-    alias: {
-      react: 'preact/compat',
-      'react-dom': 'preact/compat',
-    },
-  },
   esbuild: {
     jsx: 'automatic',
     jsxImportSource: 'preact',

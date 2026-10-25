@@ -10,12 +10,6 @@ export default defineConfig({
       input: path.resolve(__dirname, 'src/client/index.html'),
     },
   },
-  resolve: {
-    alias: {
-      react: 'preact/compat',
-      'react-dom': 'preact/compat',
-    },
-  },
   esbuild: {
     jsx: 'automatic',
     jsxImportSource: 'preact',
