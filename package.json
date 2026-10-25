@@ -55,7 +55,7 @@
     "markdown-it": "^14.3.3",
     "markdown-it-anchor": "^9.2.1",
     "markdown-it-task-lists": "^2.1.1",
-    "open": "^10.1.0",
+    "open": "^11.0.4",
     "shiki": "^1.22.0"
   },
   "devDependencies": {
