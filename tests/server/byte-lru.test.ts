@@ -6,7 +6,7 @@ describe('ByteLru', () => {
     const lru = new ByteLru(100);
     lru.set('a', 'hello');
     expect(lru.get('a')).toBe('hello');
-    expect(lru.stats()).toMatchObject({ entries: 1, bytes: 5, hits: 1, misses: 0 });
+    expect(lru.stats()).toMatchObject({ entries: 1, bytes: 6, hits: 1, misses: 0 });
   });
 
   it('returns undefined for an unknown key and counts a miss', () => {
@@ -23,7 +23,7 @@ describe('ByteLru', () => {
     expect(lru.get('a')).toBeUndefined();
     expect(lru.get('b')).toBe('1234');
     expect(lru.get('c')).toBe('1234');
-    expect(lru.stats().bytes).toBe(8);
+    expect(lru.stats().bytes).toBe(10);
   });
 
   it('keeps an entry that was read recently and evicts the older one', () => {
@@ -58,6 +58,14 @@ describe('ByteLru', () => {
     lru.set('a', '12345');
     lru.set('a', '123');
     expect(lru.get('a')).toBe('123');
-    expect(lru.stats()).toMatchObject({ entries: 1, bytes: 3 });
+    expect(lru.stats()).toMatchObject({ entries: 1, bytes: 4 });
+  });
+
+  it('counts key bytes against the cap', () => {
+    const lru = new ByteLru(10);
+    lru.set('k'.repeat(8), '12345');
+    expect(lru.stats()).toMatchObject({ entries: 0, bytes: 0 });
+    lru.set('k', '12345');
+    expect(lru.stats()).toMatchObject({ entries: 1, bytes: 6 });
   });
 });

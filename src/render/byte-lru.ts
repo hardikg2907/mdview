@@ -1,6 +1,7 @@
 /**
- * A least-recently-used cache bounded by the total size of its string values
- * rather than by entry count. Highlighted blocks range from a few hundred bytes
+ * A least-recently-used cache bounded by the total size of its keys and string
+ * values rather than by entry count. Keys count because callers may build them
+ * from untrusted input. Highlighted blocks range from a few hundred bytes
  * to hundreds of kilobytes, so an entry cap would either waste the budget or
  * blow it.
  *
@@ -28,7 +29,7 @@ export class ByteLru {
   }
 
   set(key: string, value: string): void {
-    const bytes = Buffer.byteLength(value, 'utf8');
+    const bytes = Buffer.byteLength(key, 'utf8') + Buffer.byteLength(value, 'utf8');
     this.delete(key);
     // Caching a value that is itself over budget would evict everything else
     // and then be evicted by the next insert.
