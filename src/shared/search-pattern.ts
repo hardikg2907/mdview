@@ -14,15 +14,9 @@ export interface CompiledPattern {
   test(text: string): RegExpExecArray | null;
   /** Returns all matches in `text`, with `index` and matched length. */
   matchAll(text: string): Array<{ index: number; length: number }>;
-  /**
-   * Like matchAll, but stops once wall-clock exceeds `budgetMs`. ReDoS guard
-   * for the server-side folder search where the user can pass an arbitrary
-   * regex. Returns `truncated: true` when the budget was hit mid-line.
-   */
-  matchAllWithBudget(
-    text: string,
-    budgetMs: number,
-  ): { matches: Array<{ index: number; length: number }>; truncated: boolean };
+  /** Source and flags of the compiled regex, for running it elsewhere. */
+  source: string;
+  flags: string;
   /** Original query (for empty-check). */
   query: string;
   /** Was the regex valid (for regex mode)? */
@@ -33,33 +27,23 @@ function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+function inert(query: string, valid: boolean): CompiledPattern {
+  return { test: () => null, matchAll: () => [], source: '', flags: '', query, valid };
+}
+
 /**
  * Compile a search query + options into a pattern usable for both doc and
  * folder search. If `regex: true` and the query is invalid, `valid: false` is
  * returned (callers should display a warning).
  */
 export function compilePattern(query: string, opts: SearchOptions): CompiledPattern {
-  if (!query) {
-    return {
-      test: () => null,
-      matchAll: () => [],
-      matchAllWithBudget: () => ({ matches: [], truncated: false }),
-      query,
-      valid: true,
-    };
-  }
+  if (!query) return inert(query, true);
   let re: RegExp;
   if (opts.regex) {
     try {
       re = new RegExp(query, opts.caseSensitive ? 'g' : 'gi');
     } catch {
-      return {
-        test: () => null,
-        matchAll: () => [],
-        matchAllWithBudget: () => ({ matches: [], truncated: false }),
-        query,
-        valid: false,
-      };
+      return inert(query, false);
     }
   } else {
     let pat = escapeRegex(query);
@@ -69,6 +53,8 @@ export function compilePattern(query: string, opts: SearchOptions): CompiledPatt
   return {
     query,
     valid: true,
+    source: re.source,
+    flags: re.flags,
     test(text) {
       re.lastIndex = 0;
       return re.exec(text);
@@ -86,23 +72,6 @@ export function compilePattern(query: string, opts: SearchOptions): CompiledPatt
         out.push({ index: m.index, length: m[0].length });
       }
       return out;
-    },
-    matchAllWithBudget(text, budgetMs) {
-      re.lastIndex = 0;
-      const matches: Array<{ index: number; length: number }> = [];
-      const deadline = performance.now() + budgetMs;
-      let m: RegExpExecArray | null;
-      while ((m = re.exec(text)) !== null) {
-        if (m[0].length === 0) {
-          re.lastIndex++;
-          continue;
-        }
-        matches.push({ index: m.index, length: m[0].length });
-        if (performance.now() > deadline) {
-          return { matches, truncated: true };
-        }
-      }
-      return { matches, truncated: false };
     },
   };
 }

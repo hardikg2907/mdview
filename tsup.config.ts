@@ -3,6 +3,8 @@ import { defineConfig } from 'tsup';
 export default defineConfig({
   entry: {
     'mdview': 'src/cli.ts',
+    // Loaded with new Worker(); resolved beside mdview.mjs at runtime.
+    'regex-worker': 'src/server/fs/regex-worker.ts',
   },
   format: ['esm'],
   outDir: 'bin',

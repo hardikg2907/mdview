@@ -1,8 +1,11 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import Fastify, { type FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { grepFiles } from '../../src/server/fs/grep.js';
+import { ContentCache, grepFiles } from '../../src/server/fs/grep.js';
+import { registerApiSearch } from '../../src/server/routes/api-search.js';
+import { fakeRoot } from '../helpers/roots.js';
 
 let dir: string;
 
@@ -120,16 +123,200 @@ describe('grepFiles — ReDoS mitigation (C4)', () => {
     expect(out).toBeDefined();
   });
 
-  it('honors per-line budget when matching many overlapping hits', async () => {
+  it('counts many overlapping hits on a long line without stalling', async () => {
     const start = Date.now();
     const out = await grepFiles([{ absPath: reDir, id: 'w' }], 'a', {
       regex: true,
       maxLineLenForRegex: 1_000_000,
-      perLineBudgetMs: 5,
     });
-    const elapsed = Date.now() - start;
-    expect(elapsed).toBeLessThan(500);
-    // Should produce SOME matches (per-file cap of 20 will hit fast).
-    expect(out).toBeDefined();
+    expect(Date.now() - start).toBeLessThan(2000);
+    expect(out.results[0]?.total).toBe(50_000);
+    expect(out.results[0]?.hits).toHaveLength(20);
+  });
+});
+
+// `^(\w+\s?)*$` backtracks exponentially on a line of words that ends in a
+// character \w cannot match. On this line one exec() runs for minutes.
+const CATASTROPHIC = '^(\\w+\\s?)*$';
+const BAD_LINE = 'This is a normal sentence with words in it ending here!';
+
+describe('grepFiles — regex runs in a worker with a time budget', () => {
+  let rdir: string;
+  beforeAll(() => {
+    rdir = mkdtempSync(path.join(os.tmpdir(), 'mdview-grep-worker-'));
+    // Enough matching files ahead of the bad one to fill at least one batch.
+    for (let i = 0; i < 70; i++) {
+      writeFileSync(path.join(rdir, `a${String(i).padStart(3, '0')}.md`), 'hello world\n');
+    }
+    writeFileSync(path.join(rdir, 'zz.md'), `${BAD_LINE}\n`);
+  });
+  afterAll(() => {
+    rmSync(rdir, { recursive: true, force: true });
+  });
+
+  it('stops a catastrophic pattern at its budget, keeping what it found', async () => {
+    const start = Date.now();
+    const out = await grepFiles([{ absPath: rdir, id: 'w' }], CATASTROPHIC, {
+      regex: true,
+      regexBudgetMs: 300,
+    });
+    expect(Date.now() - start).toBeLessThan(2000);
+    expect(out.timedOut).toBe(true);
+    expect(out.truncated).toBe(true);
+    expect(out.results.length).toBeGreaterThan(0);
+    expect(out.results.every((r) => r.relPath !== 'w/zz.md')).toBe(true);
+  });
+
+  it('keeps the event loop free while the pattern runs', async () => {
+    let maxLag = 0;
+    let last = performance.now();
+    const tick = setInterval(() => {
+      const now = performance.now();
+      maxLag = Math.max(maxLag, now - last);
+      last = now;
+    }, 10);
+    try {
+      await grepFiles([{ absPath: rdir, id: 'w' }], CATASTROPHIC, {
+        regex: true,
+        regexBudgetMs: 500,
+      });
+    } finally {
+      clearInterval(tick);
+    }
+    expect(maxLag).toBeLessThan(200);
+  });
+
+  it('gets a fresh worker after one was terminated', async () => {
+    const first = await grepFiles([{ absPath: rdir, id: 'w' }], CATASTROPHIC, {
+      regex: true,
+      regexBudgetMs: 200,
+    });
+    expect(first.timedOut).toBe(true);
+    const second = await grepFiles([{ absPath: rdir, id: 'w' }], 'hel+o', { regex: true });
+    expect(second.timedOut).toBe(false);
+    expect(second.results).toHaveLength(70);
+  });
+
+  it('stops promptly when the caller aborts', async () => {
+    const ac = new AbortController();
+    const start = Date.now();
+    setTimeout(() => ac.abort(), 150);
+    const out = await grepFiles([{ absPath: rdir, id: 'w' }], CATASTROPHIC, {
+      regex: true,
+      regexBudgetMs: 60_000,
+      signal: ac.signal,
+    });
+    expect(Date.now() - start).toBeLessThan(2000);
+    expect(out.timedOut).toBe(false);
+  });
+
+  it('never reports a timeout for a literal search', async () => {
+    const out = await grepFiles([{ absPath: rdir, id: 'w' }], BAD_LINE);
+    expect(out.timedOut).toBe(false);
+    expect(out.results.map((r) => r.relPath)).toEqual(['w/zz.md']);
+  });
+});
+
+describe('GET /api/search — regex time budget', () => {
+  let rdir: string;
+  let app: FastifyInstance;
+  beforeAll(async () => {
+    rdir = mkdtempSync(path.join(os.tmpdir(), 'mdview-search-route-'));
+    writeFileSync(path.join(rdir, 'bad.md'), `${BAD_LINE}\n`);
+    app = Fastify({ logger: false });
+    registerApiSearch(app, [fakeRoot(rdir, { id: 'w' })], { regexBudgetMs: 300 });
+    await app.ready();
+  });
+  afterAll(async () => {
+    await app.close();
+    rmSync(rdir, { recursive: true, force: true });
+  });
+
+  it('answers within the budget and flags the timeout', async () => {
+    const start = Date.now();
+    const res = await app.inject({
+      url: `/api/search?q=${encodeURIComponent(CATASTROPHIC)}&regex=1`,
+    });
+    expect(Date.now() - start).toBeLessThan(2000);
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ results: [], truncated: true, timedOut: true });
+  });
+
+  it('reports timedOut false on an ordinary search', async () => {
+    const res = await app.inject({ url: '/api/search?q=normal' });
+    expect(res.json()).toMatchObject({ truncated: false, timedOut: false });
+    expect(res.json().results).toHaveLength(1);
+  });
+});
+
+describe('grepFiles — reads and cache', () => {
+  let cdir: string;
+  beforeAll(() => {
+    cdir = mkdtempSync(path.join(os.tmpdir(), 'mdview-grep-cache-'));
+    for (let i = 0; i < 30; i++) {
+      writeFileSync(path.join(cdir, `f${String(i).padStart(2, '0')}.md`), `line kiwi ${i}\n`);
+    }
+  });
+  afterAll(() => {
+    rmSync(cdir, { recursive: true, force: true });
+  });
+
+  it('returns results in walk order despite concurrent reads', async () => {
+    const out = await grepFiles([{ absPath: cdir, id: 'w' }], 'kiwi');
+    expect(out.results.map((r) => r.relPath)).toEqual(
+      Array.from({ length: 30 }, (_, i) => `w/f${String(i).padStart(2, '0')}.md`),
+    );
+  });
+
+  it('serves a changed file fresh, not from the cache', async () => {
+    const cache = new ContentCache();
+    const file = path.join(cdir, 'f00.md');
+    expect((await grepFiles([{ absPath: cdir, id: 'w' }], 'mango', { cache })).results).toEqual([]);
+    writeFileSync(file, 'line mango now\n');
+    // Same mtime tick is possible; the watcher invalidation covers that case.
+    cache.invalidate(ContentCache.keyFor(cdir, 'f00.md'));
+    const out = await grepFiles([{ absPath: cdir, id: 'w' }], 'mango', { cache });
+    expect(out.results.map((r) => r.relPath)).toEqual(['w/f00.md']);
+    writeFileSync(file, 'line kiwi 0\n');
+  });
+
+  it('skips a markdown file over 16 MB', async () => {
+    const big = path.join(cdir, 'zz-big.md');
+    writeFileSync(big, Buffer.alloc(16 * 1024 * 1024 + 1, 0x61));
+    try {
+      const out = await grepFiles([{ absPath: cdir, id: 'w' }], 'aaaa');
+      expect(out.results).toEqual([]);
+    } finally {
+      rmSync(big);
+    }
+  });
+});
+
+describe('ContentCache', () => {
+  it('hits only while mtime and size match', () => {
+    const c = new ContentCache();
+    c.set('k', 1, 3, 'abc');
+    expect(c.get('k', 1, 3)).toBe('abc');
+    expect(c.get('k', 2, 3)).toBeUndefined();
+    expect(c.get('k', 1, 3)).toBeUndefined();
+  });
+
+  it('evicts least-recently-used entries past its size cap', () => {
+    const c = new ContentCache(40);
+    c.set('a', 1, 1, 'x'.repeat(10));
+    c.set('b', 1, 1, 'x'.repeat(10));
+    c.set('c', 1, 1, 'x'.repeat(10));
+    expect(c.get('a', 1, 1)).toBeDefined();
+    c.set('d', 1, 1, 'x'.repeat(10));
+    c.set('e', 1, 1, 'x'.repeat(10));
+    expect(c.get('b', 1, 1)).toBeUndefined();
+    expect(c.get('a', 1, 1)).toBeDefined();
+    expect(c.get('e', 1, 1)).toBeDefined();
+  });
+
+  it('does not keep a single body larger than a quarter of the cap', () => {
+    const c = new ContentCache(40);
+    c.set('big', 1, 1, 'x'.repeat(11));
+    expect(c.get('big', 1, 1)).toBeUndefined();
   });
 });

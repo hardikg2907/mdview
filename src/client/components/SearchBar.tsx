@@ -396,8 +396,10 @@ function flattenFolderHits(res: FolderSearchResults | null): FlatHit[] {
   return out;
 }
 
+const TIMED_OUT_NOTE = 'The pattern took too long, so the search stopped early. Try a simpler regex.';
+
 function folderSummary(res: FolderSearchResults): string {
-  if (res.results.length === 0) return 'No matches';
+  if (res.results.length === 0) return res.timedOut ? 'Stopped' : 'No matches';
   const total = res.results.reduce((n, r) => n + r.total, 0);
   const fileWord = res.results.length === 1 ? 'file' : 'files';
   const more = res.truncated ? '+' : '';
@@ -442,6 +444,13 @@ function FolderResults({
   if (error) {
     return <div class="search-results"><div class="search-empty">Error: {error}</div></div>;
   }
+  if (state?.timedOut && state.results.length === 0) {
+    return (
+      <div class="search-results">
+        <div class="search-empty">{TIMED_OUT_NOTE}</div>
+      </div>
+    );
+  }
   if (!state || state.results.length === 0) {
     return <div class="search-results"><div class="search-empty">No matches</div></div>;
   }
@@ -477,8 +486,12 @@ function FolderResults({
           </ul>
         </section>
       ))}
-      {state.truncated && (
-        <div class="search-empty">More results truncated — refine your query.</div>
+      {state.timedOut ? (
+        <div class="search-empty">{TIMED_OUT_NOTE}</div>
+      ) : (
+        state.truncated && (
+          <div class="search-empty">More results truncated — refine your query.</div>
+        )
       )}
     </div>
   );

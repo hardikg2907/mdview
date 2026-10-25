@@ -18,6 +18,8 @@ export interface FolderSearchResults {
   query: string;
   results: FolderSearchFile[];
   truncated: boolean;
+  /** A regex search ran out of time; `results` is what it found before that. */
+  timedOut?: boolean;
 }
 
 export async function fetchFolderSearch(

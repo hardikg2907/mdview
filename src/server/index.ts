@@ -3,7 +3,9 @@ import chokidar, { type FSWatcher } from 'chokidar';
 import Fastify, { type FastifyInstance } from 'fastify';
 import type { Palette, WatchEvent } from '../shared/types.js';
 import { CONFIG_FILENAME, loadEffectiveConfig } from './config.js';
+import { ContentCache } from './fs/grep.js';
 import { buildIgnoreSet } from './fs/ignore.js';
+import { closeRegexWorkers } from './fs/regex-runner.js';
 import { isAllowedHost } from './hosts.js';
 import { ASSET_SECURITY_HEADERS, registerApiAsset } from './routes/api-asset.js';
 import { registerApiFile } from './routes/api-file.js';
@@ -12,7 +14,13 @@ import { registerApiTree } from './routes/api-tree.js';
 import { registerHealth } from './routes/health.js';
 import { registerSse } from './routes/sse.js';
 import { createEventHub, createWatcher } from './watcher.js';
-import { describeRoot, type RootSpec, type RootState, resolveRootId } from './workspace.js';
+import {
+  describeRoot,
+  parseWorkspacePath,
+  type RootSpec,
+  type RootState,
+  resolveRootId,
+} from './workspace.js';
 
 export interface ServerOptions {
   /**
@@ -128,6 +136,19 @@ export async function createServer(opts: ServerOptions): Promise<MdviewServer> {
   const configWatchers = new Map<string, FSWatcher>();
   const hub = createEventHub();
 
+  // mtime + size already guard against stale entries; the watcher closes the
+  // gap of an edit inside the filesystem's mtime resolution, and frees memory.
+  const searchCache = new ContentCache();
+  hub.on('event', (e) => {
+    if (e.kind === 'workspace') {
+      searchCache.clear();
+      return;
+    }
+    if (e.kind === 'config') return;
+    const target = parseWorkspacePath(roots, e.relPath);
+    if (target) searchCache.invalidate(ContentCache.keyFor(target.state.absPath, target.rel));
+  });
+
   async function openRoot(spec: RootSpec, id: string): Promise<RootState> {
     const config = await loadEffectiveConfig(spec.absPath);
     const ignoreSet = buildIgnoreSet(config?.ignore ?? []);
@@ -214,7 +235,7 @@ export async function createServer(opts: ServerOptions): Promise<MdviewServer> {
   registerApiFile(app, roots);
   registerApiTree(app, roots, opts.paletteOverride);
   registerApiAsset(app, roots);
-  registerApiSearch(app, roots);
+  registerApiSearch(app, roots, { cache: searchCache });
   registerSse(app, hub, { ...(opts.onSseClientsChanged ? { onClientsChanged: opts.onSseClientsChanged } : {}) });
   if (opts.identity) registerHealth(app, opts.identity, roots);
 
@@ -264,6 +285,7 @@ export async function createServer(opts: ServerOptions): Promise<MdviewServer> {
       ...[...configWatchers.values()].map((w) => w.close()),
     ]);
     await hub.close();
+    await closeRegexWorkers();
   });
 
   return { app, setRoots };

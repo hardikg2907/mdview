@@ -148,6 +148,7 @@ node bin/mdview.mjs ./test-fixtures/showcase.md --no-open
 - Click a result → that file opens; search closes.
 - Tab in the input cycles back to `Doc` scope.
 - Try with `regex` mode (e.g. `\d+`) → matches numbers across all md files.
+- Add a file whose body is `This is a normal sentence with words in it ending here!`, then search `^(\w+\s?)*$` with `.*` on. Within about 3 s the list shows any hits found so far and the note "The pattern took too long, so the search stopped early. Try a simpler regex." While it runs, the sidebar and other tabs stay responsive. A plain search straight afterwards works normally.
 
 ### 14. Quick switcher
 - Press `⌘P` → palette opens.

@@ -40,7 +40,7 @@ Run all five before sending a change:
 ```bash
 npm run typecheck     # tsc --noEmit on both server and client tsconfigs
 npm run lint          # biome check (lint only — formatter disabled)
-npm test              # vitest run — 447 tests
+npm test              # vitest run — 484 tests (Node 22.18+: the regex worker runs from its .ts source)
 npm run build         # vite + tsup must both succeed
 npm audit --omit=dev  # 0 vulnerabilities in shipped deps (release blocker, see CLAUDE.md §6)
 ```
@@ -120,7 +120,7 @@ when you change it, or when you change a CLI contract it depends on (the
 `--vscode` ready line, the `?file=` URL shape, the embed-mode CSP):
 
 ```bash
-cd apps/vscode && npm run typecheck && npm run test:unit   # 157 tests
+cd apps/vscode && npm run typecheck && npm run test:unit   # 163 tests
 ```
 
 ### Where to add a new feature

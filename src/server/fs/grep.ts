@@ -1,8 +1,16 @@
-import { readFile, realpath } from 'node:fs/promises';
+import { readFile, realpath, stat } from 'node:fs/promises';
+import path from 'node:path';
 import { parseFrontmatter } from '../../render/frontmatter.js';
 import { compilePattern, type SearchOptions } from '../../shared/search-pattern.js';
 import { flattenMdRelPaths } from '../../shared/tree-utils.js';
-import { resolveSafePath } from './resolve.js';
+import {
+  openRegexSession,
+  RegexAbortError,
+  type RegexSession,
+  RegexTimeoutError,
+} from './regex-runner.js';
+import type { FileMatches } from './regex-worker.js';
+import { MAX_MARKDOWN_BYTES, resolveSafePath } from './resolve.js';
 import { walkFolder } from './tree.js';
 
 export interface SearchHit {
@@ -27,18 +35,89 @@ export interface FolderSearchResults {
   query: string;
   results: FileSearchResult[];
   truncated: boolean;
+  /**
+   * A regex search hit its time budget and stopped early. `results` holds what
+   * was found before that, and `truncated` is set too.
+   */
+  timedOut: boolean;
 }
 
 interface GrepOptions extends Partial<SearchOptions> {
   perFileCap?: number;
   globalCap?: number;
   snippetRadius?: number;
-  /** Per-line wall-clock budget for regex matching (defaults 5 ms). */
-  perLineBudgetMs?: number;
-  /** Skip lines longer than this in regex mode — defence against ReDoS on pathological lines (defaults 10_000). */
+  /** Wall-clock time a regex search may spend matching (defaults 3,000 ms). */
+  regexBudgetMs?: number;
+  /** Skip lines longer than this in regex mode (defaults 10,000). */
   maxLineLenForRegex?: number;
   /** Directory basenames to skip while walking. Forwarded to walkFolder. */
   ignore?: ReadonlySet<string>;
+  /** Reuses file bodies across searches. */
+  cache?: ContentCache;
+  /** Stops the search when the client goes away. */
+  signal?: AbortSignal;
+}
+
+/** Files read at once. Enough to hide disk latency without a burst of open fds. */
+const READ_CONCURRENCY = 8;
+/** A regex batch closes at this many files or this many characters. */
+const BATCH_FILES = 64;
+const BATCH_CHARS = 1_000_000;
+
+/**
+ * Front-matter-stripped markdown bodies keyed by path, valid while the file's
+ * mtime and size are unchanged. The watcher also invalidates entries, which
+ * catches an edit that lands within the filesystem's mtime resolution.
+ * Least-recently-used entries go first once the total passes `maxChars`.
+ */
+export class ContentCache {
+  private readonly entries = new Map<string, { mtimeMs: number; size: number; body: string }>();
+  private readonly maxChars: number;
+  private chars = 0;
+
+  constructor(maxChars = 32 * 1024 * 1024) {
+    this.maxChars = maxChars;
+  }
+
+  get(key: string, mtimeMs: number, size: number): string | undefined {
+    const e = this.entries.get(key);
+    if (!e) return undefined;
+    if (e.mtimeMs !== mtimeMs || e.size !== size) {
+      this.invalidate(key);
+      return undefined;
+    }
+    this.entries.delete(key);
+    this.entries.set(key, e);
+    return e.body;
+  }
+
+  set(key: string, mtimeMs: number, size: number, body: string): void {
+    this.invalidate(key);
+    if (body.length > this.maxChars / 4) return;
+    this.entries.set(key, { mtimeMs, size, body });
+    this.chars += body.length;
+    for (const [oldKey] of this.entries) {
+      if (this.chars <= this.maxChars) break;
+      this.invalidate(oldKey);
+    }
+  }
+
+  invalidate(key: string): void {
+    const e = this.entries.get(key);
+    if (!e) return;
+    this.chars -= e.body.length;
+    this.entries.delete(key);
+  }
+
+  clear(): void {
+    this.entries.clear();
+    this.chars = 0;
+  }
+
+  /** The key a root-relative path is cached under. Shared with the watcher hook. */
+  static keyFor(rootAbsPath: string, relPath: string): string {
+    return path.join(rootAbsPath, relPath);
+  }
 }
 
 function buildSnippet(line: string, start: number, end: number, radius: number): {
@@ -65,6 +144,70 @@ export interface GrepRoot {
   ignore?: ReadonlySet<string>;
 }
 
+interface Target {
+  root: GrepRoot;
+  realRoot: string;
+  relPath: string;
+}
+
+async function loadBody(t: Target, cache: ContentCache): Promise<string | null> {
+  try {
+    const abs = await resolveSafePath(t.root.absPath, t.relPath, { realRoot: t.realRoot });
+    const st = await stat(abs);
+    if (!st.isFile() || st.size > MAX_MARKDOWN_BYTES) return null;
+    const key = ContentCache.keyFor(t.root.absPath, t.relPath);
+    const cached = cache.get(key, st.mtimeMs, st.size);
+    if (cached !== undefined) return cached;
+    const { body } = parseFrontmatter(await readFile(abs, 'utf8'));
+    cache.set(key, st.mtimeMs, st.size, body);
+    return body;
+  } catch {
+    // Vanished, unreadable, or a link out of the root: not searchable.
+    return null;
+  }
+}
+
+/**
+ * Yield each target with its body, in order, while keeping up to `concurrency`
+ * reads in flight ahead of the consumer.
+ */
+async function* readAhead(
+  targets: readonly Target[],
+  cache: ContentCache,
+  concurrency: number,
+): AsyncGenerator<[Target, string | null]> {
+  const inflight: Array<Promise<string | null>> = [];
+  let next = 0;
+  const fill = (): void => {
+    while (inflight.length < concurrency && next < targets.length) {
+      inflight.push(loadBody(targets[next++] as Target, cache));
+    }
+  };
+  fill();
+  for (const t of targets) {
+    const body = await (inflight.shift() as Promise<string | null>);
+    fill();
+    yield [t, body];
+  }
+}
+
+async function collectTargets(roots: readonly GrepRoot[], opts: GrepOptions): Promise<Target[]> {
+  const out: Target[] = [];
+  for (const root of roots) {
+    let realRoot: string;
+    try {
+      realRoot = await realpath(root.absPath);
+    } catch {
+      continue;
+    }
+    // Walk unprefixed so paths stay resolvable against this root, then prefix
+    // on the way out.
+    const tree = await walkFolder(root.absPath, { ignore: root.ignore ?? opts.ignore });
+    for (const relPath of flattenMdRelPaths(tree)) out.push({ root, realRoot, relPath });
+  }
+  return out;
+}
+
 export async function grepFiles(
   roots: readonly GrepRoot[],
   query: string,
@@ -73,107 +216,123 @@ export async function grepFiles(
   const perFileCap = opts.perFileCap ?? 20;
   const globalCap = opts.globalCap ?? 200;
   const snippetRadius = opts.snippetRadius ?? 60;
-  const perLineBudgetMs = opts.perLineBudgetMs ?? 5;
   const maxLineLenForRegex = opts.maxLineLenForRegex ?? 10_000;
   const regexMode = opts.regex ?? false;
+  const cache = opts.cache ?? new ContentCache();
+  const signal = opts.signal;
 
-  if (!query || query.length === 0) {
-    return { query, results: [], truncated: false };
-  }
+  const empty: FolderSearchResults = { query, results: [], truncated: false, timedOut: false };
+  if (!query) return empty;
   const pattern = compilePattern(query, {
     caseSensitive: opts.caseSensitive ?? false,
     wholeWord: opts.wholeWord ?? false,
-    regex: opts.regex ?? false,
+    regex: regexMode,
   });
-  if (!pattern.valid) return { query, results: [], truncated: false };
+  if (!pattern.valid) return empty;
 
   const results: FileSearchResult[] = [];
   let totalHits = 0;
   let truncated = false;
+  let timedOut = false;
 
   // globalCap is a budget for the whole search, not per root — it exists to
   // bound the work and the response, and both are workspace-wide.
-  for (const root of roots) {
-    if (totalHits >= globalCap) {
-      truncated = true;
-      break;
-    }
-    // Walk unprefixed so paths stay resolvable against this root, then prefix
-    // on the way out.
-    const tree = await walkFolder(root.absPath, { ignore: root.ignore ?? opts.ignore });
-    const files = flattenMdRelPaths(tree);
-    let realRoot: string;
-    try {
-      realRoot = await realpath(root.absPath);
-    } catch {
-      continue;
-    }
-
-    for (const relPath of files) {
+  const record = (t: Target, body: string, m: FileMatches): void => {
+    if (m.total === 0) return;
+    const lines = body.split(/\r?\n/);
+    const hits: SearchHit[] = [];
+    let fileTruncated = m.skipped || m.total > m.hits.length;
+    for (const [lineIdx, col, len] of m.hits) {
       if (totalHits >= globalCap) {
         truncated = true;
+        fileTruncated = true;
         break;
       }
-      let absPath: string;
-      try {
-        absPath = await resolveSafePath(root.absPath, relPath, { realRoot });
-      } catch {
-        continue;
-      }
+      const { snippet, highlight } = buildSnippet(
+        lines[lineIdx] ?? '', col, col + len, snippetRadius,
+      );
+      hits.push({ line: lineIdx + 1, col, snippet, highlight });
+      totalHits++;
+    }
+    if (totalHits >= globalCap) truncated = true;
+    if (hits.length > 0) {
+      results.push({
+        relPath: `${t.root.id}/${t.relPath}`,
+        hits,
+        total: m.total,
+        truncated: fileTruncated,
+      });
+    }
+  };
 
-      let raw: string;
-      try {
-        raw = await readFile(absPath, 'utf8');
-      } catch {
-        continue;
-      }
-      const { body } = parseFrontmatter(raw);
-      // Split on both LF and CRLF — a Windows-authored .md leaves a trailing \r
-      // on every line otherwise, breaking \b end-of-line matches and snippet rendering.
-      const lines = body.split(/\r?\n/);
-
-      const fileHits: SearchHit[] = [];
-      let fileTotal = 0;
-      let fileTruncated = false;
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i]!;
-        // Skip pathologically-long lines in regex mode — single exec() against
-        // an ultra-long line is the main ReDoS shape we can't time-cancel.
-        if (regexMode && line.length > maxLineLenForRegex) {
-          fileTruncated = true;
-          continue;
-        }
-        const { matches, truncated: lineTruncated } = regexMode
-          ? pattern.matchAllWithBudget(line, perLineBudgetMs)
-          : { matches: pattern.matchAll(line), truncated: false };
-        if (lineTruncated) fileTruncated = true;
-        for (const m of matches) {
-          fileTotal++;
-          if (fileHits.length < perFileCap) {
-            const { snippet, highlight } = buildSnippet(
-              line, m.index, m.index + m.length, snippetRadius,
-            );
-            fileHits.push({ line: i + 1, col: m.index, snippet, highlight });
-            totalHits++;
-          } else {
-            fileTruncated = true;
-          }
-          if (totalHits >= globalCap) {
-            truncated = true;
-            break;
-          }
-        }
-        if (totalHits >= globalCap) break;
-      }
-      if (fileHits.length > 0) {
-        results.push({
-          relPath: `${root.id}/${relPath}`,
-          hits: fileHits,
-          total: fileTotal,
-          truncated: fileTruncated,
-        });
+  // Literal queries are escaped before they become a regex, so they cannot
+  // backtrack and stay on this thread. Split on both LF and CRLF — a
+  // Windows-authored .md leaves a trailing \r on every line otherwise.
+  const matchLiteral = (body: string): FileMatches => {
+    const out: FileMatches = { total: 0, hits: [], skipped: false };
+    const lines = body.split(/\r?\n/);
+    for (let i = 0; i < lines.length; i++) {
+      for (const m of pattern.matchAll(lines[i] as string)) {
+        out.total++;
+        if (out.hits.length < perFileCap) out.hits.push([i, m.index, m.length]);
       }
     }
+    return out;
+  };
+
+  const targets = await collectTargets(roots, opts);
+
+  // A user-supplied regex never runs on this thread: one exec() can backtrack
+  // for minutes, and nothing interrupts it short of ending the thread it runs
+  // on. The worker is terminated once the search's budget is spent.
+  const session: RegexSession | null = regexMode
+    ? openRegexSession({
+        source: pattern.source,
+        flags: pattern.flags,
+        maxLineLen: maxLineLenForRegex,
+        perFileCap,
+        budgetMs: opts.regexBudgetMs ?? 3_000,
+        ...(signal ? { signal } : {}),
+      })
+    : null;
+
+  let batch: Array<[Target, string]> = [];
+  let batchChars = 0;
+  const flush = async (): Promise<void> => {
+    if (!session || batch.length === 0) return;
+    const pending = batch;
+    batch = [];
+    batchChars = 0;
+    const matches = await session.match(pending.map(([, body]) => body));
+    for (let i = 0; i < pending.length && totalHits < globalCap; i++) {
+      const [t, body] = pending[i] as [Target, string];
+      record(t, body, matches[i] as FileMatches);
+    }
+  };
+
+  try {
+    for await (const [t, body] of readAhead(targets, cache, READ_CONCURRENCY)) {
+      if (signal?.aborted || totalHits >= globalCap) break;
+      if (body === null) continue;
+      if (!session) {
+        record(t, body, matchLiteral(body));
+        continue;
+      }
+      batch.push([t, body]);
+      batchChars += body.length;
+      if (batch.length >= BATCH_FILES || batchChars >= BATCH_CHARS) await flush();
+    }
+    if (!signal?.aborted && totalHits < globalCap) await flush();
+  } catch (err) {
+    if (err instanceof RegexTimeoutError) {
+      timedOut = true;
+      truncated = true;
+    } else if (!(err instanceof RegexAbortError)) {
+      throw err;
+    }
+  } finally {
+    session?.release();
   }
-  return { query, results, truncated };
+  if (totalHits >= globalCap) truncated = true;
+  return { query, results, truncated, timedOut };
 }
