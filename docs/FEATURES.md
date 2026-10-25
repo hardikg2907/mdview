@@ -1,6 +1,6 @@
 # Features
 
-Comprehensive catalog of what `mdview` does today (post Phase 2, May 2026).
+Comprehensive catalog of what `mdview` does today.
 
 ## Layout & navigation
 

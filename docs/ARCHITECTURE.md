@@ -34,8 +34,10 @@ The server stays running for the lifetime of one CLI invocation. Killing the pro
 ## Repo layout
 
 ```
+build/
+└── vite-woff2-only.ts               ← Vite plugin: @font-face sources reduced to woff2
 src/
-├── cli.ts                          ← CLI entry, args, port fallback, graceful shutdown
+├── cli.ts                          ← CLI entry, args, port fallback, graceful shutdown; loads the server on demand
 ├── cli-config.ts / cli-workspace.ts ← `config` and `ls` / `rm` / `stop` subcommands
 ├── daemon/                          ← background-server state, workspace file, CLI-side client
 ├── shared/                          ← cross-runtime modules (no Node-only or DOM-only deps)
@@ -46,7 +48,8 @@ src/
 │   └── tree-utils.ts                ← MD_EXT, flattenMdRelPaths
 ├── render/                          ← pure server-agnostic markdown render pipeline
 │   ├── markdown.ts
-│   ├── shiki.ts
+│   ├── shiki.ts                     ← highlighter, per-palette themes, warm-up, highlight cache
+│   ├── byte-lru.ts                  ← size-capped LRU behind the highlight cache
 │   ├── frontmatter.ts
 │   ├── outline.ts
 │   ├── links.ts                     ← tagInternalLinks, rewriteImageSrc
@@ -95,7 +98,7 @@ does not cover it.
 
 ### Entry & boot
 
-- **`src/cli.ts`** — argument parser, port-fallback listener, browser launcher, SIGINT/SIGTERM shutdown with timeout, friendly error messages (port-in-use, ENOENT, EACCES). `MDVIEW_DEBUG=1` enables full stack traces.
+- **`src/cli.ts`** — argument parser, port-fallback listener, browser launcher, SIGINT/SIGTERM shutdown with timeout, friendly error messages (port-in-use, ENOENT, EACCES). `MDVIEW_DEBUG=1` enables full stack traces. fastify, chokidar, `open` and the render pipeline load with `import()` only in the commands that start a server or open a browser, so `--version`, `ls`, `rm` and `stop` skip them. After `listen`, `warmHighlighter()` runs in the background, so the first document finds Shiki ready.
 - **`src/server/index.ts`** — `createServer({ roots, clientDir, … })` factory. Opens one `RootState` per root, composes routes over the root list, registers `@fastify/static` for the bundled SPA at `/`, hooks `onClose` to close every watcher. Boots a **second chokidar watcher per root** dedicated to that root's `.mdview.json`, because the main watcher's `ignored` filter excludes dotfiles.
 
 ### The background server (`src/daemon/`, `src/cli.ts`)
@@ -192,9 +195,9 @@ All request paths that touch the filesystem go through `resolveSafePath(rootAbsP
 
 The renderer lives in `src/render/`, **outside** `src/server/`, because it has no Node-only or HTTP-specific code. It can run from any context (server route, future editor extension, tests). Each request to `/api/file` runs through this pipeline in order:
 
-1. **`frontmatter.ts`** — `parseFrontmatter(raw)` peels off `---`-delimited YAML using `js-yaml` (default safe schema). Front matter is YAML only: an opening line like `---js` is body text, and a node budget of 10,000 rejects alias bombs and cycles. Returns `{ data, body, bodyStartLine }`.
+1. **`frontmatter.ts`** — `parseFrontmatter(raw)` peels off `---`-delimited YAML using `js-yaml` (YAML 1.2 core schema plus merge keys). Front matter is YAML only: an opening line like `---js` is body text, and a budget of 10,000 nodes and 1,000,000 characters rejects alias bombs and cycles. Returns `{ data, body, bodyStartLine }`.
 2. **`markdown.ts`** — `renderMarkdown(body)` constructs a singleton `markdown-it` instance with `linkify`, `markdown-it-anchor` (custom slugify), `markdown-it-task-lists`, and the local **`mathPlugin`**. Walks the token list to intercept `fence` tokens: `mermaid` becomes a `<div class="mermaid-block" data-source="...">` that the client renders to SVG, everything else is highlighted via Shiki.
-3. **`shiki.ts`** — `highlightCode(code, lang, palette)` lazy-loads languages on demand. It renders the requested palette's light and dark themes with `defaultColor: false`, so each token carries exactly `--shiki-light` and `--shiki-dark` and the light/dark toggle repaints purely in CSS. Changing *palette* refetches, because only the active one is rendered: rendering all eight put 16 variables on every token and took a real document from 30 KB to 204 KB.
+3. **`shiki.ts`** — `highlightCode(code, lang, palette)` lazy-loads languages on demand. Only the default palette's theme pair loads at start-up; another palette's pair loads on its first request, and concurrent requests share that load. Results sit in an 8 MB `ByteLru` (keys count toward the cap) keyed by palette, language and the SHA-256 of the code, so a live reload re-highlights only blocks that changed. It renders the requested palette's light and dark themes with `defaultColor: false`, so each token carries exactly `--shiki-light` and `--shiki-dark` and the light/dark toggle repaints purely in CSS. Changing *palette* refetches, because only the active one is rendered: rendering all eight put 16 variables on every token and took a real document from 30 KB to 204 KB.
 4. **`math.ts`** — markdown-it core rule that scans for `$$...$$` paragraphs and `$...$` inline runs (with whitespace heuristics and code-span exclusion), emitting `<span class="math-inline">` / `<div class="math-block">` placeholders with URL-encoded `data-source`.
 5. **`outline.ts`** — `extractOutline(tokens)` walks heading tokens, builds a nested `OutlineNode[]` tree using a stack-based algorithm. Handles non-monotonic depth jumps (e.g. h1 → h3 with no h2).
 6. **`links.ts`** — `tagInternalLinks(html, currentRelPath)` adds `data-internal-link="<resolved-path>"` to relative `.md` `<a href>`s so the client can intercept them. `rewriteImageSrc(html, currentRelPath)` rewrites relative `<img src>` to `/__asset/<resolved>` so they resolve against the content root, not the SPA bundle.
@@ -333,10 +336,10 @@ Sequence shortcuts (e.g. `gg`) use a module-scoped timestamp + `resetPendingSequ
 
 ## Build pipeline
 
-- **`tsup`** bundles `src/cli.ts` → `bin/mdview.mjs` (Node ESM, minified). `bin/` is gitignored; produced by `npm run build:server`.
+- **`tsup`** bundles two entries with code splitting: `src/cli.ts` → `bin/mdview.mjs` and `src/server/fs/regex-worker.ts` → `bin/regex-worker.mjs`, plus shared `bin/*.mjs` chunks for the lazily loaded server. Splitting is what keeps the server's imports out of the entry file. `package.json` `files` ships `bin/*.mjs` (no source maps). `bin/` is gitignored; produced by `npm run build:server`. `prepack` empties `bin/` and rebuilds, so stale hashed chunks never ship.
 - **Vite** builds the client SPA → `dist/client/` (HTML + hashed assets). `dist/` is gitignored; produced by `npm run build:client`.
 - The server bundle imports `dist/client/index.html` at runtime (resolved relative to the binary's own location).
-- `pele` (one chunk per diagram type), `katex` (+ its CSS) and JetBrains Mono subsets are split into separate chunks (lazy-loaded). Shiki runs on the server only, so no highlighter code or grammar ships to the browser.
+- `pele` (one chunk per diagram type), `katex` (+ its CSS) and JetBrains Mono subsets are split into separate chunks (lazy-loaded). `build/vite-woff2-only.ts` reduces every `@font-face` source list to its woff2 entry before Vite emits assets, so no `.woff` or `.ttf` file ships. Shiki runs on the server only, so no highlighter code or grammar ships to the browser.
 - `prepare` script auto-runs `npm run build` if `bin/mdview.mjs` is missing, so `npm install -g github:user/repo` works without an explicit build step.
 
 ## Tests (`tests/`)

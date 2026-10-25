@@ -6,7 +6,7 @@ on `main`, but it has never been published.
 
 ---
 
-## Wrap-up (do soon, before phase 2)
+## Wrap-up
 
 - [x] Update `README.md` to reflect the real v1 feature set
 - [x] Update `VERIFICATION.md` to match reality
