@@ -469,6 +469,9 @@ async function runDaemon(args: Args): Promise<void> {
   const wsWatcher = chokidar.watch(workspaceFilePath(), {
     ignoreInitial: true,
     persistent: true,
+    // A workspace.json replaced by a link to a directory would otherwise be
+    // walked and watched recursively.
+    followSymlinks: false,
     awaitWriteFinish: { stabilityThreshold: 60, pollInterval: 30 },
   });
   const reload = (): void => {
