@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { runInNewContext } from 'node:vm';
+import { describe, it, expect, vi } from 'vitest';
 import { buildHostHtml, escapeHtmlAttr, WEBVIEW_PORT } from '../../src/webview/host.html';
 
 // ---------------------------------------------------------------------------
@@ -160,5 +161,108 @@ describe('buildHostHtml', () => {
     // every later inbound message is checked against it.
     expect(html).toContain('iframeOrigin');
     expect(html).toContain('e.origin !== iframeOrigin');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Relay behaviour — run the real script against a fake webview document
+// ---------------------------------------------------------------------------
+
+describe('buildHostHtml relay', () => {
+  const HOST_ORIGIN = 'vscode-webview://0abc';
+
+  interface FakeWindow {
+    postMessage: ReturnType<typeof vi.fn>;
+  }
+
+  function setup() {
+    const html = buildHostHtml({ iframeUrl: 'http://127.0.0.1:1/?embed=vscode', nonce: 'n' });
+    const script = /<script nonce="n">([\s\S]*?)<\/script>/.exec(html)?.[1];
+    if (!script) throw new Error('relay script not found');
+
+    // VS Code's webview host page frames this document and forwards extension
+    // messages with contentWindow.postMessage(message, window.origin), so they
+    // arrive from window.parent carrying this document's own origin.
+    const hostPage: FakeWindow = { postMessage: vi.fn() };
+    const spaWindow: FakeWindow = { postMessage: vi.fn() };
+    const listeners: Record<string, Array<(e: unknown) => void>> = {};
+    const iframeListeners: Record<string, Array<() => void>> = {};
+    const iframe = {
+      contentWindow: spaWindow,
+      src: '',
+      addEventListener: (type: string, fn: () => void) => {
+        (iframeListeners[type] ??= []).push(fn);
+      },
+    };
+    const toExtension = vi.fn();
+    const window = {
+      parent: hostPage,
+      origin: HOST_ORIGIN,
+      location: { search: '?id=wv1' },
+      addEventListener: (type: string, fn: (e: unknown) => void) => {
+        (listeners[type] ??= []).push(fn);
+      },
+    };
+    runInNewContext(script, {
+      window,
+      document: { getElementById: () => iframe },
+      acquireVsCodeApi: () => ({ postMessage: toExtension }),
+      URLSearchParams,
+      Date,
+    });
+
+    const dispatch = (e: { source: unknown; origin: string; data: unknown }) => {
+      for (const fn of listeners.message ?? []) fn(e);
+    };
+    const load = () => {
+      for (const fn of iframeListeners.load ?? []) fn();
+    };
+    return { hostPage, spaWindow, iframe, toExtension, dispatch, load };
+  }
+
+  it('queues extension messages until the iframe loads, then flushes them in order', () => {
+    const r = setup();
+    r.dispatch({ source: r.hostPage, origin: HOST_ORIGIN, data: { type: 'mdview/init' } });
+    r.dispatch({ source: r.hostPage, origin: HOST_ORIGIN, data: { type: 'mdview/theme' } });
+    expect(r.spaWindow.postMessage).not.toHaveBeenCalled();
+    r.load();
+    expect(r.spaWindow.postMessage.mock.calls.map((c) => c[0])).toEqual([
+      { type: 'mdview/init' },
+      { type: 'mdview/theme' },
+    ]);
+  });
+
+  it('relays an extension message straight through once loaded', () => {
+    const r = setup();
+    r.load();
+    r.dispatch({ source: r.hostPage, origin: HOST_ORIGIN, data: { type: 'x' } });
+    expect(r.spaWindow.postMessage).toHaveBeenCalledWith({ type: 'x' }, '*');
+  });
+
+  it('drops a message from any window other than the host page', () => {
+    const r = setup();
+    r.load();
+    const stranger = { postMessage: vi.fn() };
+    r.dispatch({ source: stranger, origin: HOST_ORIGIN, data: { type: 'mdview/init' } });
+    r.dispatch({ source: null, origin: HOST_ORIGIN, data: { type: 'mdview/init' } });
+    expect(r.spaWindow.postMessage).not.toHaveBeenCalled();
+    expect(r.toExtension).not.toHaveBeenCalled();
+  });
+
+  it('drops a message from the host page window carrying another origin', () => {
+    const r = setup();
+    r.load();
+    r.dispatch({ source: r.hostPage, origin: 'http://evil.test', data: { type: 'x' } });
+    expect(r.spaWindow.postMessage).not.toHaveBeenCalled();
+  });
+
+  it('forwards SPA messages to the extension and locks the SPA origin', () => {
+    const r = setup();
+    r.load();
+    r.dispatch({ source: r.spaWindow, origin: 'http://127.0.0.1:1', data: { type: 'ready' } });
+    r.dispatch({ source: r.spaWindow, origin: 'http://other:2', data: { type: 'spoof' } });
+    expect(r.toExtension.mock.calls.map((c) => c[0])).toEqual([{ type: 'ready' }]);
+    r.dispatch({ source: r.hostPage, origin: HOST_ORIGIN, data: { type: 'x' } });
+    expect(r.spaWindow.postMessage).toHaveBeenCalledWith({ type: 'x' }, 'http://127.0.0.1:1');
   });
 });

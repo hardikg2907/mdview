@@ -52,7 +52,9 @@ export interface BuildHostHtmlOptions {
  * iframe's real origin (post-proxy) is opaque, so the relay discovers it from
  * the SPA's first message, locks it, and validates every later inbound message
  * against it plus `e.source === iframe.contentWindow`. The extension re-validates
- * every inbound message regardless (see messages/validate.ts).
+ * every inbound message regardless (see messages/validate.ts). Outbound, only
+ * messages from the VS Code host page (`window.parent`, same origin as this
+ * document) are relayed into the SPA.
  *
  * The only HTML-attribute interpolation is the escaped nonce; the iframe URL is
  * embedded only inside the nonced script as a JSON string literal.
@@ -91,11 +93,15 @@ export function buildHostHtml({ iframeUrl, nonce }: BuildHostHtmlOptions): strin
       if (iframeOrigin === null) iframeOrigin = e.origin;
       else if (e.origin !== iframeOrigin) return;
       vscode.postMessage(e.data);
-    } else if (iframeReady) {
-      toIframe(e.data);
-    } else {
-      pending.push(e.data);
+      return;
     }
+    // Outbound: only the extension's own messages. VS Code delivers them from
+    // the webview host page that frames this document, posting to this
+    // document's own origin. Anything else (a frame inside the SPA, another
+    // window holding a reference to this one) is dropped, not relayed.
+    if (e.source !== window.parent || e.origin !== window.origin) return;
+    if (iframeReady) toIframe(e.data);
+    else pending.push(e.data);
   });
 
   // Why: Chromium 142 (VS Code 1.126) blocks a webview iframe from navigating
