@@ -1,7 +1,7 @@
-import { execFileSync, execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 const REPO_ROOT = resolve(__dirname, '../../');
 const BIN = resolve(REPO_ROOT, 'bin/mdview.mjs');
@@ -27,9 +27,6 @@ function staticImportSpecifiers(source: string): string[] {
   return specifiers;
 }
 
-beforeAll(() => {
-  execSync('npm run build:server', { cwd: REPO_ROOT, stdio: 'inherit' });
-}, 60_000);
 
 describe('CLI start-up', () => {
   it('does not statically import server-only packages from the entry file', () => {

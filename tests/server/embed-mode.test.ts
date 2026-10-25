@@ -1,4 +1,5 @@
-import { type ChildProcess, execSync, spawn } from 'node:child_process';
+import { type ChildProcess, spawn } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path, { resolve } from 'node:path';
@@ -9,18 +10,12 @@ import { createServer, EMBED_TOKEN_HEADER } from '../../src/server/index.js';
 const REPO_ROOT = resolve(__dirname, '../../');
 const BIN = resolve(REPO_ROOT, 'bin/mdview.mjs');
 const FIXTURE_ROOT = resolve(REPO_ROOT, 'test-fixtures');
-// dist/client is built by the beforeAll below so CSP inject tests
+// Built by tests/global-setup.ts, so the inject-based CSP tests
 // (sendFile('index.html')) work on a fresh checkout.
 const CLIENT_DIR = resolve(REPO_ROOT, 'dist/client');
 
-beforeAll(() => {
-  // Full build: server bin for the spawn-based stdout tests, client bundle for
-  // the inject-based CSP tests (sendFile('index.html') needs dist/client to exist).
-  execSync('npm run build', { cwd: REPO_ROOT, stdio: 'inherit' });
-}, 120_000);
-
 // Same shape the extension generates: 32 random bytes, base64url.
-const TOKEN = 'Zm9vYmFyYmF6cXV4MTIzNDU2Nzg5MGFiY2RlZmdoaWo';
+const TOKEN = randomBytes(32).toString('base64url');
 
 /** The environment the extension spawns the CLI with, minus anything inherited. */
 function embedEnv(token: string | null = TOKEN): NodeJS.ProcessEnv {

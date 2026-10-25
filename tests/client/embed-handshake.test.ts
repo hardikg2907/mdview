@@ -11,7 +11,7 @@ import {
   withEmbedToken,
 } from '../../src/client/lib/embed.js';
 
-const TOKEN = 'Zm9vYmFyYmF6cXV4MTIzNDU2Nzg5MGFiY2RlZmdoaWo';
+const TOKEN = `${crypto.randomUUID()}${crypto.randomUUID()}`.replaceAll('-', '');
 
 function setSearch(search: string): void {
   Object.defineProperty(window, 'location', { value: { search }, configurable: true });

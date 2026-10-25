@@ -1,8 +1,9 @@
+import { randomBytes } from 'node:crypto';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import * as vscode from 'vscode';
 import { buildEmbedUrl, PreviewPanel } from '../../src/webview/PreviewPanel';
 
-const TOKEN = 'Zm9vYmFyYmF6cXV4MTIzNDU2Nzg5MGFiY2RlZmdoaWo';
+const TOKEN = randomBytes(32).toString('base64url');
 
 // Capture the underlying mock panel a PreviewPanel creates, so a test can drive
 // its lifecycle (simulate the user closing the webview).

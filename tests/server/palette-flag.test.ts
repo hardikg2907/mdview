@@ -1,4 +1,5 @@
-import { type ChildProcess, execSync, spawn } from 'node:child_process';
+import { type ChildProcess, spawn } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path, { resolve } from 'node:path';
@@ -15,7 +16,6 @@ let fixtureRoot: string;
 let xdgRoot: string;
 
 beforeAll(() => {
-  execSync('npm run build:server', { cwd: REPO_ROOT, stdio: 'inherit' });
   fixtureRoot = mkdtempSync(path.join(tmpdir(), 'mdview-palette-fixture-'));
   // A project config with a palette — the CLI override should beat it.
   writeFileSync(path.join(fixtureRoot, '.mdview.json'), JSON.stringify({ palette: 'solarized' }));
@@ -39,7 +39,7 @@ interface Ready {
 // --palette behavior is independent of --vscode, so using it here only
 // changes how we *discover* the bound port. Embed mode gates the API on its
 // token, so the requests below carry it.
-const EMBED_TOKEN = 'cGFsZXR0ZS1mbGFnLXRlc3QtdG9rZW4tMDEyMzQ1Njc4OQ';
+const EMBED_TOKEN = randomBytes(32).toString('base64url');
 const EMBED_HEADERS = { 'x-mdview-embed-token': EMBED_TOKEN };
 
 function spawnCliReady(args: string[]): Promise<Ready> {
