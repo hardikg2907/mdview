@@ -10,8 +10,10 @@ import {
   type Palette,
   type RenderedFile,
 } from '../../shared/types.js';
-import { resolveSafePath } from '../fs/resolve.js';
+import { MAX_MARKDOWN_BYTES, OutsideRootError, resolveSafePath } from '../fs/resolve.js';
 import { parseWorkspacePath, type RootState, toWorkspacePath } from '../workspace.js';
+
+const MD_FILE_RE = /\.(md|markdown|mdx)$/i;
 
 export function registerApiFile(app: FastifyInstance, roots: readonly RootState[]): void {
   app.get<{ Querystring: { path?: string; palette?: string } }>(
@@ -54,25 +56,36 @@ export function registerApiFile(app: FastifyInstance, roots: readonly RootState[
     // Restrict to markdown extensions. Without this, /api/file?path=.env
     // returns the file's contents inside the rendered response, since the
     // route otherwise reads any file under root.
-    if (!/\.(md|markdown|mdx)$/i.test(rel)) {
+    if (!MD_FILE_RE.test(rel)) {
       return reply.code(400).send({ error: 'Only markdown files are supported' });
     }
 
     let absPath: string;
     try {
-      absPath = resolveSafePath(state.absPath, rel);
+      absPath = await resolveSafePath(state.absPath, rel);
     } catch (err) {
-      return reply.code(400).send({ error: (err as Error).message });
+      if (err instanceof OutsideRootError) {
+        return reply.code(400).send({ error: err.message });
+      }
+      return reply.code(404).send({ error: 'File not found' });
+    }
+    // An in-root link named `notes.md` may point at `.env`; the file read is
+    // the link's target, so the target has to be markdown too.
+    if (!MD_FILE_RE.test(absPath)) {
+      return reply.code(400).send({ error: 'Only markdown files are supported' });
     }
 
     let raw: string;
     let mtimeMs: number;
     try {
-      const [content, st] = await Promise.all([
-        readFile(absPath, 'utf8'),
-        stat(absPath),
-      ]);
-      raw = content;
+      const st = await stat(absPath);
+      if (!st.isFile()) {
+        return reply.code(404).send({ error: 'File not found' });
+      }
+      if (st.size > MAX_MARKDOWN_BYTES) {
+        return reply.code(413).send({ error: 'File is too large to render (over 16 MB)' });
+      }
+      raw = await readFile(absPath, 'utf8');
       mtimeMs = st.mtimeMs;
     } catch {
       return reply.code(404).send({ error: 'File not found' });

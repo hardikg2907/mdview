@@ -2,7 +2,7 @@ import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import type { FastifyInstance } from 'fastify';
-import { resolveSafePath } from '../fs/resolve.js';
+import { OutsideRootError, resolveSafePath } from '../fs/resolve.js';
 import { parseWorkspacePath, type RootState } from '../workspace.js';
 
 const MIME: Record<string, string> = {
@@ -54,9 +54,12 @@ export function registerApiAsset(app: FastifyInstance, roots: readonly RootState
     }
     let abs: string;
     try {
-      abs = resolveSafePath(resolved.state.absPath, resolved.rel);
+      abs = await resolveSafePath(resolved.state.absPath, resolved.rel);
     } catch (err) {
-      return reply.code(400).send({ error: (err as Error).message });
+      if (err instanceof OutsideRootError) {
+        return reply.code(400).send({ error: err.message });
+      }
+      return reply.code(404).send({ error: 'Asset not found' });
     }
     // Dot-directories hold tool state (.git, .ssh, .vscode), never content a
     // document links to, whatever the extension of the file inside them.
@@ -72,9 +75,10 @@ export function registerApiAsset(app: FastifyInstance, roots: readonly RootState
     if (!st.isFile()) {
       return reply.code(404).send({ error: 'Not a file' });
     }
-    const ext = path.extname(abs).toLowerCase();
-    const mime = MIME[ext];
-    if (!mime) {
+    // Both names must be media: the one asked for, and the file an in-root
+    // link actually lands on (`logo.png -> id_ed25519.pub` is not an image).
+    const mime = MIME[path.extname(abs).toLowerCase()];
+    if (!mime || !MIME[path.extname(resolved.rel).toLowerCase()]) {
       // Media types only: the route exists for <img>, <video> and <audio> in
       // rendered documents. Source, config and keys under the root stay unreadable.
       return reply.code(404).send({ error: 'Asset type not allowed' });

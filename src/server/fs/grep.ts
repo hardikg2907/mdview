@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { readFile, realpath } from 'node:fs/promises';
 import { parseFrontmatter } from '../../render/frontmatter.js';
 import { compilePattern, type SearchOptions } from '../../shared/search-pattern.js';
 import { flattenMdRelPaths } from '../../shared/tree-utils.js';
@@ -102,6 +102,12 @@ export async function grepFiles(
     // on the way out.
     const tree = await walkFolder(root.absPath, { ignore: root.ignore ?? opts.ignore });
     const files = flattenMdRelPaths(tree);
+    let realRoot: string;
+    try {
+      realRoot = await realpath(root.absPath);
+    } catch {
+      continue;
+    }
 
     for (const relPath of files) {
       if (totalHits >= globalCap) {
@@ -110,7 +116,7 @@ export async function grepFiles(
       }
       let absPath: string;
       try {
-        absPath = resolveSafePath(root.absPath, relPath);
+        absPath = await resolveSafePath(root.absPath, relPath, { realRoot });
       } catch {
         continue;
       }

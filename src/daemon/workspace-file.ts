@@ -1,4 +1,4 @@
-import { existsSync, statSync } from 'node:fs';
+import { existsSync, lstatSync, realpathSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { deriveRootId, isValidRootId, type RootSpec } from '../server/workspace.js';
 import { readJsonSafe, workspaceFilePath, writeJsonAtomic } from './state.js';
@@ -96,8 +96,16 @@ export function resolveTarget(target: string): ResolvedTarget {
     return { absPath: abs, kind: 'dir', filePath: '', name: path.basename(abs) };
   }
   if (st.isFile()) {
-    const dir = path.dirname(abs);
-    return { absPath: dir, kind: 'file', filePath: path.basename(abs), name: path.basename(abs) };
+    // A linked file is served from the folder its target lives in: the target
+    // usually sits outside the link's folder, and the server refuses to follow
+    // a link out of a root.
+    const real = lstatSync(abs).isSymbolicLink() ? realpathSync(abs) : abs;
+    return {
+      absPath: path.dirname(real),
+      kind: 'file',
+      filePath: path.basename(real),
+      name: path.basename(abs),
+    };
   }
   throw new Error(`Unsupported path type: ${abs}`);
 }

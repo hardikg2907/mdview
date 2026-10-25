@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import Fastify, { type FastifyInstance } from 'fastify';
@@ -93,5 +93,65 @@ describe('GET /api/file (markdown-only)', () => {
   it('400s when ?path is missing in folder mode', async () => {
     const res = await app.inject({ method: 'GET', url: '/api/file' });
     expect(res.statusCode).toBe(400);
+  });
+
+  it('404s on a missing markdown file', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/file?path=missing.md' });
+    expect(res.statusCode).toBe(404);
+  });
+
+  it('413s on a markdown file over 16 MB without reading it', async () => {
+    writeFileSync(path.join(root, 'huge.md'), Buffer.alloc(16 * 1024 * 1024 + 1, 0x61));
+    const res = await app.inject({ method: 'GET', url: '/api/file?path=huge.md' });
+    expect(res.statusCode).toBe(413);
+    expect(res.json().error).toMatch(/too large/);
+  });
+});
+
+describe.skipIf(process.platform === 'win32')('GET /api/file (symlinks)', () => {
+  let base: string;
+  let app: FastifyInstance;
+
+  beforeAll(async () => {
+    base = mkdtempSync(path.join(tmpdir(), 'mdview-file-link-'));
+    const root = path.join(base, 'root');
+    mkdirSync(root);
+    mkdirSync(path.join(base, 'outside'));
+    writeFileSync(path.join(base, 'outside', 'secret'), 'TOP-SECRET');
+    writeFileSync(path.join(root, 'README.md'), '# Real');
+    writeFileSync(path.join(root, '.env'), 'SECRET=hunter2');
+    symlinkSync('../outside/secret', path.join(root, 'leak.md'));
+    symlinkSync('/etc/hosts', path.join(root, 'hosts.md'));
+    symlinkSync('README.md', path.join(root, 'alias.md'));
+    symlinkSync('.env', path.join(root, 'env.md'));
+
+    app = Fastify({ logger: false });
+    registerApiFile(app, [fakeRoot(root, { id: 'w' })]);
+    await app.ready();
+  });
+
+  afterAll(async () => {
+    await app.close();
+    rmSync(base, { recursive: true, force: true });
+  });
+
+  it('refuses a link that leads out of the root', async () => {
+    for (const p of ['leak.md', 'hosts.md']) {
+      const res = await app.inject({ method: 'GET', url: `/api/file?path=${p}` });
+      expect(res.statusCode, p).toBe(400);
+      expect(res.body).not.toContain('TOP-SECRET');
+    }
+  });
+
+  it('follows a link that stays inside the root', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/file?path=alias.md' });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().title).toBe('Real');
+  });
+
+  it('refuses an in-root link whose target is not markdown', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/file?path=env.md' });
+    expect(res.statusCode).toBe(400);
+    expect(res.body).not.toContain('hunter2');
   });
 });

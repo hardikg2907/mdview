@@ -378,6 +378,7 @@ node bin/mdview.mjs --foreground --no-open --port 7399 /tmp/mdv-untrusted/root
 
 - **An iframe of an SVG asset in a .md does not run script.** Open `http://127.0.0.1:7399/?file=root/a.md` with DevTools → Network open. The `<iframe>` stays blank and the console shows a `frame-src` CSP violation. The `![svg]` image still renders. No request to `/api/health?exfil=…` appears.
 - Open `http://127.0.0.1:7399/__asset/root/evil.svg` directly in a tab → the SVG draws, but the console shows the script blocked by the sandbox, and no `exfil` request appears.
+- Stop the server, then `ln -s ../outside/secret /tmp/mdv-untrusted/root/leak.md && ln -s ../outside/secret /tmp/mdv-untrusted/root/leak.png` and restart it. `curl -s -H 'Host: 127.0.0.1' 'http://127.0.0.1:7399/api/file?path=root/leak.md'` and `…/__asset/root/leak.png` → both `400`, and neither body contains `TOP-SECRET`. A link that stays inside (`ln -s a.md /tmp/mdv-untrusted/root/alias.md`) still opens at `?file=root/alias.md`.
 
 ## Tests
 

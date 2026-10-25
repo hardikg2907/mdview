@@ -1,5 +1,5 @@
 import dns from 'node:dns/promises';
-import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
+import { existsSync, lstatSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { FastifyInstance } from 'fastify';
@@ -202,13 +202,17 @@ function detectRoot(target: string): RootSpec {
     return { absPath: abs, id: deriveRootId(abs, new Set()), kind: 'dir' };
   }
   if (st.isFile()) {
-    const dir = path.dirname(abs);
+    // A linked file is served from the folder its target lives in: the target
+    // usually sits outside the link's folder, and the server refuses to follow
+    // a link out of a root.
+    const real = lstatSync(abs).isSymbolicLink() ? realpathSync(abs) : abs;
+    const dir = path.dirname(real);
     return {
       absPath: dir,
       id: deriveRootId(dir, new Set()),
       name: path.basename(abs),
       kind: 'file',
-      filePath: path.basename(abs),
+      filePath: path.basename(real),
     };
   }
   throw new Error(`Unsupported path type: ${abs}`);

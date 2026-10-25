@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import Fastify, { type FastifyInstance } from 'fastify';
@@ -78,6 +78,57 @@ describe('GET /__asset/* (extension allow-list)', () => {
   it('judges a dot segment after normalising the path', async () => {
     const res = await app.inject({ method: 'GET', url: '/__asset/img/..%2fpic.png' });
     expect(res.statusCode).toBe(200);
+  });
+});
+
+describe.skipIf(process.platform === 'win32')('GET /__asset/* (symlinks)', () => {
+  let base: string;
+  let app: FastifyInstance;
+
+  beforeAll(async () => {
+    base = mkdtempSync(path.join(tmpdir(), 'mdview-asset-link-'));
+    const root = path.join(base, 'root');
+    mkdirSync(root);
+    mkdirSync(path.join(base, 'outside'));
+    writeFileSync(path.join(base, 'outside', 'secret.png'), 'TOP-SECRET');
+    writeFileSync(path.join(base, 'outside', 'id_ed25519'), 'PRIVATE KEY');
+    writeFileSync(path.join(root, 'pic.png'), Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+    writeFileSync(path.join(root, 'key.pem'), 'PRIVATE KEY');
+    symlinkSync('../outside/secret.png', path.join(root, 'leak.png'));
+    symlinkSync('../outside/id_ed25519', path.join(root, 'notes.png'));
+    symlinkSync(path.join(base, 'outside'), path.join(root, 'outdir'));
+    symlinkSync('pic.png', path.join(root, 'alias.png'));
+    symlinkSync('key.pem', path.join(root, 'logo.png'));
+
+    app = Fastify({ logger: false });
+    registerApiAsset(app, [fakeRoot(root, { id: 'w' })]);
+    await app.ready();
+  });
+
+  afterAll(async () => {
+    await app.close();
+    rmSync(base, { recursive: true, force: true });
+  });
+
+  it('refuses a link that leads out of the root', async () => {
+    for (const url of ['/__asset/leak.png', '/__asset/notes.png', '/__asset/outdir/secret.png']) {
+      const res = await app.inject({ method: 'GET', url });
+      expect(res.statusCode, url).toBe(400);
+      expect(res.body).not.toContain('SECRET');
+      expect(res.body).not.toContain('PRIVATE');
+    }
+  });
+
+  it('follows a link that stays inside the root', async () => {
+    const res = await app.inject({ method: 'GET', url: '/__asset/alias.png' });
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['content-type']).toBe('image/png');
+  });
+
+  it('refuses an in-root link whose target is not media', async () => {
+    const res = await app.inject({ method: 'GET', url: '/__asset/logo.png' });
+    expect(res.statusCode).toBe(404);
+    expect(res.body).not.toContain('PRIVATE');
   });
 });
 
