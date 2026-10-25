@@ -1,6 +1,65 @@
 import { describe, expect, it } from 'vitest';
-import { highlightCode } from '../../src/render/shiki.js';
+import { highlightCache, highlightCode, warmHighlighter } from '../../src/render/shiki.js';
 import { PALETTES } from '../../src/shared/types.js';
+
+describe('highlight cache', () => {
+  it('serves a repeat of the same block from the cache', async () => {
+    const code = `const cacheHit = ${Math.random()};`;
+    const first = await highlightCode(code, 'ts', 'solarized');
+    const before = highlightCache.stats();
+    const second = await highlightCode(code, 'ts', 'solarized');
+    const after = highlightCache.stats();
+    expect(second).toBe(first);
+    expect(after.hits).toBe(before.hits + 1);
+    expect(after.misses).toBe(before.misses);
+    expect(after.entries).toBe(before.entries);
+  });
+
+  it('misses on the first sight of a block and stores it', async () => {
+    const before = highlightCache.stats();
+    await highlightCode(`const cacheMiss = ${Math.random()};`, 'ts');
+    const after = highlightCache.stats();
+    expect(after.misses).toBe(before.misses + 1);
+    expect(after.entries).toBe(before.entries + 1);
+    expect(after.bytes).toBeGreaterThan(before.bytes);
+  });
+
+  it('keeps palettes apart: the same code under another palette is a miss', async () => {
+    const code = `const paletteSplit = ${Math.random()};`;
+    const everforest = await highlightCode(code, 'ts', 'everforest');
+    const before = highlightCache.stats();
+    const catppuccin = await highlightCode(code, 'ts', 'catppuccin');
+    expect(highlightCache.stats().misses).toBe(before.misses + 1);
+    expect(catppuccin).not.toEqual(everforest);
+    expect(await highlightCode(code, 'ts', 'everforest')).toBe(everforest);
+  });
+
+  it('keeps languages apart: the same code under another language is a miss', async () => {
+    const code = `plain ${Math.random()}`;
+    await highlightCode(code, 'ts');
+    const before = highlightCache.stats();
+    await highlightCode(code, 'python');
+    expect(highlightCache.stats().misses).toBe(before.misses + 1);
+  });
+
+  it('stays within its byte budget however much is highlighted', async () => {
+    // Plain text keeps tokenising cheap; only the size of the output matters here.
+    const line = `${'x'.repeat(200)}\n`;
+    for (let i = 0; i < 120; i++) {
+      await highlightCode(`${line.repeat(400)}${i}`, 'text');
+    }
+    const { bytes, entries } = highlightCache.stats();
+    expect(bytes).toBeLessThanOrEqual(8 * 1024 * 1024);
+    expect(entries).toBeGreaterThan(0);
+  });
+});
+
+describe('warmHighlighter', () => {
+  it('resolves and leaves the highlighter usable', async () => {
+    await expect(warmHighlighter()).resolves.toBeUndefined();
+    expect(await highlightCode('1', 'json')).toContain('<pre');
+  });
+});
 
 describe('highlightCode', () => {
   it('produces shiki-themed html for known language', async () => {
