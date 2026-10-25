@@ -24,25 +24,11 @@ Originally-deferred MVP-adjacent features. Build as a coordinated push once v1 h
 - [~] **Static export** — dropped. Bundle-size cost (KaTeX SSR + duplicated render code) didn't justify the use case; the live server is the canonical way to read mdview content.
 - [x] **Resizable sidebars** — drag handles between tree/content and content/outline panes; persist widths to `localStorage`; snap to default at min threshold; collapse if dragged below threshold.
 - [x] **Math / LaTeX** — KaTeX, dynamically imported only when a doc contains `$...$` or `$$...$$`; same lazy pattern as mermaid.
-- [x] **Custom themes / per-project config** — read `.mdview.json` at folder root for palette, font, line-width, default-collapsed states; built-in theme picker in header (classic / paper / nord / solarized).
+- [x] **Custom themes / per-project config** — read `.mdview.json` at folder root for palette, font, line-width, default-collapsed states; built-in palette picker in the header View menu (flexoki / paper / solarized / everforest / rose-pine / kanagawa / catppuccin / high-contrast).
 - [x] **Extended vim-style shortcuts** — `gg` / `G` top/bottom; `H` / `L` prev/next file; `]` / `[` next/prev heading at same level; `Ctrl+D` / `Ctrl+U` half-page scroll. (`n` / `N` deferred — needs persisted-search-state plumbing.) Reflect in shortcuts panel.
-- [x] **Focus mode / minimap** — focus mode dims everything except the section whose content is at the viewport center; thin minimap rail at right edge showing doc structure, draggable to scroll.
+- [x] **Focus mode / minimap** — focus mode dims everything except the section whose heading last crossed the top-third reading band of the viewport; thin minimap rail at right edge showing doc structure, draggable to scroll.
 
 ---
-
-## Phase 4 — Editor extensions (VS Code, Zed)
-
-Distribute the viewer as a native side-panel inside the user's editor instead of
-(or alongside) the standalone server. The VS Code extension lives in
-`apps/vscode` as a side-by-side package with its own deps and test suite; design
-notes are in `docs/superpowers/specs/2026-05-24-vscode-extension-design.md`.
-
-- [x] **VS Code extension** — webview panel that renders the active `.md` file using the mdview UI, auto-updates when the editor's active file changes, and follows the in-editor theme. It spawns the CLI per workspace folder (`ServerPool`) and frames the SPA through VS Code's webview resource proxy.
-- [x] **Editor-aware features** — heading and internal-link clicks in the preview move the editor cursor and reveal the line; moving the cursor scrolls the preview to the nearest heading at or above it, debounced, with a suppression window so the two don't chase each other.
-- [ ] **Publish to the Marketplace** — still `0.1.0` and unpublished. Needs a publisher account, an icon, a README with screenshots, and a real `CHANGELOG` for the extension itself. The integration test runner (`@vscode/test-electron`) has never been run in CI.
-- [ ] **Zed extension** — equivalent for Zed once their extension API supports webviews; similar UX (split-pane preview, theme follow, live update on save).
-- [ ] **Architecture** — extract the rendering pipeline + frontend into a reusable package so the standalone CLI, VS Code extension, and Zed extension all share one codebase. The extensions would then ship the renderer in-process instead of spawning a Node server, which is what the current extension does.
-- [ ] **Watch scope** — optionally watch only the active file rather than the whole workspace folder.
 
 ## Phase 3 — Workspaces
 
@@ -58,6 +44,20 @@ instead of by a `/<name>/api/...` route prefix.
 - [ ] **No-port URL** — `mdview service install` / `uninstall`: one sudo, a kernel redirect from :80 to the server's port (pfctl / iptables / netsh) plus a launchd or systemd unit to reapply it after reboot, so the URL is just `http://mdview.localhost`. The server stays unprivileged. Deliberately deferred — three platform implementations and a reversible uninstall is a feature of its own.
 - [ ] **Per-workspace state** — sidebar widths, theme override, recent files, search history scoped to the active folder. Currently all window-level and shared, which is right for panes and theme but arguably wrong for recent files.
 - [ ] **Switcher UI** — only worth building if showing every folder at once turns out not to scale past a handful.
+
+## Phase 4 — Editor extensions (VS Code, Zed)
+
+Distribute the viewer as a native side-panel inside the user's editor instead of
+(or alongside) the standalone server. The VS Code extension lives in
+`apps/vscode` as a side-by-side package with its own deps and test suite; design
+notes are in `docs/superpowers/specs/2026-05-24-vscode-extension-design.md`.
+
+- [x] **VS Code extension** — webview panel that renders the active `.md` file using the mdview UI, auto-updates when the editor's active file changes, and follows the in-editor theme. It spawns the CLI per workspace folder (`ServerPool`) and frames the SPA through VS Code's webview resource proxy.
+- [x] **Editor-aware features** — heading and internal-link clicks in the preview move the editor cursor and reveal the line; moving the cursor scrolls the preview to the nearest heading at or above it, debounced, with a suppression window so the two don't chase each other.
+- [ ] **Publish to the Marketplace** — still `0.1.0` and unpublished. Needs a publisher account, an icon, a README with screenshots, and a real `CHANGELOG` for the extension itself. The integration test runner (`@vscode/test-electron`) has never been run in CI.
+- [ ] **Zed extension** — equivalent for Zed once their extension API supports webviews; similar UX (split-pane preview, theme follow, live update on save).
+- [ ] **Architecture** — extract the rendering pipeline + frontend into a reusable package so the standalone CLI, VS Code extension, and Zed extension all share one codebase. The extensions would then ship the renderer in-process instead of spawning a Node server, which is what the current extension does.
+- [ ] **Watch scope** — optionally watch only the active file rather than the whole workspace folder.
 
 ---
 
