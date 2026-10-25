@@ -369,9 +369,13 @@ Sequence shortcuts (e.g. `gg`) use a module-scoped timestamp + `resetPendingSequ
 `markdown-it` runs with `html: true`, so inline HTML in a document reaches the
 page verbatim. The CSP is what keeps that from becoming script execution. It is
 assembled in `buildCspHtml()` (`src/server/index.ts`) and applied by an `onSend`
-hook to `text/html` responses, alongside `x-content-type-options: nosniff` and
-`referrer-policy: no-referrer`. `/__asset/*` responses get a different policy
-(below) and never this one.
+hook to `text/html` responses, alongside `referrer-policy: no-referrer`.
+`/__asset/*` responses get a different policy (below) and never this one.
+
+Every response carries `x-content-type-options: nosniff` — HTML, JSON, errors
+and assets alike — so the declared type is the only one a browser acts on. The
+same `onSend` hook sets it; the SSE stream writes its headers straight to the
+socket, past the hook, so `sse.ts` sets it there.
 
 | Directive | Value | Why |
 |---|---|---|

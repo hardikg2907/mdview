@@ -19,6 +19,9 @@ export function registerSse(app: FastifyInstance, hub: Watcher, hooks: SseHooks 
       'Cache-Control': 'no-cache, no-transform',
       Connection: 'keep-alive',
       'X-Accel-Buffering': 'no',
+      // Written straight to the socket, so the onSend hook that adds this to
+      // every other response never sees the stream.
+      'X-Content-Type-Options': 'nosniff',
     });
     reply.raw.write(': connected\n\n');
 

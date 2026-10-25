@@ -1,4 +1,5 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import http from 'node:http';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { FastifyInstance } from 'fastify';
@@ -119,5 +120,29 @@ describe('Host guard on a live server', () => {
     const res = await app.inject({ url: '/', headers: { host: 'localhost' } });
     expect(res.statusCode).toBe(200);
     expect(res.headers['content-security-policy']).toContain("default-src 'self'");
+  });
+
+  it('sends nosniff on every response, not only HTML', async () => {
+    for (const url of ['/', '/api/tree', '/api/file?path=README.md', '/api/file?path=missing.md', '/__asset/x.png', '/api/nope']) {
+      const res = await app.inject({ url, headers: { host: 'localhost' } });
+      expect(res.headers['x-content-type-options'], url).toBe('nosniff');
+    }
+    const refused = await app.inject({ url: '/api/tree', headers: { host: 'evil.com' } });
+    expect(refused.headers['x-content-type-options']).toBe('nosniff');
+  });
+
+  it('sends nosniff on the SSE stream, which bypasses the onSend hook', async () => {
+    await app.listen({ host: '127.0.0.1', port: 0 });
+    const addr = app.server.address();
+    if (!addr || typeof addr !== 'object') throw new Error('no address');
+    const headers = await new Promise<http.IncomingHttpHeaders>((resolve, reject) => {
+      const req = http.get({ host: '127.0.0.1', port: addr.port, path: '/api/watch' }, (res) => {
+        resolve(res.headers);
+        req.destroy();
+      });
+      req.on('error', reject);
+    });
+    expect(headers['content-type']).toBe('text/event-stream');
+    expect(headers['x-content-type-options']).toBe('nosniff');
   });
 });

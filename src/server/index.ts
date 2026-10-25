@@ -148,6 +148,7 @@ export async function createServer(opts: ServerOptions): Promise<MdviewServer> {
   // URL: the router decodes `/%5F%5Fasset/...` onto this route while the raw
   // URL keeps the escapes. Any SVG is sandboxed whatever route sent it.
   app.addHook('onSend', async (req, reply, payload) => {
+    reply.header('x-content-type-options', 'nosniff');
     const ct = String(reply.getHeader('content-type') ?? '');
     // Gated on the response type rather than on paths, so the shell at `/`,
     // `/index.html` and the SPA fallback for any unknown path are all covered.
@@ -173,7 +174,6 @@ export async function createServer(opts: ServerOptions): Promise<MdviewServer> {
     }
     if (ct.startsWith('text/html')) {
       reply.header('content-security-policy', cspHtml);
-      reply.header('x-content-type-options', 'nosniff');
       reply.header('referrer-policy', 'no-referrer');
     }
     return payload;

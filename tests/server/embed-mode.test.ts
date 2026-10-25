@@ -325,6 +325,7 @@ describe('--vscode embed mode: token gate', () => {
         const res = await app.inject({ method, url: `${url}?embed=vscode` });
         expect(res.statusCode).toBe(403);
         expect(res.headers['content-type']).toMatch(/^text\/plain/);
+        expect(res.headers['x-content-type-options']).toBe('nosniff');
         if (method === 'GET') {
           expect(res.body).toBe('Forbidden');
           expect(Number(res.headers['content-length'])).toBe(res.rawPayload.length);
