@@ -14,7 +14,9 @@ import {
   addIgnoreEntries,
   isValidIgnoreEntry,
   listUserIgnoreEntries,
+  readUpdateCheck,
   removeIgnoreEntries,
+  setUpdateCheck,
 } from '../../src/server/config-write.js';
 
 let dir: string;
@@ -136,5 +138,42 @@ describe.skipIf(process.platform === 'win32')('config file modes', () => {
     await addIgnoreEntries(['deps'], cfgPath);
     expect(statSync(dir).mode & 0o777).toBe(0o700);
     expect(statSync(cfgPath).mode & 0o777).toBe(0o600);
+  });
+});
+
+describe('update-check setting', () => {
+  it('is off when the file or key is missing', async () => {
+    expect(await readUpdateCheck(cfgPath)).toBe(false);
+    writeFileSync(cfgPath, '{"palette":"kanagawa"}');
+    expect(await readUpdateCheck(cfgPath)).toBe(false);
+  });
+
+  it('turns on and off, keeping the other keys, with a 0600 file', async () => {
+    writeFileSync(cfgPath, JSON.stringify({ palette: 'kanagawa', ignore: ['deps'] }));
+    expect(await setUpdateCheck(true, cfgPath)).toEqual({ before: false, after: true, path: cfgPath });
+    expect(JSON.parse(readFileSync(cfgPath, 'utf8'))).toEqual({
+      palette: 'kanagawa',
+      ignore: ['deps'],
+      updateCheck: true,
+    });
+    if (process.platform !== 'win32') expect(statSync(cfgPath).mode & 0o777).toBe(0o600);
+    expect(await readUpdateCheck(cfgPath)).toBe(true);
+
+    expect(await setUpdateCheck(false, cfgPath)).toEqual({ before: true, after: false, path: cfgPath });
+    expect(JSON.parse(readFileSync(cfgPath, 'utf8'))).toEqual({
+      palette: 'kanagawa',
+      ignore: ['deps'],
+    });
+  });
+
+  it('creates the file when there is none', async () => {
+    await setUpdateCheck(true, cfgPath);
+    expect(JSON.parse(readFileSync(cfgPath, 'utf8'))).toEqual({ updateCheck: true });
+  });
+
+  it('refuses to overwrite a config that is not JSON', async () => {
+    writeFileSync(cfgPath, 'not json');
+    await expect(setUpdateCheck(true, cfgPath)).rejects.toThrow(/not valid JSON/);
+    expect(readFileSync(cfgPath, 'utf8')).toBe('not json');
   });
 });

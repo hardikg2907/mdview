@@ -35,7 +35,11 @@ export function globalConfigPath(): string {
  * dropped silently; invalid types are dropped with a console warning.
  * Conservative: never throws — bad config falls back to "no config".
  */
-export function validateConfig(raw: unknown, source = CONFIG_FILENAME): ProjectConfig | null {
+export function validateConfig(
+  raw: unknown,
+  source = CONFIG_FILENAME,
+  scope: 'global' | 'project' = 'project',
+): ProjectConfig | null {
   if (!isObject(raw)) return null;
   const out: ProjectConfig = {};
 
@@ -102,10 +106,26 @@ export function validateConfig(raw: unknown, source = CONFIG_FILENAME): ProjectC
     }
   }
 
+  if ('updateCheck' in raw) {
+    // Enabling a network call is the user's decision alone: a cloned repo's
+    // .mdview.json must never be able to turn it on.
+    if (scope !== 'global') {
+      console.warn(`[mdview] ${source}: updateCheck is only read from the global config; ignoring`);
+    } else if (typeof raw.updateCheck === 'boolean') {
+      out.updateCheck = raw.updateCheck;
+    } else {
+      console.warn(`[mdview] ${source}: ignoring invalid updateCheck: ${String(raw.updateCheck)}`);
+    }
+  }
+
   return out;
 }
 
-async function loadConfigFromPath(filePath: string, source: string): Promise<ProjectConfig | null> {
+async function loadConfigFromPath(
+  filePath: string,
+  source: string,
+  scope: 'global' | 'project',
+): Promise<ProjectConfig | null> {
   let raw: string;
   try {
     raw = await readFile(filePath, 'utf8');
@@ -121,21 +141,29 @@ async function loadConfigFromPath(filePath: string, source: string): Promise<Pro
     console.warn(`[mdview] ${source} is not valid JSON: ${(err as Error).message}`);
     return null;
   }
-  return validateConfig(parsed, source);
+  return validateConfig(parsed, source, scope);
 }
 
 export async function loadProjectConfig(rootAbsPath: string): Promise<ProjectConfig | null> {
-  return loadConfigFromPath(path.join(rootAbsPath, CONFIG_FILENAME), CONFIG_FILENAME);
+  return loadConfigFromPath(path.join(rootAbsPath, CONFIG_FILENAME), CONFIG_FILENAME, 'project');
 }
 
 export async function loadGlobalConfig(): Promise<ProjectConfig | null> {
-  return loadConfigFromPath(globalConfigPath(), `~/.config/mdview/${GLOBAL_CONFIG_FILENAME}`);
+  return loadConfigFromPath(
+    globalConfigPath(),
+    `~/.config/mdview/${GLOBAL_CONFIG_FILENAME}`,
+    'global',
+  );
 }
 
 /**
  * Merge global and project configs. Project values override global for all
  * scalar fields; `ignore` is unioned so a per-repo extra dir doesn't drop the
  * user's global build-dir list. Returns null if both inputs are null.
+ *
+ * `updateCheck` is deliberately not carried over: it is read straight from the
+ * global config by whoever acts on it, and the merged result is sent to the
+ * browser.
  */
 export function mergeConfigs(
   global: ProjectConfig | null,

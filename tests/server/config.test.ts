@@ -1,5 +1,13 @@
-import { describe, expect, it, vi } from 'vitest';
-import { mergeConfigs, validateConfig } from '../../src/server/config.js';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  loadEffectiveConfig,
+  loadGlobalConfig,
+  mergeConfigs,
+  validateConfig,
+} from '../../src/server/config.js';
 
 describe('validateConfig', () => {
   it('returns null for non-object input', () => {
@@ -118,5 +126,68 @@ describe('mergeConfigs', () => {
       { ignore: ['shared', 'project-only'] },
     );
     expect(merged?.ignore?.sort()).toEqual(['deps', 'project-only', 'shared']);
+  });
+});
+
+describe('updateCheck', () => {
+  let tmp: string;
+  let previousXdg: string | undefined;
+
+  beforeEach(() => {
+    tmp = mkdtempSync(path.join(tmpdir(), 'mdview-uc-'));
+    previousXdg = process.env.XDG_CONFIG_HOME;
+    process.env.XDG_CONFIG_HOME = path.join(tmp, 'xdg');
+    mkdirSync(path.join(tmp, 'xdg', 'mdview'), { recursive: true });
+    mkdirSync(path.join(tmp, 'repo'));
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    if (previousXdg === undefined) delete process.env.XDG_CONFIG_HOME;
+    else process.env.XDG_CONFIG_HOME = previousXdg;
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  it('is read from the global config', () => {
+    expect(validateConfig({ updateCheck: true }, 'global', 'global')).toEqual({ updateCheck: true });
+    expect(validateConfig({ updateCheck: false }, 'global', 'global')).toEqual({ updateCheck: false });
+  });
+
+  it('drops a non-boolean value from the global config', () => {
+    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(validateConfig({ updateCheck: 'yes' }, 'global', 'global')).toEqual({});
+    expect(spy).toHaveBeenCalled();
+  });
+
+  it('is ignored with a warning in a project config, which is the default scope', () => {
+    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(validateConfig({ updateCheck: true })).toEqual({});
+    expect(validateConfig({ updateCheck: true }, '.mdview.json', 'project')).toEqual({});
+    expect(spy).toHaveBeenCalledTimes(2);
+  });
+
+  it('cannot be switched on by a .mdview.json in a folder the user opens', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    writeFileSync(
+      path.join(tmp, 'repo', '.mdview.json'),
+      JSON.stringify({ updateCheck: true, palette: 'kanagawa' }),
+    );
+    const effective = await loadEffectiveConfig(path.join(tmp, 'repo'));
+    expect(effective).toEqual({ palette: 'kanagawa' });
+    expect((await loadGlobalConfig())?.updateCheck).toBeUndefined();
+  });
+
+  it('does not let a project override a global opt-in, and never reaches the merged config', async () => {
+    writeFileSync(path.join(tmp, 'xdg', 'mdview', 'config.json'), JSON.stringify({ updateCheck: true }));
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    writeFileSync(path.join(tmp, 'repo', '.mdview.json'), JSON.stringify({ updateCheck: false }));
+    expect((await loadGlobalConfig())?.updateCheck).toBe(true);
+    expect(await loadEffectiveConfig(path.join(tmp, 'repo'))).toEqual({});
+  });
+
+  it('is not carried by mergeConfigs, which feeds the browser', () => {
+    expect(mergeConfigs({ updateCheck: true, palette: 'kanagawa' }, null)).toEqual({
+      palette: 'kanagawa',
+    });
   });
 });

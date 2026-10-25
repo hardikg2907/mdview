@@ -38,6 +38,10 @@ export function daemonLockPath(): string {
   return path.join(stateDir(), 'daemon.lock');
 }
 
+export function updateCheckPath(): string {
+  return path.join(stateDir(), 'update-check.json');
+}
+
 /** Identity of the running background server. Nothing here is a secret. */
 export interface DaemonState {
   pid: number;

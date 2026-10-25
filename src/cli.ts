@@ -4,12 +4,17 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { FastifyInstance } from 'fastify';
 import { runConfigSubcommand } from './cli-config.js';
+import { runUpdateCommand } from './cli-update.js';
 import { runListCommand, runRemoveCommand, runStopCommand } from './cli-workspace.js';
 import { ensureDaemon, waitForRoot } from './daemon/client.js';
 import { clearDaemonState, workspaceFilePath, writeDaemonState } from './daemon/state.js';
+import { createUpdateChecker } from './daemon/update-check.js';
 import { addRoot, readWorkspace, toRootSpecs } from './daemon/workspace-file.js';
+import { loadGlobalConfig } from './server/config.js';
 import { deriveRootId, type RootSpec } from './server/workspace.js';
 import { PALETTES, type Palette } from './shared/types.js';
+import { fetchLatestVersion } from './update/latest.js';
+import { printUpdateNotice } from './update/notice.js';
 import { readVersion } from './version.js';
 
 export type ParseResult =
@@ -26,6 +31,7 @@ Usage:
   mdview ls                List open folders and the background server
   mdview rm <name|path>…   Stop serving a folder
   mdview stop              Stop the background server
+  mdview update            Check for a newer release and print the install command
   mdview config <…>        Read or edit the global config (run 'mdview config -h')
 
 One background server serves every folder you open, so 'mdview .' in a second
@@ -53,6 +59,7 @@ Examples:
   mdview --port 9000 ./docs              One-off server on a specific port
   mdview config ignore add deps _site    Hide extra build dirs globally
   mdview config path                     Print global config path
+  mdview update                          Is there a newer mdview?
 `.trim());
 }
 
@@ -450,6 +457,15 @@ async function runDaemon(args: Args): Promise<void> {
   writeDaemonState({ pid: process.pid, port: boundPort, startedAt });
   console.log(`[${new Date().toISOString()}] mdview daemon pid ${process.pid} on port ${boundPort}`);
 
+  // Off unless the user turned it on in the global config, and re-read on every
+  // tick, so flipping the setting needs no restart.
+  const updateChecker = createUpdateChecker({
+    isEnabled: async () => (await loadGlobalConfig())?.updateCheck === true,
+    fetchLatest: () => fetchLatestVersion(),
+    now: Date.now,
+    log: (message) => console.log(`[${new Date().toISOString()}] ${message}`),
+  });
+
   const { default: chokidar } = await import('chokidar');
   const wsWatcher = chokidar.watch(workspaceFilePath(), {
     ignoreInitial: true,
@@ -476,6 +492,7 @@ async function runDaemon(args: Args): Promise<void> {
     // Drop the record first: a client that reads it while we are closing should
     // start a fresh daemon rather than wait on a dying one.
     clearDaemonState();
+    updateChecker.stop();
     const timeout = new Promise<void>((resolve) => setTimeout(resolve, 1500));
     await Promise.race([
       Promise.all([server.app.close().catch(() => undefined), wsWatcher.close()]).then(
@@ -504,6 +521,7 @@ async function runDaemon(args: Args): Promise<void> {
   // Last, so the state file and the workspace watcher are in place before the
   // warm-up holds the event loop.
   warmHighlighterInBackground();
+  updateChecker.start();
 }
 
 /**
@@ -533,6 +551,14 @@ async function runAttach(args: Args): Promise<void> {
 
   console.log(`mdview → ${url}`);
   console.log(`${added.changed ? 'added' : 'open'}: ${added.root.path} (${added.root.id})`);
+  await printUpdateNotice({
+    version: readVersion(),
+    now: Date.now,
+    interactive: () => Boolean(process.stdout.isTTY && process.stderr.isTTY),
+    isEnabled: async () => (await loadGlobalConfig())?.updateCheck === true,
+    print: (line) => console.error(line),
+  });
+
   if (args.open) await openBrowser(url);
 }
 
@@ -545,6 +571,13 @@ async function main(): Promise<void> {
   if (sub === 'ls' || sub === 'status') process.exit(await runListCommand());
   if (sub === 'rm') process.exit(await runRemoveCommand(argv.slice(1)));
   if (sub === 'stop') process.exit(await runStopCommand());
+  if (sub === 'update') {
+    if (argv.length > 1) {
+      console.error('Usage: mdview update');
+      process.exit(2);
+    }
+    process.exit(await runUpdateCommand());
+  }
 
   let parsed: ParseResult;
   try {

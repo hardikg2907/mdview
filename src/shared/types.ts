@@ -88,4 +88,10 @@ export interface ProjectConfig {
     outline?: boolean;
   };
   ignore?: string[];
+  /**
+   * Global config only: whether the background server checks the registry for a
+   * newer release. A project file cannot set it, and it is never merged into the
+   * effective config that reaches the browser.
+   */
+  updateCheck?: boolean;
 }

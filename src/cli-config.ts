@@ -2,7 +2,9 @@ import { globalConfigPath } from './server/config.js';
 import {
   addIgnoreEntries,
   listUserIgnoreEntries,
+  readUpdateCheck,
   removeIgnoreEntries,
+  setUpdateCheck,
 } from './server/config-write.js';
 import { DEFAULT_IGNORED_DIRS } from './shared/ignore.js';
 
@@ -16,11 +18,17 @@ Subcommands:
   ignore list                Show the built-in skips plus user-added ones
   ignore add <name…>         Append basename(s) to the ignore list
   ignore rm  <name…>         Remove basename(s) from the ignore list
+  update-check [on|off]      Show, or turn on/off, the daily check for a newer release
 
 Examples:
   mdview config path
   mdview config ignore add deps _site
   mdview config ignore list
+
+The update check is off by default. When on, the background server asks
+registry.npmjs.org once a day for the latest version and sends nothing that
+identifies you. It only ever prints a one-line notice; 'mdview update' shows
+the install command.
 
 After editing the ignore list, restart any running mdview instance — the file
 watcher caches its skip set at startup.
@@ -45,6 +53,8 @@ export async function runConfigSubcommand(argv: readonly string[]): Promise<numb
       return 0;
     case 'ignore':
       return runIgnoreSubcommand(rest);
+    case 'update-check':
+      return runUpdateCheckSubcommand(rest);
     default:
       console.error(`Unknown subcommand: config ${sub}`);
       printConfigUsage();
@@ -121,5 +131,34 @@ async function runIgnoreSubcommand(argv: readonly string[]): Promise<number> {
     default:
       printIgnoreUsage();
       return 2;
+  }
+}
+
+async function runUpdateCheckSubcommand(argv: readonly string[]): Promise<number> {
+  const [action, ...extra] = argv;
+  if (extra.length > 0 || (action !== undefined && action !== 'on' && action !== 'off')) {
+    console.error('Usage: mdview config update-check [on|off]');
+    return 2;
+  }
+  try {
+    if (action === undefined) {
+      console.log(`update-check: ${(await readUpdateCheck()) ? 'on' : 'off'}`);
+      return 0;
+    }
+    const result = await setUpdateCheck(action === 'on');
+    if (result.before === result.after) {
+      console.log(`update-check is already ${action}.`);
+    } else if (result.after) {
+      console.log(`update-check on (${result.path}).`);
+      console.log(
+        'The background server checks registry.npmjs.org about once a day; a running one notices this within an hour.',
+      );
+    } else {
+      console.log(`update-check off (${result.path}).`);
+    }
+    return 0;
+  } catch (err) {
+    console.error((err as Error).message);
+    return 2;
   }
 }

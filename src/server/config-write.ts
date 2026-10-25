@@ -108,3 +108,27 @@ export async function listUserIgnoreEntries(
   const cfg = await readGlobalRaw(filePath);
   return readIgnoreArray(cfg);
 }
+
+export interface UpdateCheckChangeResult {
+  before: boolean;
+  after: boolean;
+  path: string;
+}
+
+/** Only an explicit `true` counts: anything else in the file means off. */
+export async function readUpdateCheck(filePath: string = globalConfigPath()): Promise<boolean> {
+  const cfg = await readGlobalRaw(filePath);
+  return cfg.updateCheck === true;
+}
+
+export async function setUpdateCheck(
+  enabled: boolean,
+  filePath: string = globalConfigPath(),
+): Promise<UpdateCheckChangeResult> {
+  const cfg = await readGlobalRaw(filePath);
+  const before = cfg.updateCheck === true;
+  if (enabled) cfg.updateCheck = true;
+  else delete cfg.updateCheck;
+  await writeGlobalRaw(filePath, cfg);
+  return { before, after: enabled, path: filePath };
+}
