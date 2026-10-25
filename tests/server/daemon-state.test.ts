@@ -198,15 +198,13 @@ describe('workspace file', () => {
     expect(readWorkspace().roots).toHaveLength(1);
   });
 
-  it('gives a file under a dot-directory a root of its own, since folder roots refuse it', () => {
+  it('serves a file under a dot-directory from the folder that covers it', () => {
     mkdirSync(path.join(repoA, '.github'));
     writeFileSync(path.join(repoA, '.github', 'PR.md'), '# PR\n');
     addRoot(repoA);
     const res = addRoot(path.join(repoA, '.github', 'PR.md'));
-    expect(res.changed).toBe(true);
-    expect(res.root.kind).toBe('file');
-    expect(res.root.path).toBe(path.join(repoA, '.github'));
-    expect(readWorkspace().roots).toHaveLength(2);
+    expect(res.changed).toBe(false);
+    expect(readWorkspace().roots).toHaveLength(1);
   });
 
   it('does not treat a sibling with a shared name prefix as covered', () => {

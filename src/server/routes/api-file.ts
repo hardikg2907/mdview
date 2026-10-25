@@ -11,7 +11,7 @@ import {
   type Palette,
   type RenderedFile,
 } from '../../shared/types.js';
-import { hasDotSegment, MAX_MARKDOWN_BYTES, OutsideRootError, resolveSafePath } from '../fs/resolve.js';
+import { MAX_MARKDOWN_BYTES, OutsideRootError, resolveSafePath } from '../fs/resolve.js';
 import { parseWorkspacePath, type RootState, toWorkspacePath } from '../workspace.js';
 
 const MD_FILE_RE = /\.(md|markdown|mdx)$/i;
@@ -165,12 +165,6 @@ export function registerApiFile(app: FastifyInstance, roots: readonly RootState[
     if (!MD_FILE_RE.test(absPath)) {
       return reply.code(400).send({ error: 'Only markdown files are supported' });
     }
-    // The tree and the asset route hide dot-directories, so this route does
-    // too. A single-file root's own file is exempt: the user named it.
-    if (!pinned && (hasDotSegment(rel) || hasDotSegment(path.relative(realRoot, absPath)))) {
-      return reply.code(404).send({ error: 'File not found' });
-    }
-
     let raw: string;
     let mtimeMs: number;
     try {

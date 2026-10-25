@@ -1,6 +1,5 @@
 import { existsSync, lstatSync, realpathSync, statSync } from 'node:fs';
 import path from 'node:path';
-import { hasDotSegment } from '../server/fs/resolve.js';
 import { deriveRootId, isValidRootId, type RootSpec } from '../server/workspace.js';
 import { readJsonSafe, workspaceFilePath, writeJsonAtomic } from './state.js';
 
@@ -140,9 +139,6 @@ function findCovering(
     if (root.kind !== 'dir' && root.path !== abs) continue;
     const rel = path.relative(root.path, abs);
     if (rel.startsWith('..') || path.isAbsolute(rel)) continue;
-    // A folder root hides and refuses everything under a dot-directory, so a
-    // target there (`.github/x.md`) gets a root of its own instead.
-    if (hasDotSegment(rel)) continue;
     if (!best || root.path.length > best.root.path.length) {
       best = { root, rel: rel.split(path.sep).join('/') };
     }

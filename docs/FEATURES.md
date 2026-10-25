@@ -156,7 +156,7 @@ to, and only the bare `mdview [path]` form changed.
 - **Folders are unrelated.** They don't have to be siblings, or share a parent, or be in the same tree at all. Each keeps its own `.mdview.json` `ignore` list and its own file watcher.
 - **The sidebar groups them.** One folder's contents sit at the top level exactly as before; two or more get a heading each. `⌘P` and folder-wide search span all of them.
 - **Persistent.** Folders stay open across restarts and reboots until `mdview rm`. Capped at 8, since each holds a live recursive watcher.
-- **Reuse over duplication.** Opening a file or subfolder inside an already-open folder reuses it and jumps to the file, instead of adding an overlapping root. A target under a dot-directory (`.github/x.md`) is the exception: folders hide those, so it gets a root of its own.
+- **Reuse over duplication.** Opening a file or subfolder inside an already-open folder reuses it and jumps to the file, instead of adding an overlapping root. This includes a file under a dot-directory (`.github/x.md`), which the tree hides but the folder still serves.
 - **A single file is just that file.** `mdview ~/README.md` watches only `README.md`, not the folder it sits in, and serves only the images and media the document references.
 - **Runs until stopped.** `mdview stop` ends it; otherwise it stays put, which keeps the URL reliable. `MDVIEW_IDLE_TIMEOUT` opts into exiting after N minutes with no tab connected, for anyone who'd rather it didn't sit there holding watchers.
 - **State** lives only in `~/.config/mdview/` — `daemon.json` (pid, port, start time), `workspace.json` (the open folders), `daemon.log` (truncated past 1 MB).

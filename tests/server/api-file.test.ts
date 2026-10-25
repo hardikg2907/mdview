@@ -90,19 +90,10 @@ describe('GET /api/file (markdown-only)', () => {
     expect(res.json()).toMatchObject({ error: expect.stringMatching(/markdown/i) });
   });
 
-  it('404s on markdown inside a dot-directory or a dotfile', async () => {
-    for (const p of [
-      '.github/PR.md',
-      'w/.github/PR.md',
-      '.claude/CLAUDE.md',
-      '.draft.md',
-      'x/../.github/PR.md',
-      encodeURIComponent('./.claude/CLAUDE.md'),
-    ]) {
+  it('serves markdown inside a dot-directory, which a README may link to', async () => {
+    for (const p of ['.github/PR.md', 'w/.github/PR.md', '.claude/CLAUDE.md']) {
       const res = await app.inject({ method: 'GET', url: `/api/file?path=${p}` });
-      expect(res.statusCode, p).toBe(404);
-      expect(res.body, p).not.toContain('template');
-      expect(res.body, p).not.toContain('Agent notes');
+      expect(res.statusCode, p).toBe(200);
     }
   });
 
@@ -173,10 +164,10 @@ describe.skipIf(process.platform === 'win32')('GET /api/file (symlinks)', () => 
     expect(res.json().title).toBe('Real');
   });
 
-  it('refuses an in-root link whose target sits in a dot-directory', async () => {
+  it('follows an in-root link whose target sits in a dot-directory', async () => {
     const res = await app.inject({ method: 'GET', url: '/api/file?path=agent.md' });
-    expect(res.statusCode).toBe(404);
-    expect(res.body).not.toContain('Agent notes');
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toContain('Agent notes');
   });
 
   it('refuses an in-root link whose target is not markdown', async () => {
