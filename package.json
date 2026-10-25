@@ -26,7 +26,7 @@
     "mdview": "./bin/mdview.mjs"
   },
   "files": [
-    "bin/mdview.mjs",
+    "bin/*.mjs",
     "dist",
     "README.md",
     "LICENSE",
@@ -44,6 +44,7 @@
     "lint": "biome check src tests",
     "lint:fix": "biome check --write src tests",
     "capture": "node scripts/capture-screenshots.mjs",
+    "prepack": "node -e \"require('fs').rmSync('bin',{recursive:true,force:true})\" && npm run build",
     "prepare": "husky || true && node -e \"const fs=require('fs');if(!fs.existsSync('bin/mdview.mjs'))require('child_process').execSync('npm run build',{stdio:'inherit'})\""
   },
   "dependencies": {

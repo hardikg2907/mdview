@@ -9,9 +9,16 @@ export default defineConfig({
   outExtension: () => ({ js: '.mjs' }),
   target: 'node20',
   sourcemap: true,
+  // Several test files rebuild bin/ at the same moment, and a clean in one
+  // build would delete chunks another is about to spawn. Stale chunks are
+  // dropped by `prepack` instead.
   clean: false,
   bundle: true,
-  splitting: false,
+  // Without splitting, esbuild hoists every external import of a dynamic
+  // import() to the top of the single output file, so `--version` would still
+  // load fastify, shiki and chokidar. Each lazily loaded module needs its own
+  // chunk, and the chunks sit next to the entry in bin/.
+  splitting: true,
   shims: true,
   banner: { js: '#!/usr/bin/env node' },
 });

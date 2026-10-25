@@ -2,15 +2,12 @@ import dns from 'node:dns/promises';
 import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import chokidar from 'chokidar';
 import type { FastifyInstance } from 'fastify';
-import openBrowser from 'open';
 import { runConfigSubcommand } from './cli-config.js';
 import { runListCommand, runRemoveCommand, runStopCommand } from './cli-workspace.js';
 import { ensureDaemon, waitForRoot } from './daemon/client.js';
 import { clearDaemonState, workspaceFilePath, writeDaemonState } from './daemon/state.js';
 import { addRoot, readWorkspace, toRootSpecs } from './daemon/workspace-file.js';
-import { createServer } from './server/index.js';
 import { deriveRootId, type RootSpec } from './server/workspace.js';
 import { PALETTES, type Palette } from './shared/types.js';
 
@@ -300,6 +297,37 @@ export function idleTimeoutMs(): number {
 }
 
 /**
+ * Loaded on demand rather than at the top of the file: fastify, shiki,
+ * markdown-it and chokidar take roughly 150 ms to parse, and `--version`, `ls`,
+ * `rm` and `stop` never touch any of them.
+ */
+function loadServer(): Promise<typeof import('./server/index.js')> {
+  return import('./server/index.js');
+}
+
+async function openBrowser(url: string): Promise<void> {
+  const { default: open } = await import('open');
+  await open(url);
+}
+
+/**
+ * Pays Shiki's start-up cost once the port is bound, off the request path, so
+ * the first document a browser asks for finds a ready highlighter. A failure
+ * only means that first request pays for the load instead.
+ *
+ * The short delay lets requests that are already on their way in (the CLI's
+ * readiness probe, the page's first fetches) be answered before the warm-up
+ * holds the event loop for tens of milliseconds.
+ */
+const WARM_UP_DELAY_MS = 100;
+
+function warmHighlighterInBackground(): void {
+  setTimeout(() => {
+    void import('./render/shiki.js').then((m) => m.warmHighlighter()).catch(() => undefined);
+  }, WARM_UP_DELAY_MS).unref();
+}
+
+/**
  * A server in this terminal, serving one folder, stopped with Ctrl-C. This is
  * what --foreground, --port, --palette and --vscode all get.
  */
@@ -307,6 +335,7 @@ async function runForeground(args: Args): Promise<void> {
   const root = detectRoot(args.target);
   const clientDir = requireClientDir();
 
+  const { createServer } = await loadServer();
   const { app } = await createServer({
     roots: [root],
     clientDir,
@@ -331,6 +360,10 @@ async function runForeground(args: Args): Promise<void> {
     console.log(`mdview → ${url}`);
     console.log(`watching: ${root.absPath}`);
   }
+
+  // After the ready line: the warm-up holds the event loop for tens of
+  // milliseconds, and nothing waiting on this process should queue behind it.
+  warmHighlighterInBackground();
 
   if (args.open) await openBrowser(url);
 
@@ -383,6 +416,7 @@ async function runDaemon(args: Args): Promise<void> {
   const startedAt = Date.now();
   let idleTimer: ReturnType<typeof setTimeout> | undefined;
 
+  const { createServer } = await loadServer();
   const server = await createServer({
     roots: toRootSpecs(readWorkspace()),
     clientDir,
@@ -401,6 +435,7 @@ async function runDaemon(args: Args): Promise<void> {
   writeDaemonState({ pid: process.pid, port: boundPort, startedAt });
   console.log(`[${new Date().toISOString()}] mdview daemon pid ${process.pid} on port ${boundPort}`);
 
+  const { default: chokidar } = await import('chokidar');
   const wsWatcher = chokidar.watch(workspaceFilePath(), {
     ignoreInitial: true,
     persistent: true,
@@ -447,6 +482,10 @@ async function runDaemon(args: Args): Promise<void> {
   // Nothing is watching yet, so start the clock now — otherwise a daemon whose
   // browser tab never opens would sit there holding watchers forever.
   armIdle();
+
+  // Last, so the state file and the workspace watcher are in place before the
+  // warm-up holds the event loop.
+  warmHighlighterInBackground();
 }
 
 /**

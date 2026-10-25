@@ -1,6 +1,6 @@
 node_modules
 dist
-bin/mdview.mjs
+bin/*.mjs
 bin/*.map
 .DS_Store
 *.log
