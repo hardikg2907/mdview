@@ -7,10 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`mdview update` checks for a newer release and prints the install command.** It asks registry.npmjs.org once, sends nothing that identifies you, and never installs or runs npm. The command is pinned to that version and uses the npm beside the Node that runs mdview.
+- **An optional daily update notice, off by default.** `mdview config update-check on` makes the background server check about once a day. `mdview <path>` then prints one line to stderr, at most once a day per version, and only in a terminal. Only the global config can turn it on.
+- **`mdview ls` says when the background server runs a different version** than the CLI.
+
 ### Removed
 - **Node 20 is no longer supported; mdview now needs Node 22.12 or later.** Node 20 reached end of life on 2026-04-30, and a fresh install of 0.10.0 already failed to start a server on Node 20.0–20.18: `@fastify/static` 10.1.7 pulls `content-disposition` 3, which ships ES modules only, and Node loads those through `require()` without a flag only from 22.12. Run `node --version` before upgrading. The VS Code extension now needs VS Code 1.101 or later, the first release that runs on Node 22.
 
 ### Security
+- **Security fixes now take effect after `npm i -g` without `mdview stop`.** `mdview <path>` replaces a background server that runs another version (or, like 0.10.0 and older, reports none) and prints `mdview: restarted the background server (old → new)`. Open folders stay open. `/api/health` now reports `version`.
+- **The registry answer is validated before it reaches your terminal.** The version must be plain semver, the read is capped at 64 KB and 5 s, redirects are refused, and errors never echo the response. A `.mdview.json` in a cloned repo cannot turn on the update check.
 - **KaTeX is updated to 0.19, which fixes a prototype-pollution advisory** that could bypass its `trust` restrictions. KaTeX ships inside the client bundle, so `npm audit --omit=dev` never reported it.
 - **A markdown file can no longer run script through an SVG beside it.** A document could frame `/__asset/…/evil.svg`, or link to it, and the SVG's script ran with no policy and could read other files and send them off the machine. Every `/__asset/*` response and every SVG response now carries a sandbox CSP, `nosniff` and `Cross-Origin-Resource-Policy: same-origin`, including when the route is reached through a percent-encoded URL. The page policy adds `frame-src 'none'` and `object-src 'none'`.
 - **Symlinks can no longer lead out of an open folder.** A link committed into a repo (`notes.md -> /etc/hosts`, `logo.png -> ~/.ssh/id_ed25519`) was served as if it lived in the folder. Paths are now checked again after resolving every link. Links that stay inside the folder still work.
@@ -45,6 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Diagrams render with pele 1.10.** Labels and links in diagrams are sanitised more strictly (entity codes decode once; stray non-characters are stripped before the link scheme check), subgraph diagrams have fewer edge crossings, class diagrams wrap into rows instead of shrinking, CJK labels wrap, and `List<T>` in a label no longer renders as `List`. A `%%` comment no longer deletes the character before it, so a diagram that only parsed because of that now shows a syntax error.
 
 ### Fixed
+- **Two CLIs started at the same moment can no longer both spawn a background server.** Taking the spawn lock now re-checks for a server a rival just started.
 - **A front matter block holding only whitespace or comments is still recognised as front matter** and removed from the page.
 - **Navigating between files no longer drops and reopens the live-reload connection.** The watch stream reconnected on every navigation, so a file change could fall into the gap, and the server's connected-tab count briefly dropped to zero, which matters with `MDVIEW_IDLE_TIMEOUT`. One connection now lasts for the life of the page.
 - **A burst of file changes no longer refetches the file tree hundreds of times.** Switching git branches fired one full tree request per added or removed file. Refreshes now wait 150 ms after the last change and run once, and the tree still ends up current.
