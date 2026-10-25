@@ -362,8 +362,9 @@ Sequence shortcuts (e.g. `gg`) use a module-scoped timestamp + `resetPendingSequ
 `markdown-it` runs with `html: true`, so inline HTML in a document reaches the
 page verbatim. The CSP is what keeps that from becoming script execution. It is
 assembled in `buildCspHtml()` (`src/server/index.ts`) and applied by an `onSend`
-hook that fires for `text/html` responses only, alongside
-`x-content-type-options: nosniff` and `referrer-policy: no-referrer`.
+hook to `text/html` responses, alongside `x-content-type-options: nosniff` and
+`referrer-policy: no-referrer`. `/__asset/*` responses get a different policy
+(below) and never this one.
 
 | Directive | Value | Why |
 |---|---|---|
@@ -373,11 +374,30 @@ hook that fires for `text/html` responses only, alongside
 | `img-src` | `'self' data:` | `data:` for inlined SVG. |
 | `font-src` | `'self' data:` | JetBrains Mono subsets are same-origin; KaTeX inlines some faces. |
 | `connect-src` | `'self'` | Confines `fetch` and the SSE stream to this origin. |
+| `frame-src` / `object-src` | `'none'` | Nothing in the SPA frames or embeds a document. A same-origin `<iframe>` in a `.md` would otherwise load an `/__asset/*` SVG as a page of its own. |
 | `base-uri` / `form-action` | `'none'` | No `<base>` hijack, no form posts anywhere. |
 | `frame-ancestors` | `'none'`, **omitted** under `--vscode` | Blocks framing by default. Under `--vscode` the directive is dropped entirely rather than widened to `*`: Chromium 142 (VS Code 1.126) rejects the webview's `vscode-webview://` origin against a wildcard, so an omitted directive is the only thing that both frames correctly and stays honest about what is being allowed. |
 
 Adding a `script-src` source, adding `'unsafe-inline'` to `script-src`, or
 weakening `connect-src` are all regressions — see `CLAUDE.md` §3.1.
+
+### Asset responses
+
+`/__asset/*` serves files from inside a root, so it serves whatever a document's
+author put there — including an SVG with a `<script>`. A policy on a subresource
+does not affect its use in `<img>`, `<video>` or `<audio>`; it only applies when
+the file is opened as a document (a new tab, a frame). Every response from the
+route, success or error, carries `ASSET_SECURITY_HEADERS`
+(`src/server/routes/api-asset.ts`), applied by URL in the same `onSend` hook:
+
+| Header | Value | Why |
+|---|---|---|
+| `content-security-policy` | `default-src 'none'; style-src 'unsafe-inline'; sandbox; frame-ancestors 'none'` | `sandbox` gives a directly opened SVG an opaque origin and no script, so it cannot read other files. Inline styles keep SVGs drawing correctly. |
+| `x-content-type-options` | `nosniff` | The declared media type is the only one the browser uses. |
+| `cross-origin-resource-policy` | `same-origin` | Another site cannot embed the user's files through the loopback port. |
+
+The route serves an allow-list of image, video and audio types only, and 404s
+any path with a segment that starts with `.`.
 
 ## Design constraints baked in
 

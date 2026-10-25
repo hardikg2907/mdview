@@ -20,9 +20,30 @@ const MIME: Record<string, string> = {
   '.mov': 'video/quicktime',
   '.mp3': 'audio/mpeg',
   '.wav': 'audio/wav',
-  '.pdf': 'application/pdf',
-  '.txt': 'text/plain; charset=utf-8',
 };
+
+/**
+ * Sent on every /__asset/* response, success or error. A policy on a
+ * subresource does not affect its use in <img>/<video>/<audio>; it only bites
+ * when the asset is opened as a document. Then `sandbox` gives it an opaque
+ * origin with no script, so an SVG cannot read other files. CORP stops other
+ * sites embedding the user's files through the loopback port.
+ */
+export const ASSET_SECURITY_HEADERS: Readonly<Record<string, string>> = {
+  'content-security-policy':
+    "default-src 'none'; style-src 'unsafe-inline'; sandbox; frame-ancestors 'none'",
+  'x-content-type-options': 'nosniff',
+  'cross-origin-resource-policy': 'same-origin',
+};
+
+// Checked after containment, on the normalised path, so `a/../b.png` is judged
+// by where it lands rather than by the `..` it passed through.
+function hasDotSegment(rel: string): boolean {
+  return path
+    .normalize(rel)
+    .split(/[\\/]/)
+    .some((seg) => seg.startsWith('.') && seg !== '.');
+}
 
 export function registerApiAsset(app: FastifyInstance, roots: readonly RootState[]): void {
   app.get<{ Params: { '*': string } }>('/__asset/*', async (req, reply) => {
@@ -37,6 +58,11 @@ export function registerApiAsset(app: FastifyInstance, roots: readonly RootState
     } catch (err) {
       return reply.code(400).send({ error: (err as Error).message });
     }
+    // Dot-directories hold tool state (.git, .ssh, .vscode), never content a
+    // document links to, whatever the extension of the file inside them.
+    if (hasDotSegment(resolved.rel)) {
+      return reply.code(404).send({ error: 'Asset not found' });
+    }
     let st: Awaited<ReturnType<typeof stat>>;
     try {
       st = await stat(abs);
@@ -49,9 +75,8 @@ export function registerApiAsset(app: FastifyInstance, roots: readonly RootState
     const ext = path.extname(abs).toLowerCase();
     const mime = MIME[ext];
     if (!mime) {
-      // Allow-list known media types only. Without this, /__asset/.env or any
-      // dotfile under the watched root would be readable by anything that can
-      // reach the server (a script in a rendered .md, or any other localhost tab).
+      // Media types only: the route exists for <img>, <video> and <audio> in
+      // rendered documents. Source, config and keys under the root stay unreadable.
       return reply.code(404).send({ error: 'Asset type not allowed' });
     }
     reply.header('content-type', mime);

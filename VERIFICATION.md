@@ -362,6 +362,23 @@ cd /some/other/repo && mdview .
 - `mdview --port 9000 ./test-fixtures` and `mdview --palette kanagawa ./test-fixtures` → both block in the terminal, exactly as before the daemon existed.
 - `mdview --vscode --port 0 ./test-fixtures` → still one JSON line with a `http://127.0.0.1:<port>/` URL, still exits on stdin close.
 
+### 38. Untrusted content stays contained
+
+Use a scratch folder you can throw away:
+
+```bash
+mkdir -p /tmp/mdv-untrusted/root /tmp/mdv-untrusted/outside
+echo 'TOP-SECRET' > /tmp/mdv-untrusted/outside/secret
+cat > /tmp/mdv-untrusted/root/evil.svg <<'EOF'
+<svg xmlns="http://www.w3.org/2000/svg"><script>fetch('/api/tree').then(r=>r.text()).then(t=>fetch('/api/health?exfil='+encodeURIComponent(t)))</script></svg>
+EOF
+printf '# demo\n\n<iframe src="/__asset/root/evil.svg"></iframe>\n\n![svg](evil.svg)\n' > /tmp/mdv-untrusted/root/a.md
+node bin/mdview.mjs --foreground --no-open --port 7399 /tmp/mdv-untrusted/root
+```
+
+- **An iframe of an SVG asset in a .md does not run script.** Open `http://127.0.0.1:7399/?file=root/a.md` with DevTools → Network open. The `<iframe>` stays blank and the console shows a `frame-src` CSP violation. The `![svg]` image still renders. No request to `/api/health?exfil=…` appears.
+- Open `http://127.0.0.1:7399/__asset/root/evil.svg` directly in a tab → the SVG draws, but the console shows the script blocked by the sandbox, and no `exfil` request appears.
+
 ## Tests
 
 ```bash

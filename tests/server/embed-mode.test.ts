@@ -137,6 +137,8 @@ const SHARED_DIRECTIVES = [
   "img-src 'self' data:",
   "font-src 'self' data:",
   "connect-src 'self'",
+  "frame-src 'none'",
+  "object-src 'none'",
   "base-uri 'none'",
   "form-action 'none'",
 ] as const;

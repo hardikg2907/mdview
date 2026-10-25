@@ -5,7 +5,7 @@ import type { Palette, WatchEvent } from '../shared/types.js';
 import { CONFIG_FILENAME, loadEffectiveConfig } from './config.js';
 import { buildIgnoreSet } from './fs/ignore.js';
 import { isAllowedHost } from './hosts.js';
-import { registerApiAsset } from './routes/api-asset.js';
+import { ASSET_SECURITY_HEADERS, registerApiAsset } from './routes/api-asset.js';
 import { registerApiFile } from './routes/api-file.js';
 import { registerApiSearch } from './routes/api-search.js';
 import { registerApiTree } from './routes/api-tree.js';
@@ -71,6 +71,10 @@ function buildCspHtml(embedMode: boolean): string {
     "img-src 'self' data:",
     "font-src 'self' data:",
     "connect-src 'self'",
+    // Nothing in the SPA frames or embeds documents. A same-origin frame of an
+    // /__asset/* URL would otherwise run as a document of its own.
+    "frame-src 'none'",
+    "object-src 'none'",
     "base-uri 'none'",
     "form-action 'none'",
   ];
@@ -95,7 +99,15 @@ export async function createServer(opts: ServerOptions): Promise<MdviewServer> {
   // exfiltrate sibling files via /__asset/* and /api/file. The CSP below blocks
   // inline + remote scripts on the SPA shell, which is where rendered markdown
   // is injected.
-  app.addHook('onSend', async (_req, reply, payload) => {
+  //
+  // Asset responses carry their own policy whatever their type: an SVG opened
+  // as a document (a new tab, a frame) runs its scripts under its own response
+  // headers, not the SPA's. Keyed on the URL so error replies are covered too.
+  app.addHook('onSend', async (req, reply, payload) => {
+    if (req.url.startsWith('/__asset/')) {
+      reply.headers(ASSET_SECURITY_HEADERS);
+      return payload;
+    }
     const ct = String(reply.getHeader('content-type') ?? '');
     if (ct.startsWith('text/html')) {
       reply.header('content-security-policy', cspHtml);
