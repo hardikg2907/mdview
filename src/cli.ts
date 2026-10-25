@@ -11,6 +11,7 @@ import { clearDaemonState, workspaceFilePath, writeDaemonState } from './daemon/
 import { createUpdateChecker } from './daemon/update-check.js';
 import { addRoot, readWorkspace, toRootSpecs } from './daemon/workspace-file.js';
 import { loadGlobalConfig } from './server/config.js';
+import { readUpdateCheck } from './server/config-write.js';
 import { deriveRootId, type RootSpec } from './server/workspace.js';
 import { PALETTES, type Palette } from './shared/types.js';
 import { fetchLatestVersion } from './update/latest.js';
@@ -555,7 +556,9 @@ async function runAttach(args: Args): Promise<void> {
     version: readVersion(),
     now: Date.now,
     interactive: () => Boolean(process.stdout.isTTY && process.stderr.isTTY),
-    isEnabled: async () => (await loadGlobalConfig())?.updateCheck === true,
+    // The raw key, not loadGlobalConfig: this short command must not start
+    // warning about unrelated fields in a config it never read before.
+    isEnabled: () => readUpdateCheck(),
     print: (line) => console.error(line),
   });
 
