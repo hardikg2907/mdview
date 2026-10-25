@@ -64,6 +64,11 @@ describe('parseFrontmatter hardening', () => {
     expect(body).toBe('body');
   });
 
+  it('applies YAML merge keys', () => {
+    const r = parseFrontmatter('---\nbase: &b\n  a: 1\n  b: 2\nchild:\n  <<: *b\n  b: 3\n---\nbody');
+    expect(r.data).toEqual({ base: { a: 1, b: 2 }, child: { a: 1, b: 3 } });
+  });
+
   it('gives null data for a scalar block but still strips it', () => {
     const { data, body } = parseFrontmatter('---\njust text\n---\nbody');
     expect(data).toBeNull();

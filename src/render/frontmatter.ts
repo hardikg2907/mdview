@@ -1,4 +1,4 @@
-import { load } from 'js-yaml';
+import { CORE_SCHEMA, load, mergeTag } from 'js-yaml';
 
 export interface FrontmatterResult {
   data: Record<string, unknown> | null;
@@ -18,6 +18,11 @@ export interface FrontmatterResult {
 const MAX_NODES = 10_000;
 const MAX_STRING_CHARS = 1_000_000;
 
+// YAML 1.2 dropped merge keys, but front matter written for YAML 1.1 tools
+// (`<<: *defaults`) relies on them. The budgets above still bound what a merge
+// can expand to.
+const SCHEMA = CORE_SCHEMA.withTags(mergeTag);
+
 function unparsed(raw: string): FrontmatterResult {
   return { data: null, body: raw, bodyStartLine: 0 };
 }
@@ -31,7 +36,7 @@ export function parseFrontmatter(raw: string): FrontmatterResult {
   // still front matter with no keys.
   if (!isBlank(block.yaml)) {
     try {
-      loaded = load(block.yaml);
+      loaded = load(block.yaml, { schema: SCHEMA });
     } catch {
       return unparsed(raw);
     }
