@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- Bumped shipped dependencies to clear advisories: `markdown-it` 14.3.2 → 14.3.3 (quadratic-time parsing of inline HTML when `html` is enabled, and of a multi-line link reference definition), `fastify` 5.12.5 → 5.12.7 (header validation bypass via case-sensitive `propertyNames`), and `fast-uri` 3.1.8 → 3.1.9 and 4.2.1 → 4.2.3 (scheme spoofing, path equivalence and host confusion in URI handling). The `markdown-it` ones were reachable: the renderer enables `html`, so a crafted markdown file could block the server. The others were not reachable as mdview is configured (no route declares a headers schema), but they ship in the install.
+
 ## [0.10.0] — 2026-10-19
 
 A security fix for front matter, and a lighter diagram renderer that follows
