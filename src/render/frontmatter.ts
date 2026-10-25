@@ -26,18 +26,20 @@ export function parseFrontmatter(raw: string): FrontmatterResult {
   const block = locateBlock(raw);
   if (!block) return unparsed(raw);
 
-  let loaded: unknown;
-  try {
-    loaded = load(block.yaml);
-  } catch {
-    return unparsed(raw);
+  let loaded: unknown = {};
+  // `load` throws on an empty or comment-only source, but such a block is
+  // still front matter with no keys.
+  if (!isBlank(block.yaml)) {
+    try {
+      loaded = load(block.yaml);
+    } catch {
+      return unparsed(raw);
+    }
+    if (!withinBudget(loaded)) return unparsed(raw);
   }
-  if (!withinBudget(loaded)) return unparsed(raw);
 
   return {
-    // An empty or comment-only block loads as `undefined`; it is still a
-    // front matter block with no keys.
-    data: loaded === undefined ? {} : isPlainObject(loaded) ? loaded : null,
+    data: isPlainObject(loaded) ? loaded : null,
     // CRLF-safe strip so the body and the bodyStartLine offset stay aligned for
     // both LF- and CRLF-authored sources.
     body: block.body.replace(/^(?:\r?\n)+/, ''),
@@ -76,6 +78,10 @@ function locateBlock(
     body: parts.slice((closingIdx + 1) * 2).join(''),
     bodyStartLine,
   };
+}
+
+function isBlank(yaml: string): boolean {
+  return yaml.split(/\r?\n/).every((line) => /^\s*(?:#.*)?$/.test(line));
 }
 
 function withinBudget(root: unknown): boolean {

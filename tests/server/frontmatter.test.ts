@@ -50,10 +50,18 @@ describe('parseFrontmatter hardening', () => {
     expect(bodyStartLine).toBe(9);
   });
 
-  it('parses a YAML date as a Date so JSON output stays an ISO string', () => {
-    const { data } = parseFrontmatter('---\ndate: 2024-01-02\n---\nbody');
-    expect(data?.date).toBeInstanceOf(Date);
-    expect(JSON.stringify(data)).toBe('{"date":"2024-01-02T00:00:00.000Z"}');
+  it('keeps a YAML date as the text the author wrote', () => {
+    const { data } = parseFrontmatter('---\ndate: 2024-01-02\nat: 2024-01-02T10:00:00Z\n---\nbody');
+    expect(data).toEqual({ date: '2024-01-02', at: '2024-01-02T10:00:00Z' });
+  });
+
+  it.each([
+    ['whitespace only', '---\n   \n\t\n---\nbody'],
+    ['comment only', '---\n# nothing here\n  # indented\n---\nbody'],
+  ])('treats a %s block as front matter with no keys', (_name, raw) => {
+    const { data, body } = parseFrontmatter(raw);
+    expect(data).toEqual({});
+    expect(body).toBe('body');
   });
 
   it('gives null data for a scalar block but still strips it', () => {
