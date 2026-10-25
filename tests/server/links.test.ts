@@ -73,6 +73,28 @@ describe('tagInternalLinks', () => {
     const out = tagInternalLinks(html, 'guides/intro.md');
     expect(out).toContain('href="?file=guides%2Fother.md#section-2"');
   });
+
+  it('cannot break out of data-internal-link with a percent-encoded quote', () => {
+    const html = '<a href="x%22%20onmouseover%3D%22alert(1)%22%20a%3D%22.md">x</a>';
+    const out = tagInternalLinks(html, 'a.md');
+    expect(out).not.toMatch(/"\s+onmouseover=/);
+    expect(out).toContain(
+      'data-internal-link="x&quot; onmouseover=&quot;alert(1)&quot; a=&quot;.md"',
+    );
+  });
+
+  it('escapes < > and quotes decoded from the path', () => {
+    const html = '<a href="%3Cimg%20src%3Dx%3E%27.md">x</a>';
+    const out = tagInternalLinks(html, 'a.md');
+    expect(out).not.toContain('<img');
+    expect(out).toContain('data-internal-link="&lt;img src=x&gt;&#39;.md"');
+  });
+
+  it('round-trips an escaped & in the query without double-escaping', () => {
+    const html = '<a href="other.md?a=1&amp;b=2">x</a>';
+    const out = tagInternalLinks(html, 'a.md');
+    expect(out).toContain('data-internal-link="other.md?a=1&amp;b=2"');
+  });
 });
 
 describe('rewriteImageSrc', () => {

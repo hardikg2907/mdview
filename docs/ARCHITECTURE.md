@@ -354,6 +354,7 @@ Sequence shortcuts (e.g. `gg`) use a module-scoped timestamp + `resetPendingSequ
 - **State directory:** `~/.config/mdview/` is owner-only. `ensurePrivateDir` (`src/daemon/state.ts`) creates it `0700` and chmods it if it already exists; `config.json`, `workspace.json`, `daemon.json`, `daemon.lock` and `daemon.log` are written `0600`, and existing files are tightened, because a mode passed at creation does not change an existing file. These files name every folder the user has opened. On Windows the modes are a no-op.
 - **Watchers:** every chokidar watch over a root (the tree watcher and the `.mdview.json` watcher) sets `followSymlinks: false`. chokidar follows links by default, so a repo holding `link -> /` would otherwise have it walk and watch the whole disk.
 - **External links:** `target="_blank"` is always paired with `rel="noopener noreferrer"`.
+- **Rewritten link attributes:** `tagInternalLinks` (`src/render/links.ts`) unescapes the captured `href`, percent-decodes the path, and HTML-escapes both the new `href` and `data-internal-link` on the way out. The decode is what makes the escape necessary: `%22` becomes a raw quote.
 - **Clipboard:** writes only happen in user-initiated event handlers.
 - **Project config:** `validateConfig` rejects `lineWidth` strings that don't match a tight character class (so untrusted CSS can't slip in via `.mdview.json`).
 - The server binds to `127.0.0.1` only (never 0.0.0.0). Single-machine, single-user.
