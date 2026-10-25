@@ -53,6 +53,7 @@ src/
 │   ├── frontmatter.ts
 │   ├── outline.ts
 │   ├── links.ts                     ← tagInternalLinks, rewriteImageSrc
+│   ├── html-tags.ts                 ← linear tag scanner (rewriteTags)
 │   └── math.ts                      ← KaTeX placeholder emission
 ├── server/
 │   ├── index.ts                     ← createServer factory + .mdview.json watcher
@@ -200,7 +201,7 @@ The renderer lives in `src/render/`, **outside** `src/server/`, because it has n
 3. **`shiki.ts`** — `highlightCode(code, lang, palette)` lazy-loads languages on demand. Only the default palette's theme pair loads at start-up; another palette's pair loads on its first request, and concurrent requests share that load. Results sit in an 8 MB `ByteLru` (keys count toward the cap) keyed by palette, language and the SHA-256 of the code, so a live reload re-highlights only blocks that changed. It renders the requested palette's light and dark themes with `defaultColor: false`, so each token carries exactly `--shiki-light` and `--shiki-dark` and the light/dark toggle repaints purely in CSS. Changing *palette* refetches, because only the active one is rendered: rendering all eight put 16 variables on every token and took a real document from 30 KB to 204 KB.
 4. **`math.ts`** — markdown-it core rule that scans for `$$...$$` paragraphs and `$...$` inline runs (with whitespace heuristics and code-span exclusion), emitting `<span class="math-inline">` / `<div class="math-block">` placeholders with URL-encoded `data-source`.
 5. **`outline.ts`** — `extractOutline(tokens)` walks heading tokens, builds a nested `OutlineNode[]` tree using a stack-based algorithm. Handles non-monotonic depth jumps (e.g. h1 → h3 with no h2).
-6. **`links.ts`** — `tagInternalLinks(html, currentRelPath)` adds `data-internal-link="<resolved-path>"` to relative `.md` `<a href>`s so the client can intercept them. `rewriteImageSrc(html, currentRelPath)` rewrites relative `<img src>` to `/__asset/<resolved>` so they resolve against the content root, not the SPA bundle.
+6. **`links.ts`** — `tagInternalLinks(html, currentRelPath)` adds `data-internal-link="<resolved-path>"` to relative `.md` `<a href>`s so the client can intercept them. `rewriteImageSrc(html, currentRelPath)` rewrites relative `<img src>` to `/__asset/<resolved>` so they resolve against the content root, not the SPA bundle. Both run over the final HTML through `rewriteTags` (`html-tags.ts`), a single forward pass that reads tags the way an HTML tokenizer does: quoted attribute values may hold `>`, comments and the attributes of other tags are stepped over, attribute names match case-insensitively, and single-quoted or unquoted values are handled like double-quoted ones. Markdown links and raw-HTML anchors and images are rewritten alike.
 
 ### Filesystem (`src/server/fs/`)
 
@@ -360,7 +361,8 @@ Sequence shortcuts (e.g. `gg`) use a module-scoped timestamp + `resetPendingSequ
 - **Dot paths:** `/__asset/*` refuses any path with a segment starting with `.`, judged by `hasDotSegment` (`src/server/fs/resolve.ts`) on the requested path and on the real path relative to the real root. The second check catches an in-root link into `.git`, and on Windows an 8.3 short name (`GIT~1`) that names `.git` without a dot. `/api/file` does not apply it: it returns markdown only, other origins cannot read it, and a README may link to `.github/CONTRIBUTING.md`.
 - **Watchers:** every chokidar watch (each root's tree watcher, each root's `.mdview.json` watcher, and the daemon's `workspace.json` watcher) sets `followSymlinks: false`. chokidar follows links by default, so a repo holding `link -> /` would otherwise have it walk and watch the whole disk.
 - **External links:** `target="_blank"` is always paired with `rel="noopener noreferrer"`.
-- **Rewritten link attributes:** `tagInternalLinks` (`src/render/links.ts`) unescapes the captured `href`, percent-decodes the path, and HTML-escapes both the new `href` and `data-internal-link` on the way out. The decode is what makes the escape necessary: `%22` becomes a raw quote.
+- **Rewritten link attributes:** `tagInternalLinks` (`src/render/links.ts`) unescapes the captured `href`, percent-decodes the path, and HTML-escapes both the new `href` and `data-internal-link` on the way out. The decode is what makes the escape necessary: `%22` becomes a raw quote. `rewriteImageSrc` escapes a quote that a single-quoted or unquoted `src` carried.
+- **Linear passes over whole documents:** every pass over a whole document — link and image rewriting, front matter, folder-search line walks — is a single forward scan with `indexOf` and character checks, never a backtracking regex. A regex like `<a\s+([^>]*?)href="…` restarts at every `<a` and scans to the next `>`, so an HTML block of `<a ` with no `>` would be quadratic — about a minute of CPU for 1 MB, with the whole daemon stalled — and any rendered document can make the daemon render another one through `<img src="/api/file?path=…">`.
 - **Clipboard:** writes only happen in user-initiated event handlers.
 - **Project config:** `validateConfig` rejects `lineWidth` strings that don't match a tight character class (so untrusted CSS can't slip in via `.mdview.json`).
 - The server binds to `127.0.0.1` only (never 0.0.0.0). Single-machine, single-user.

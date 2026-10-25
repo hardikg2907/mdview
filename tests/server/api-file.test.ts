@@ -18,6 +18,7 @@ describe('GET /api/file (markdown-only)', () => {
       path.join(root, 'evil.md'),
       '---js\n{ ranInServer: typeof process === "object", pid: process.pid }\n---\n# Hello',
     );
+    writeFileSync(path.join(root, 'anchors.md'), `<div>\n${'<a '.repeat(400_000)}\n`);
     writeFileSync(path.join(root, '.env'), 'SECRET=hunter2');
     writeFileSync(path.join(root, 'notes.txt'), 'plain text');
     mkdirSync(path.join(root, '.github'));
@@ -82,6 +83,13 @@ describe('GET /api/file (markdown-only)', () => {
     expect(res.statusCode).toBe(200);
     expect(res.json()).toMatchObject({ frontmatter: null });
     expect(res.body).not.toContain(`"pid":${process.pid}`);
+  });
+
+  it('answers quickly for a large HTML block of unclosed anchors', async () => {
+    const start = performance.now();
+    const res = await app.inject({ method: 'GET', url: '/api/file?path=anchors.md' });
+    expect(res.statusCode).toBe(200);
+    expect(performance.now() - start).toBeLessThan(2_000);
   });
 
   it('400s on .env (no markdown extension)', async () => {
