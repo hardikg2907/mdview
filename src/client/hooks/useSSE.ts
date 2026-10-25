@@ -1,13 +1,19 @@
-import { useEffect } from 'preact/hooks';
+import { useEffect, useRef } from 'preact/hooks';
 import type { WatchEvent } from '../../shared/types.js';
 
 export function useSSE(onEvent: (e: WatchEvent) => void): void {
+  // Handlers are rebuilt on every navigation. Reading the newest one through a
+  // ref keeps a single EventSource for the hook's lifetime, so no event can fall
+  // into a close/reopen gap and the server's client count never dips to zero.
+  const latest = useRef(onEvent);
+  latest.current = onEvent;
+
   useEffect(() => {
     const es = new EventSource('/api/watch');
     const handler = (msg: MessageEvent<string>) => {
       try {
         const data = JSON.parse(msg.data) as WatchEvent;
-        onEvent(data);
+        latest.current(data);
       } catch { /* ignore malformed */ }
     };
     es.addEventListener('change', handler as EventListener);
@@ -16,5 +22,5 @@ export function useSSE(onEvent: (e: WatchEvent) => void): void {
     es.addEventListener('config', handler as EventListener);
     es.addEventListener('workspace', handler as EventListener);
     return () => es.close();
-  }, [onEvent]);
+  }, []);
 }
