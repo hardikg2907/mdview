@@ -240,7 +240,7 @@ mdview config ignore rm  deps       # remove one or more basenames
 
 ## Stack
 
-Node 20+, TypeScript, Fastify 5, markdown-it 14, Shiki 1, js-yaml 4, chokidar 4, Preact 10 + @preact/signals, KaTeX 0.16, pele (lazy), JetBrains Mono via @fontsource, Vite 6, tsup 8, vitest 3.
+Node 20+, TypeScript 7, Fastify 5, markdown-it 15, Shiki 4, js-yaml 5, chokidar 4, Preact 11 + @preact/signals, KaTeX 0.19, pele (lazy), JetBrains Mono via @fontsource, Vite 8, tsup 9, vitest 5.
 
 ## Documentation
 

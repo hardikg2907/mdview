@@ -12,6 +12,13 @@ cd md-to-html
 npm install
 ```
 
+**Node versions.** Two floors apply, and they differ on purpose.
+
+- The published CLI runs on Node `>=20` (`engines.node`). Do not take a runtime dependency that needs a newer Node.
+- Developing the repo needs Node `>=22.18` (`devEngines` in `package.json`; npm warns on an older Node). The dev toolchain sets that floor: tsup 9 needs `^22.18`, and vitest 5 needs `^22.12`.
+
+Vitest runs two projects from `vitest.config.ts`: `server` (Node environment, everything outside `tests/client/`) and `client` (happy-dom, `tests/client/`). Run one with `npx vitest run --project client`.
+
 ## Daily workflow
 
 ```bash
@@ -40,7 +47,7 @@ Run all five before sending a change:
 ```bash
 npm run typecheck     # tsc --noEmit on both server and client tsconfigs
 npm run lint          # biome check (lint only — formatter disabled)
-npm test              # vitest run — 484 tests (Node 22.18+: the regex worker runs from its .ts source)
+npm test              # vitest run — 530 tests (Node 22.18+: the regex worker runs from its .ts source)
 npm run build         # vite + tsup must both succeed
 npm audit --omit=dev  # 0 vulnerabilities in shipped deps (release blocker, see CLAUDE.md §6)
 ```
