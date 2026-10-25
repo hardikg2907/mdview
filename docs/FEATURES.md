@@ -53,7 +53,7 @@ Comprehensive catalog of what `mdview` does today (post Phase 2, May 2026).
 | Feature | Implementation |
 |---------|----------------|
 | In-doc search with match highlighting | `SearchBar.tsx` + `lib/search.ts` |
-| **Folder-wide search** | `GET /api/search` → `server/fs/grep.ts`; client `lib/folder-search.ts` + `SearchBar` `Folder` scope; results grouped by file with snippets |
+| **Folder-wide search** | `GET /api/search` → `server/fs/grep.ts`; client `lib/folder-search.ts` + `SearchBar` `Folder` scope; results grouped by file with snippets. Regex patterns run in a worker thread with a 3 s budget; a pattern that runs out shows the hits found so far and a note to simplify it |
 | **Search options: case-sensitive, whole-word, regex** | shared regex compiler in `shared/search-pattern.ts` (used by both doc and folder search); UI pills `Aa`/`ab`/`.*` on the search bar |
 | Match counter ("3 / 12") | live-read from DOM (`mark.search-hit` count) for state-sync robustness |
 | Prev / next navigation (Enter / Shift-Enter / arrows / buttons) | `SearchBar.tsx` |

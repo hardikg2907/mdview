@@ -1,5 +1,5 @@
 import dns from 'node:dns/promises';
-import { existsSync, lstatSync, readFileSync, realpathSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { FastifyInstance } from 'fastify';
@@ -204,8 +204,11 @@ function detectRoot(target: string): RootSpec {
   if (st.isFile()) {
     // A linked file is served from the folder its target lives in: the target
     // usually sits outside the link's folder, and the server refuses to follow
-    // a link out of a root.
-    const real = lstatSync(abs).isSymbolicLink() ? realpathSync(abs) : abs;
+    // a link out of a root. A file only reached through a linked folder (macOS
+    // /tmp) is not itself a link, so it keeps the path it was given.
+    const target = realpathSync(abs);
+    const linked = target !== path.join(realpathSync(path.dirname(abs)), path.basename(abs));
+    const real = linked ? target : abs;
     const dir = path.dirname(real);
     return {
       absPath: dir,
