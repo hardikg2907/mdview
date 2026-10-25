@@ -9,12 +9,11 @@ export default defineConfig({
     outDir: '../../dist/client',
     emptyOutDir: true,
     rollupOptions: {
-      input: path.resolve(__dirname, 'src/client/index.html'),
+      input: path.resolve(import.meta.dirname, 'src/client/index.html'),
     },
   },
-  esbuild: {
-    jsx: 'automatic',
-    jsxImportSource: 'preact',
+  oxc: {
+    jsx: { runtime: 'automatic', importSource: 'preact' },
   },
   server: {
     port: 5173,

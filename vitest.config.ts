@@ -22,8 +22,7 @@ export default defineConfig({
       },
     ],
   },
-  esbuild: {
-    jsx: 'automatic',
-    jsxImportSource: 'preact',
+  oxc: {
+    jsx: { runtime: 'automatic', importSource: 'preact' },
   },
 });
