@@ -2,7 +2,7 @@ import { render } from 'preact';
 import { PALETTES, type Palette } from '../shared/types.js';
 import { App } from './App.js';
 import { setPalette } from './hooks/usePalette.js';
-import { pushPath, setCurrentPath } from './hooks/usePathRouting.js';
+import { currentPathSignal, pushPath, setCurrentPath } from './hooks/usePathRouting.js';
 import { type IncomingMessage, isEmbedded, onIncoming, postToParent } from './lib/embed.js';
 import '@fontsource/jetbrains-mono/400.css';
 import '@fontsource/jetbrains-mono/600.css';
@@ -35,12 +35,18 @@ function handleIncoming(msg: IncomingMessage): void {
 
   switch (msg.type) {
     case 'mdview/init': {
-      // Handshake complete — tell the extension the SPA is wired and ready.
+      // Handshake complete — tell the extension the SPA is wired and ready. This
+      // first message from the frame is also what the relay locks the frame's
+      // origin on, so later inits, which carry the token, go to this origin only.
       postToParent({ type: 'mdview/ready' });
       break;
     }
     case 'mdview/set-file': {
       const relPath = msg.relPath;
+      // The extension restores its file after every load of this frame, which
+      // is usually the file already showing; pushing it again would only add a
+      // duplicate history entry.
+      if (relPath === currentPathSignal.value) break;
       if (typeof relPath === 'string' && isSafeRelPath(relPath)) {
         // Why: extension-driven file changes must also push the URL so a hard
         // reload keeps the same file and so pushPath's ?embed=vscode

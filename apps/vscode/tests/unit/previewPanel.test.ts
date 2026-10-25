@@ -64,6 +64,44 @@ describe('PreviewPanel webview setup', () => {
   });
 });
 
+describe('PreviewPanel handshake', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  interface Webview {
+    postMessage: (msg: unknown) => Promise<boolean>;
+    __receiveMessage: (msg: unknown) => void;
+  }
+
+  it('answers every mdview/ready with an init carrying the token, ahead of the handlers', () => {
+    const captured = capturePanel();
+    const p = new PreviewPanel(4321, TOKEN, 'a.md');
+    const webview = (captured.get() as unknown as { webview: Webview }).webview;
+    const log: unknown[] = [];
+    vi.spyOn(webview, 'postMessage').mockImplementation(async (msg) => {
+      log.push(msg);
+      return true;
+    });
+    p.onSpaMessage((msg) => log.push(`handler:${msg.type}`));
+
+    webview.__receiveMessage({ type: 'mdview/ready' });
+    // The frame reloaded: a new document, so a new init.
+    webview.__receiveMessage({ type: 'mdview/ready' });
+
+    const init = { type: 'mdview/init', webviewPort: 7331, token: TOKEN };
+    expect(log).toEqual([init, 'handler:mdview/ready', init, 'handler:mdview/ready']);
+  });
+
+  it('sends no init until the frame reports a load', () => {
+    const captured = capturePanel();
+    const spy = vi.fn();
+    new PreviewPanel(4321, TOKEN, 'a.md');
+    const webview = (captured.get() as unknown as { webview: Webview }).webview;
+    vi.spyOn(webview, 'postMessage').mockImplementation(spy);
+    webview.__receiveMessage({ type: 'mdview/heading-clicked', line: 1, file: 'a.md' });
+    expect(spy).not.toHaveBeenCalled();
+  });
+});
+
 describe('buildEmbedUrl', () => {
   it('carries the token on a browser URL but leaves embed mode off', () => {
     const url = new URL(buildEmbedUrl(5555, TOKEN, 'README.md', false));

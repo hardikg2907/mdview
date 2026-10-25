@@ -232,6 +232,29 @@ describe('buildHostHtml relay', () => {
     ]);
   });
 
+  it('tells the extension about every load of the frame, so each new document gets an init', () => {
+    const r = setup();
+    expect(r.toExtension).not.toHaveBeenCalled();
+    r.load();
+    expect(r.toExtension.mock.calls.map((c) => c[0])).toEqual([{ type: 'mdview/ready' }]);
+    // A reload of the frame: the new document has no handshake yet.
+    r.load();
+    expect(r.toExtension.mock.calls.map((c) => c[0])).toEqual([
+      { type: 'mdview/ready' },
+      { type: 'mdview/ready' },
+    ]);
+  });
+
+  it('flushes queued messages before announcing the load', () => {
+    const r = setup();
+    const order: string[] = [];
+    r.spaWindow.postMessage.mockImplementation(() => order.push('to-spa'));
+    r.toExtension.mockImplementation(() => order.push('to-extension'));
+    r.dispatch({ source: r.hostPage, origin: HOST_ORIGIN, data: { type: 'mdview/set-file' } });
+    r.load();
+    expect(order).toEqual(['to-spa', 'to-extension']);
+  });
+
   it('relays an extension message straight through once loaded', () => {
     const r = setup();
     r.load();
@@ -243,6 +266,7 @@ describe('buildHostHtml relay', () => {
     const r = setup();
     r.load();
     const stranger = { postMessage: vi.fn() };
+    r.toExtension.mockClear();
     r.dispatch({ source: stranger, origin: HOST_ORIGIN, data: { type: 'mdview/init' } });
     r.dispatch({ source: null, origin: HOST_ORIGIN, data: { type: 'mdview/init' } });
     expect(r.spaWindow.postMessage).not.toHaveBeenCalled();
@@ -259,6 +283,7 @@ describe('buildHostHtml relay', () => {
   it('forwards SPA messages to the extension and locks the SPA origin', () => {
     const r = setup();
     r.load();
+    r.toExtension.mockClear();
     r.dispatch({ source: r.spaWindow, origin: 'http://127.0.0.1:1', data: { type: 'ready' } });
     r.dispatch({ source: r.spaWindow, origin: 'http://other:2', data: { type: 'spoof' } });
     expect(r.toExtension.mock.calls.map((c) => c[0])).toEqual([{ type: 'ready' }]);

@@ -76,14 +76,20 @@ export function buildHostHtml({ iframeUrl, nonce }: BuildHostHtmlOptions): strin
     iframe.contentWindow.postMessage(data, iframeOrigin || '*');
   }
 
-  // Why: the extension posts mdview/init as soon as the panel is created, but
-  // the SPA only installs its message listener after its module bundle loads
-  // over HTTP. postMessage does not buffer for an absent listener, so we queue
-  // extension->iframe messages until the iframe 'load' event and flush in order.
+  // Why: the SPA only installs its message listener after its module bundle
+  // loads over HTTP, and postMessage does not buffer for an absent listener, so
+  // extension->iframe messages queue until the iframe 'load' event.
+  //
+  // Every load is a fresh SPA document that needs its own mdview/init, and it
+  // cannot ask for one: it may not post to an origin it has not learned yet.
+  // So the relay announces each load to the extension as mdview/ready, and the
+  // extension answers every ready with init. This covers the first load, a
+  // reload of the frame, and a reload of this whole webview.
   iframe.addEventListener('load', function () {
     iframeReady = true;
     for (var i = 0; i < pending.length; i++) toIframe(pending[i]);
     pending = [];
+    vscode.postMessage({ type: 'mdview/ready' });
   });
 
   window.addEventListener('message', function (e) {

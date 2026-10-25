@@ -311,6 +311,8 @@ python3 -m http.server 8000
 - Click an outline heading, then reload the iframe (right-click → Reload frame) → it reloads into the same file, still embedded: the URL kept `embed` and `token`.
 - Remove `&token=$TOKEN` from the iframe `src` → the frame shows `Forbidden` and no `mdview/ready` arrives. Keep the `src` token but send `token: 'wrong'` in the init → the page loads but no `mdview/ready` arrives.
 - DevTools → Console (iframe context): `window.parent === window` → `false`; `new URLSearchParams(location.search).get('embed')` → `'vscode'`.
+- In the parent console, post the same init into the frame twice more (`document.getElementById('f').contentWindow.postMessage({ type: 'mdview/init', webviewPort: 7331, token: '<token>' }, 'http://127.0.0.1:7331')`) → no further `from SPA {type: 'mdview/ready'}` lines: an init after the handshake is ignored.
+- In VS Code with the extension: open a preview, then reload the frame (Command Palette → `Developer: Open Webview Developer Tools`, pick the mdview iframe as the console context, run `location.reload()`), and separately run `Developer: Reload Webviews`. After each, the preview comes back on the editor's current file, clicking an outline heading still moves the editor cursor, and switching to another markdown tab still switches the preview.
 - (Stream B will exercise the postMessage routing for internal-link / outline-heading clicks; the harness only sends the `mdview/init` handshake.)
 
 ### 32. Friendly hostname + Host guard

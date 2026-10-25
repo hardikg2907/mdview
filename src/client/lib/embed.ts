@@ -101,6 +101,7 @@ export function postToParent(msg: unknown): void {
  * Post-handshake rules:
  *   - Messages whose `e.origin` does not match `parentOrigin` are dropped.
  *   - Messages whose `e.data` is not an object with a string `type` are dropped.
+ *   - A further `mdview/init` is dropped: the handshake happens once.
  *   - The allow-list check (`type` must be a known string) is done by the
  *     caller's dispatcher, not here; unknown types arriving here are delivered
  *     to the handler which drops them silently.
@@ -149,6 +150,10 @@ export function onIncoming(h: (msg: IncomingMessage) => void): void {
     ) {
       return;
     }
+    // The extension answers every mdview/ready with an init, so more than one
+    // can arrive. The handshake happens once; a later init would otherwise make
+    // the SPA answer ready again, and the two sides would ping-pong forever.
+    if ((e.data as Record<string, unknown>).type === 'mdview/init') return;
     handler?.(e.data as IncomingMessage);
   };
 

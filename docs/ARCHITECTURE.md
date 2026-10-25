@@ -459,6 +459,19 @@ gate of its own: a **per-launch token**.
 - The SPA completes the `mdview/init` handshake only when the message comes from
   `window.parent` and its `token` equals the one in the page's boot URL. The
   extension sends the token in its init message.
+- Every load of the frame is a new SPA document that needs its own init, and it
+  cannot ask: before the handshake it does not know the parent's origin, and it
+  never posts to `'*'`. So the relay in the webview host page
+  (`apps/vscode/src/webview/host.html.ts`) posts `mdview/ready` to the extension
+  on every iframe `load`, and `PreviewPanel` answers every `mdview/ready` with an
+  init before the extension restores its file with `mdview/set-file`. This
+  covers the first load, a reload of the frame, and a reload of the whole
+  webview. The SPA also posts `mdview/ready` once its handshake is done; that is
+  the frame's first message, so the relay locks the frame's origin on it and
+  later inits go to that origin only. The SPA ignores any init after its
+  handshake (`src/client/lib/embed.ts`), which is what stops the two sides from
+  answering each other forever, and a `set-file` for the file already showing
+  changes nothing.
 
 ### Asset responses
 

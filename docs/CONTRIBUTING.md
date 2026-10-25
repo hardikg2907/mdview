@@ -128,7 +128,7 @@ when you change it, or when you change a CLI contract it depends on (the
 token):
 
 ```bash
-cd apps/vscode && npm run typecheck && npm run test:unit   # 170 tests
+cd apps/vscode && npm run typecheck && npm run test:unit   # 174 tests
 ```
 
 ### Where to add a new feature

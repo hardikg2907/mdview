@@ -219,6 +219,33 @@ describe('onIncoming — parentOrigin is one-shot', () => {
     postToParent({ type: 'mdview/ready' });
     expect(postMessageMock).toHaveBeenCalledWith({ type: 'mdview/ready' }, goodOrigin);
   });
+
+  it('ignores a repeated mdview/init from the same origin, so the SPA does not answer it again', () => {
+    // The extension answers every mdview/ready with an init. If a repeat init
+    // reached the handler, the SPA would answer with ready, and so on forever.
+    const received: IncomingMessage[] = [];
+    const postMessageMock = vi.fn();
+    const fakeParent = { postMessage: postMessageMock } as unknown as Window;
+    Object.defineProperty(window, 'parent', { value: fakeParent, configurable: true });
+    const origin = 'https://vscode-webview.net';
+
+    onIncoming((m) => {
+      received.push(m);
+      if (m.type === 'mdview/init') postToParent({ type: 'mdview/ready' });
+    });
+    dispatchMessage({ type: 'mdview/init', webviewPort: 7331, token: TOKEN }, origin);
+    expect(received.map((m) => m.type)).toEqual(['mdview/init']);
+    expect(postMessageMock).toHaveBeenCalledTimes(1);
+
+    dispatchMessage({ type: 'mdview/init', webviewPort: 7331, token: TOKEN }, origin);
+    dispatchMessage({ type: 'mdview/init', webviewPort: 7331, token: TOKEN }, origin);
+    expect(received.map((m) => m.type)).toEqual(['mdview/init']);
+    expect(postMessageMock).toHaveBeenCalledTimes(1);
+
+    // Other messages still get through after the repeats.
+    dispatchMessage({ type: 'mdview/set-file', relPath: 'a.md' }, origin);
+    expect(received.map((m) => m.type)).toEqual(['mdview/init', 'mdview/set-file']);
+  });
 });
 
 // ---------------------------------------------------------------------------

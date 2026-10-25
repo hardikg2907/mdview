@@ -2,7 +2,6 @@ import * as vscode from 'vscode';
 import { ServerPool } from './server/ServerPool';
 import { bundledCliEntry, type ServerInfo } from './server/ServerHandle';
 import { buildEmbedUrl, PreviewPanel } from './webview/PreviewPanel';
-import { WEBVIEW_PORT } from './webview/host.html';
 import { readConfig, buildCliArgs, type PaletteSetting } from './config/loader';
 import { resolvePalette, themeKindToPalette } from './theme/palette';
 import { probeAndNotify } from './nodeProbe';
@@ -116,15 +115,14 @@ async function openPreview(
   };
   previews.set(folderKey, ctx);
 
-  // Register the handler before init is sent so no inbound message is missed.
+  // The panel answers each mdview/ready with init; this handler then restores
+  // the file the editor is on.
   const msgDisposable = panel.onSpaMessage((msg) => handleSpaMessage(ctx, msg));
   panel.onDispose(() => {
     msgDisposable.dispose();
     if (ctx.cursorTimer) clearTimeout(ctx.cursorTimer);
     previews.delete(folderKey);
   });
-
-  panel.postToSpa({ type: 'mdview/init', webviewPort: WEBVIEW_PORT, token: info.token });
 }
 
 // ---------------------------------------------------------------------------

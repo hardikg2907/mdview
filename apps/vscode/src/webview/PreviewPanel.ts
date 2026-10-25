@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import * as crypto from 'node:crypto';
-import { buildHostHtml } from './host.html';
+import { buildHostHtml, WEBVIEW_PORT } from './host.html';
 import { Dispatcher } from '../messages/dispatcher';
 import type { KnownIncomingMessage, OutgoingMessage } from '../messages/types';
 import { log } from '../output';
@@ -59,7 +59,16 @@ export class PreviewPanel {
     );
 
     this.dispatcher = new Dispatcher({
-      'mdview/ready': (msg) => this.broadcastToHandlers(msg),
+      // Each mdview/ready means a new SPA document loaded in the frame (the
+      // relay announces every load), and a new document has not completed the
+      // handshake yet. Answering every one, not just the first, is what keeps
+      // the preview working after the frame or the webview reloads; the SPA
+      // ignores an init once its handshake is done. Init goes out before the
+      // handlers run so it reaches the SPA ahead of anything they send.
+      'mdview/ready': (msg) => {
+        this.postToSpa({ type: 'mdview/init', webviewPort: WEBVIEW_PORT, token: this.embedToken });
+        this.broadcastToHandlers(msg);
+      },
       'mdview/internal-link-clicked': (msg) => this.broadcastToHandlers(msg),
       'mdview/heading-clicked': (msg) => this.broadcastToHandlers(msg),
       'mdview/error': (msg) => this.broadcastToHandlers(msg),
