@@ -7,13 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-- **`mdview update` checks for a newer release and prints the install command.** It asks registry.npmjs.org once, sends nothing that identifies you, and never installs or runs npm. The command is pinned to that version and uses the npm beside the Node that runs mdview.
-- **An optional daily update notice, off by default.** `mdview config update-check on` makes the background server check about once a day. `mdview <path>` then prints one line to stderr, at most once a day per version, and only in a terminal. Only the global config can turn it on.
-- **`mdview ls` says when the background server runs a different version** than the CLI.
+## [0.11.0] — 2026-10-25
 
-### Removed
-- **Node 20 is no longer supported; mdview now needs Node 22.12 or later.** Node 20 reached end of life on 2026-04-30, and a fresh install of 0.10.0 already failed to start a server on Node 20.0–20.18: `@fastify/static` 10.1.7 pulls `content-disposition` 3, which ships ES modules only, and Node loads those through `require()` without a flag only from 22.12. Run `node --version` before upgrading. The VS Code extension now needs VS Code 1.101 or later, the first release that runs on Node 22.
+A security release. Upgrade if you open markdown you did not write: a file in
+an open folder could read other files on your machine through an SVG and a
+symlink, and several crafted inputs could stall or exhaust the server. This
+release also needs Node 22.12, starts faster, ships 43% smaller, and restarts
+an older background server by itself, so the fixes take effect after
+`npm i -g`.
 
 ### Security
 - **Security fixes now take effect after `npm i -g` without `mdview stop`.** `mdview <path>` replaces a background server that runs another version (or, like 0.10.0 and older, reports none) and prints `mdview: restarted the background server (old → new)`. Open folders stay open. `/api/health` now reports `version`.
@@ -36,6 +37,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dot-folders are also checked on the real path**, so an in-folder link into `.git` is refused by `/__asset/*`, and so is a Windows short name such as `GIT~1`.
 - **Every response now carries `X-Content-Type-Options: nosniff`**, not only HTML pages, and the `workspace.json` watcher no longer follows symlinks.
 - - **Shipped dependencies are updated to clear advisories:** `markdown-it` 14.3.2 → 15.0.3 (quadratic-time parsing of inline HTML when `html` is enabled, of a multi-line link reference definition, and further quadratic paths fixed in 15.0.1–15.0.3), `fastify` 5.12.5 → 5.12.7 (header validation bypass via case-sensitive `propertyNames`), and `fast-uri` 3.1.8 → 3.1.9 and 4.2.1 → 4.2.3 (scheme spoofing, path equivalence and host confusion in URI handling). The `markdown-it` ones were reachable: the renderer enables `html`, so a crafted markdown file could block the server. The others were not reachable as mdview is configured (no route declares a schema), but they ship in the install. `shiki` 4, `js-yaml` 5 and `open` 11 are also taken.
+- **Folder search can no longer stall the server or exhaust its memory through many parallel requests.** At most two searches run at once across the whole server, literal and regex alike; later ones wait, and one whose page goes away is dropped. File contents read for searches share one 32 MB budget, and literal matching gives way to other requests every 10 ms. Sixteen parallel searches fired from `<img>` tags used to stall every request for 13 s and take the server past 2 GB; other requests now answer within 0.1 s and memory stays under 0.6 GB.
+
+### Removed
+- **Node 20 is no longer supported; mdview now needs Node 22.12 or later.** Node 20 reached end of life on 2026-04-30, and a fresh install of 0.10.0 already failed to start a server on Node 20.0–20.18: `@fastify/static` 10.1.7 pulls `content-disposition` 3, which ships ES modules only, and Node loads those through `require()` without a flag only from 22.12. Run `node --version` before upgrading. The VS Code extension now needs VS Code 1.101 or later, the first release that runs on Node 22.
+
+### Added
+- **`mdview update` checks for a newer release and prints the install command.** It asks registry.npmjs.org once, sends nothing that identifies you, and never installs or runs npm. The command is pinned to that version and uses the npm beside the Node that runs mdview.
+- **An optional daily update notice, off by default.** `mdview config update-check on` makes the background server check about once a day. `mdview <path>` then prints one line to stderr, at most once a day per version, and only in a terminal. Only the global config can turn it on.
+- **`mdview ls` says when the background server runs a different version** than the CLI.
 
 ### Changed
 - **`mdview --version`, `ls`, `rm` and `stop` start about five times faster.** They took about 0.2 s because every command loaded the web server, syntax highlighter and file watcher first; they now take about 0.04 s. The server code loads only when a command starts one.
@@ -56,6 +66,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A front matter block holding only whitespace or comments is still recognised as front matter** and removed from the page.
 - **Navigating between files no longer drops and reopens the live-reload connection.** The watch stream reconnected on every navigation, so a file change could fall into the gap, and the server's connected-tab count briefly dropped to zero, which matters with `MDVIEW_IDLE_TIMEOUT`. One connection now lasts for the life of the page.
 - **A burst of file changes no longer refetches the file tree hundreds of times.** Switching git branches fired one full tree request per added or removed file. Refreshes now wait 150 ms after the last change and run once, and the tree still ends up current.
+- **A markdown file with millions of blank lines after its front matter renders again**, and folder search includes it. It used to overflow the stack and return a 500.
+- **`mdview README.MD` on a case-insensitive disk (macOS, Windows) now live-reloads** when `README.md` is saved.
+- **The VS Code preview keeps working after its frame or the webview reloads.** It used to stop following the editor.
 
 ## [0.10.0] — 2026-10-19
 
