@@ -82,6 +82,26 @@ describe('parseFrontmatter hardening', () => {
     expect(result).toEqual({ data: null, body: raw, bodyStartLine: 0 });
   });
 
+  it('rejects aliases to one long string that stay under the node budget', () => {
+    // 5,000 nodes, but ~100 MB of characters once serialized.
+    const long = 'x'.repeat(20_000);
+    const refs = Array.from({ length: 5_000 }, () => '*s').join(', ');
+    const raw = `---\ns: &s "${long}"\nt: [${refs}]\n---\nbody`;
+    const result = parseFrontmatter(raw);
+    expect(result).toEqual({ data: null, body: raw, bodyStartLine: 0 });
+  });
+
+  it('counts keys toward the character budget', () => {
+    const key = 'k'.repeat(400_000);
+    const raw = `---\nm: &m { ${key}: 1 }\nl: [*m, *m, *m]\n---\nbody`;
+    expect(parseFrontmatter(raw).data).toBeNull();
+  });
+
+  it('keeps an ordinary long string under the character budget', () => {
+    const raw = `---\nsummary: "${'y'.repeat(50_000)}"\n---\nbody`;
+    expect((parseFrontmatter(raw).data as { summary: string }).summary).toHaveLength(50_000);
+  });
+
   it('rejects a self-referencing alias cycle without throwing', () => {
     const raw = '---\na: &a\n  b: *a\n---\nbody';
     expect(parseFrontmatter(raw).data).toBeNull();

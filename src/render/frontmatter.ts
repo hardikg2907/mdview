@@ -12,8 +12,11 @@ export interface FrontmatterResult {
 }
 
 // Aliases are shared references, so a few hundred bytes of YAML can expand to
-// hundreds of MB when serialized, or loop back on themselves.
+// hundreds of MB when serialized, or loop back on themselves. Nodes alone do
+// not bound that: a few thousand aliases to one long string stay under the
+// node budget, so the characters they would serialize to are counted too.
 const MAX_NODES = 10_000;
+const MAX_STRING_CHARS = 1_000_000;
 
 function unparsed(raw: string): FrontmatterResult {
   return { data: null, body: raw, bodyStartLine: 0 };
@@ -78,14 +81,21 @@ function locateBlock(
 function withinBudget(root: unknown): boolean {
   const stack: unknown[] = [root];
   let visited = 0;
+  let chars = 0;
   while (stack.length > 0) {
     const node = stack.pop();
     if (++visited > MAX_NODES) return false;
-    if (Array.isArray(node)) {
+    if (typeof node === 'string') {
+      chars += node.length;
+    } else if (Array.isArray(node)) {
       for (const child of node) stack.push(child);
     } else if (isPlainObject(node)) {
-      for (const child of Object.values(node)) stack.push(child);
+      for (const [key, child] of Object.entries(node)) {
+        chars += key.length;
+        stack.push(child);
+      }
     }
+    if (chars > MAX_STRING_CHARS) return false;
   }
   return true;
 }
