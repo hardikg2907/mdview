@@ -157,6 +157,7 @@ node bin/mdview.mjs ./test-fixtures/showcase.md --no-open
 - Try with `regex` mode (e.g. `\d+`) → matches numbers across all md files.
 - Add a file whose body is `This is a normal sentence with words in it ending here!`, then search `^(\w+\s?)*$` with `.*` on. Within about 3 s the list shows any hits found so far and the note "The pattern took too long, so the search stopped early. Try a simpler regex." While it runs, the sidebar and other tabs stay responsive. A plain search straight afterwards works normally.
 - Add `huge.md` holding one 15 MB line of `a` (`node -e "require('fs').writeFileSync('huge.md','a'.repeat(15e6))"`), then search `a` with `.*` off. The list comes back at once, without `huge.md`, and ends with "More results truncated — refine your query." The server's memory stays flat (Activity Monitor or `ps -o rss`).
+- Fill a folder with 72 MB of long lines (`node -e "const b='a'.repeat(9999)+'\n';for(let i=0;i<8;i++)require('fs').writeFileSync('f'+i+'.md',b.repeat(900))"`), open it, then fire 16 searches at once from a second terminal: `for i in $(seq 1 16); do curl -s -o /dev/null -H "Host: h$i.localhost:7331" "http://127.0.0.1:7331/api/search?q=a" & done; wait`. While they run, clicking files in the tree still loads them at once. The searches finish one pair at a time, and `ps -o rss= -p <server pid>` stays under about 500 MB.
 
 ### 14. Quick switcher
 - Press `⌘P` → palette opens.

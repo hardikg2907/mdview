@@ -3,7 +3,12 @@ import os from 'node:os';
 import path from 'node:path';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { ContentCache, grepFiles } from '../../src/server/fs/grep.js';
+import {
+  ContentCache,
+  grepFiles,
+  searchReadBudget,
+  searchSlots,
+} from '../../src/server/fs/grep.js';
 import { registerApiSearch } from '../../src/server/routes/api-search.js';
 import { fakeRoot } from '../helpers/roots.js';
 
@@ -150,6 +155,149 @@ describe('grepFiles — literal search limits', () => {
     expect(file?.truncated).toBe(true);
     expect(out.truncated).toBe(true);
     expect(out.timedOut).toBe(false);
+  });
+});
+
+describe('grepFiles — every search shares two slots and one read budget', () => {
+  let bigDir: string;
+  let smallDir: string;
+  beforeAll(() => {
+    bigDir = mkdtempSync(path.join(os.tmpdir(), 'mdview-grep-big-'));
+    // 15 MB of lines just under the length cap: more `a` hits than a short
+    // matching budget gets through.
+    writeFileSync(path.join(bigDir, 'big.md'), `${'a'.repeat(9_999)}\n`.repeat(1_500));
+    smallDir = mkdtempSync(path.join(os.tmpdir(), 'mdview-grep-small-'));
+    for (let i = 0; i < 40; i++) {
+      writeFileSync(path.join(smallDir, `f${String(i).padStart(2, '0')}.md`), 'pear\n'.repeat(20_000));
+    }
+  });
+  afterAll(() => {
+    rmSync(bigDir, { recursive: true, force: true });
+    rmSync(smallDir, { recursive: true, force: true });
+  });
+
+  const settled = async (): Promise<void> => {
+    for (let i = 0; i < 20 && searchReadBudget.inUse > 0; i++) {
+      await new Promise((r) => setTimeout(r, 10));
+    }
+  };
+
+  it('reads a folder larger than the read budget, with two searches at once', async () => {
+    const heavyDir = mkdtempSync(path.join(os.tmpdir(), 'mdview-grep-heavy-'));
+    try {
+      // 72 MB in 9 MB files: only three fit in the budget at once, so later
+      // reads must wait for earlier ones without ever waiting on each other.
+      const body = `${'b'.repeat(9_999)}\n`.repeat(900);
+      for (let i = 0; i < 8; i++) writeFileSync(path.join(heavyDir, `f${i}.md`), body);
+      const outs = await Promise.all([
+        grepFiles([{ absPath: heavyDir, id: 'w' }], 'zzz'),
+        grepFiles([{ absPath: heavyDir, id: 'w' }], 'zzz', { regex: true }),
+      ]);
+      for (const out of outs) expect(out).toMatchObject({ results: [], truncated: false });
+      await settled();
+      expect(searchReadBudget.inUse).toBe(0);
+    } finally {
+      rmSync(heavyDir, { recursive: true, force: true });
+    }
+  }, 20_000);
+
+  it('runs at most two literal searches at once; the others wait their turn', async () => {
+    let maxActive = 0;
+    let maxWaiting = 0;
+    const sample = setInterval(() => {
+      maxActive = Math.max(maxActive, searchSlots.inUse);
+      maxWaiting = Math.max(maxWaiting, searchSlots.waiting);
+    }, 5);
+    const done: number[] = [];
+    try {
+      await Promise.all(
+        Array.from({ length: 4 }, (_, i) =>
+          grepFiles([{ absPath: bigDir, id: 'w' }], 'a', { literalBudgetMs: 150 }).then((out) => {
+            expect(out.truncated).toBe(true);
+            done.push(i);
+          }),
+        ),
+      );
+    } finally {
+      clearInterval(sample);
+    }
+    expect(maxActive).toBe(2);
+    expect(maxWaiting).toBe(2);
+    // The first two hold the slots until they finish.
+    expect(done.slice(0, 2).sort()).toEqual([0, 1]);
+    expect(searchSlots.inUse).toBe(0);
+  });
+
+  it('drops a queued literal search when the caller aborts', async () => {
+    const busy = Array.from({ length: 2 }, () =>
+      grepFiles([{ absPath: bigDir, id: 'w' }], 'a', { literalBudgetMs: 1_000 }),
+    );
+    const ac = new AbortController();
+    setTimeout(() => ac.abort(), 100);
+    const start = performance.now();
+    const queued = await grepFiles([{ absPath: bigDir, id: 'w' }], 'a', { signal: ac.signal });
+    expect(performance.now() - start).toBeLessThan(600);
+    expect(queued.results).toEqual([]);
+    expect(searchSlots.waiting).toBe(0);
+    await Promise.all(busy);
+  });
+
+  it('stops a running literal search part way through a file when the caller aborts', async () => {
+    const ac = new AbortController();
+    setTimeout(() => ac.abort(), 50);
+    const out = await grepFiles([{ absPath: bigDir, id: 'w' }], 'a', {
+      literalBudgetMs: 60_000,
+      signal: ac.signal,
+    });
+    expect(out.results[0]?.total ?? 0).toBeLessThan(9_999 * 1_500);
+  });
+
+  it('keeps the event loop free while it matches one big file', async () => {
+    let maxLag = 0;
+    let last = performance.now();
+    const lag = (): void => {
+      const now = performance.now();
+      maxLag = Math.max(maxLag, now - last);
+      last = now;
+    };
+    const tick = setInterval(lag, 5);
+    try {
+      const out = await grepFiles([{ absPath: bigDir, id: 'w' }], 'a');
+      expect(out.results[0]?.total).toBe(9_999 * 1_500);
+    } finally {
+      clearInterval(tick);
+      lag();
+    }
+    // Matching the whole file in one go holds the thread for hundreds of ms.
+    expect(maxLag).toBeLessThan(60);
+  });
+
+  it('gives back every byte of read budget when a search stops early', async () => {
+    const capped = await grepFiles([{ absPath: smallDir, id: 'w' }], 'pear', { globalCap: 2 });
+    expect(capped.truncated).toBe(true);
+    await settled();
+    expect(searchReadBudget.inUse).toBe(0);
+
+    const outOfTime = await grepFiles([{ absPath: smallDir, id: 'w' }], 'pear', {
+      literalBudgetMs: 0,
+    });
+    expect(outOfTime.truncated).toBe(true);
+    await settled();
+    expect(searchReadBudget.inUse).toBe(0);
+
+    const ac = new AbortController();
+    ac.abort();
+    await grepFiles([{ absPath: smallDir, id: 'w' }], 'pear', { signal: ac.signal });
+    await settled();
+    expect(searchReadBudget.inUse).toBe(0);
+    expect(searchSlots.inUse).toBe(0);
+  });
+
+  it('gives back the read budget after a regex search', async () => {
+    const out = await grepFiles([{ absPath: smallDir, id: 'w' }], 'pe+ar', { regex: true });
+    expect(out.results.length).toBeGreaterThan(0);
+    await settled();
+    expect(searchReadBudget.inUse).toBe(0);
   });
 });
 

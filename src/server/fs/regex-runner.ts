@@ -16,42 +16,11 @@ export class RegexAbortError extends Error {}
 
 // One warm worker is kept between searches. A search that finds none idle gets
 // a fresh one, so concurrent searches never share a thread, and terminating
-// one search's worker cannot cut another search short.
+// one search's worker cannot cut another search short. Sessions are opened only
+// by a search holding one of the shared search slots (grep.ts), and that is
+// what bounds how many workers run at once.
 let idle: Worker | null = null;
 let nextId = 1;
-
-// Searches can be fired by any page the user opens (an <img> per query in a
-// rendered document), so threads are capped and later searches queue for one.
-const MAX_ACTIVE_WORKERS = 2;
-let active = 0;
-const waiting: Array<() => void> = [];
-
-function acquireSlot(signal: AbortSignal | undefined): Promise<void> {
-  if (signal?.aborted) return Promise.reject(new RegexAbortError('Search aborted'));
-  if (active < MAX_ACTIVE_WORKERS) {
-    active++;
-    return Promise.resolve();
-  }
-  return new Promise<void>((resolve, reject) => {
-    const grant = (): void => {
-      signal?.removeEventListener('abort', onAbort);
-      active++;
-      resolve();
-    };
-    const onAbort = (): void => {
-      const i = waiting.indexOf(grant);
-      if (i >= 0) waiting.splice(i, 1);
-      reject(new RegexAbortError('Search aborted'));
-    };
-    waiting.push(grant);
-    signal?.addEventListener('abort', onAbort, { once: true });
-  });
-}
-
-function releaseSlot(): void {
-  active--;
-  waiting.shift()?.();
-}
 
 function spawn(): Worker {
   const worker = new Worker(WORKER_URL);
@@ -93,19 +62,14 @@ export interface RegexSession {
 
 export function openRegexSession(opts: RegexSessionOptions): RegexSession {
   let worker: Worker | null = null;
-  let slot: Promise<void> | null = null;
-  let holdsSlot = false;
+  let started = false;
   let spentMs = 0;
 
-  async function ready(): Promise<void> {
-    if (!slot) {
-      slot = acquireSlot(opts.signal).then(() => {
-        holdsSlot = true;
-        worker = idle ?? spawn();
-        idle = null;
-      });
-    }
-    await slot;
+  function ready(): void {
+    if (started) return;
+    started = true;
+    worker = idle ?? spawn();
+    idle = null;
   }
 
   function kill(): void {
@@ -116,7 +80,7 @@ export function openRegexSession(opts: RegexSessionOptions): RegexSession {
 
   return {
     async match(files) {
-      await ready();
+      ready();
       const w = worker;
       if (!w) return Promise.reject(new RegexTimeoutError('Regex worker is gone'));
       const remaining = opts.budgetMs - spentMs;
@@ -190,10 +154,6 @@ export function openRegexSession(opts: RegexSessionOptions): RegexSession {
       if (w) {
         if (idle) void w.terminate();
         else idle = w;
-      }
-      if (holdsSlot) {
-        holdsSlot = false;
-        releaseSlot();
       }
     },
   };

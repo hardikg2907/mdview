@@ -1,8 +1,10 @@
 import { readFile, realpath, stat } from 'node:fs/promises';
 import path from 'node:path';
+import { setImmediate as yieldToEventLoop } from 'node:timers/promises';
 import { parseFrontmatter } from '../../render/frontmatter.js';
 import { compilePattern, type SearchOptions } from '../../shared/search-pattern.js';
 import { flattenMdRelPaths } from '../../shared/tree-utils.js';
+import { Limiter, LimiterAbortError } from './limiter.js';
 import {
   openRegexSession,
   RegexAbortError,
@@ -63,8 +65,24 @@ interface GrepOptions extends Partial<SearchOptions> {
   signal?: AbortSignal;
 }
 
-/** Files read at once. Enough to hide disk latency without a burst of open fds. */
+/** Files one search reads at once. Enough to hide disk latency without a burst of open fds. */
 const READ_CONCURRENCY = 8;
+/**
+ * A literal search hands the thread back after this much matching, so one big
+ * file cannot hold up every other request, and an abort lands within a slice.
+ */
+const LITERAL_SLICE_MS = 10;
+/** Lines plus hits matched between clock reads. A line under the cap holds at most 10,000 hits. */
+const LITERAL_CHECK_STEPS = 4096;
+
+// Any page the user has open can fire searches with <img> tags, each on its own
+// connection, so every folder search (literal or regex) runs under one of these
+// two slots and the rest queue. Bodies read from disk are charged to a byte
+// budget shared by all searches, so memory in flight does not grow with the
+// number of searches. It fits the largest readable file once per slot.
+export const searchSlots = new Limiter(2);
+export const searchReadBudget = new Limiter(2 * MAX_MARKDOWN_BYTES);
+
 /** A regex batch closes at this many files or this many characters. */
 const BATCH_FILES = 64;
 const BATCH_CHARS = 1_000_000;
@@ -142,25 +160,35 @@ function buildSnippet(line: string, start: number, end: number, radius: number):
   };
 }
 
+/** Where a line starts: its 0-based index and its offset in the body. */
+interface LinePos {
+  index: number;
+  start: number;
+}
+
 /**
  * Visit each line of `body` as `[start, end)` offsets, split on LF and CRLF the
  * way `split(/\r?\n/)` would. A 16 MB body of short lines would otherwise
- * become millions of strings at once. Stops when `visit` returns false.
+ * become millions of strings at once. Stops when `visit` returns false, and
+ * returns where the next line starts so a later call can resume there, or null
+ * once the last line has been visited.
  */
 function eachLine(
   body: string,
   visit: (index: number, start: number, end: number) => boolean,
-): void {
-  let start = 0;
-  for (let index = 0; ; index++) {
+  from: LinePos = { index: 0, start: 0 },
+): LinePos | null {
+  let start = from.start;
+  for (let index = from.index; ; index++) {
     const nl = body.indexOf('\n', start);
     if (nl < 0) {
       visit(index, start, body.length);
-      return;
+      return null;
     }
     const end = nl > start && body.charCodeAt(nl - 1) === 13 ? nl - 1 : nl;
-    if (!visit(index, start, end)) return;
+    const more = visit(index, start, end);
     start = nl + 1;
+    if (!more) return { index: index + 1, start };
   }
 }
 
@@ -190,44 +218,95 @@ interface Target {
   relPath: string;
 }
 
-async function loadBody(t: Target, cache: ContentCache): Promise<string | null> {
+/** A body ready to match, and the read budget it holds until the matcher is done with it. */
+interface Loaded {
+  body: string | null;
+  release: () => void;
+}
+
+const HOLDS_NOTHING = (): void => undefined;
+
+/**
+ * A file's place in its search's queue for read budget. `prev` settles once
+ * every earlier file has queued (or needed no budget); `pass` lets the next
+ * file queue.
+ */
+interface Turn {
+  prev: Promise<void>;
+  pass: () => void;
+}
+
+async function loadBody(
+  t: Target,
+  cache: ContentCache,
+  signal: AbortSignal,
+  turn: Turn,
+): Promise<Loaded> {
+  let release = HOLDS_NOTHING;
+  let passed = false;
   try {
     const abs = await resolveSafePath(t.root.absPath, t.relPath, { realRoot: t.realRoot });
     const st = await stat(abs);
-    if (!st.isFile() || st.size > MAX_MARKDOWN_BYTES) return null;
+    if (!st.isFile() || st.size > MAX_MARKDOWN_BYTES) return { body: null, release };
     const key = ContentCache.keyFor(t.root.absPath, t.relPath);
     const cached = cache.get(key, st.mtimeMs, st.size);
-    if (cached !== undefined) return cached;
+    // Already in memory, so it costs the budget nothing.
+    if (cached !== undefined) return { body: cached, release };
+    // Files queue for budget in walk order, the order the consumer takes them.
+    // Queued in the order their stats finish instead, later files could hold
+    // the budget while the one the consumer waits on never fits.
+    await turn.prev;
+    const granted = searchReadBudget.acquire(st.size, signal);
+    passed = true;
+    turn.pass();
+    release = await granted;
     const { body } = parseFrontmatter(await readFile(abs, 'utf8'));
     cache.set(key, st.mtimeMs, st.size, body);
-    return body;
+    return { body, release };
   } catch {
-    // Vanished, unreadable, or a link out of the root: not searchable.
-    return null;
+    // Vanished, unreadable, a link out of the root, or the search stopped
+    // while this read waited for budget: not searchable.
+    release();
+    return { body: null, release: HOLDS_NOTHING };
+  } finally {
+    if (!passed) void turn.prev.then(turn.pass);
   }
 }
 
 /**
  * Yield each target with its body, in order, while keeping up to `concurrency`
- * reads in flight ahead of the consumer.
+ * reads in flight ahead of the consumer. The consumer releases each body it
+ * receives.
  */
 async function* readAhead(
   targets: readonly Target[],
   cache: ContentCache,
   concurrency: number,
-): AsyncGenerator<[Target, string | null]> {
-  const inflight: Array<Promise<string | null>> = [];
+  signal: AbortSignal,
+): AsyncGenerator<[Target, Loaded]> {
+  const inflight: Array<Promise<Loaded>> = [];
   let next = 0;
+  let queued: Promise<void> = Promise.resolve();
   const fill = (): void => {
     while (inflight.length < concurrency && next < targets.length) {
-      inflight.push(loadBody(targets[next++] as Target, cache));
+      const prev = queued;
+      let pass = HOLDS_NOTHING;
+      queued = new Promise<void>((resolve) => {
+        pass = resolve;
+      });
+      inflight.push(loadBody(targets[next++] as Target, cache, signal, { prev, pass }));
     }
   };
-  fill();
-  for (const t of targets) {
-    const body = await (inflight.shift() as Promise<string | null>);
+  try {
     fill();
-    yield [t, body];
+    for (const t of targets) {
+      const loaded = await (inflight.shift() as Promise<Loaded>);
+      fill();
+      yield [t, loaded];
+    }
+  } finally {
+    // The consumer can stop early, and reads it never received still hold budget.
+    for (const pending of inflight) void pending.then((l) => l.release());
   }
 }
 
@@ -309,91 +388,146 @@ export async function grepFiles(
   };
 
   // Literal queries are escaped before they become a regex, so they cannot
-  // backtrack and stay on this thread. They still get the line cap and a time
-  // budget: one 15 MB line of `a` holds 15 million hits for `q=a`, and any page
-  // the user has open can ask for that search with an <img> tag. Hits past the
-  // per-file cap are counted, never stored.
+  // backtrack and stay on this thread. They still get the line cap and a budget
+  // of matching time: one 15 MB line of `a` holds 15 million hits for `q=a`, and
+  // any page the user has open can ask for that search with an <img> tag. Hits
+  // past the per-file cap are counted, never stored. Only time spent matching
+  // is charged, so searches taking turns on the thread do not spend each
+  // other's budget.
   const literalRe = regexMode ? null : new RegExp(pattern.source, pattern.flags);
   let literalLeftMs = opts.literalBudgetMs ?? 1_000;
-  const matchLiteral = (re: RegExp, body: string): { m: FileMatches; outOfTime: boolean } => {
+  let sliceMs = 0;
+  let clock = 0;
+  let steps = 0;
+  const charge = (): void => {
+    const now = performance.now();
+    literalLeftMs -= now - clock;
+    sliceMs += now - clock;
+    clock = now;
+  };
+  // Called every LITERAL_CHECK_STEPS: reading the clock on every line and hit
+  // would cost more than the matching.
+  const checkpoint = async (): Promise<'time' | 'abort' | null> => {
+    steps = 0;
+    charge();
+    if (literalLeftMs <= 0) return 'time';
+    if (sliceMs < LITERAL_SLICE_MS) return null;
+    sliceMs = 0;
+    await yieldToEventLoop();
+    clock = performance.now();
+    return stop.signal.aborted ? 'abort' : null;
+  };
+  const matchLiteral = async (
+    re: RegExp,
+    body: string,
+  ): Promise<{ m: FileMatches; stopped: 'time' | 'abort' | null }> => {
     const out: FileMatches = { total: 0, hits: [], skipped: false };
-    const started = performance.now();
-    const deadline = started + literalLeftMs;
-    let steps = 0;
-    let outOfTime = false;
-    // Reading the clock on every line and hit would cost more than the matching.
-    const overBudget = (): boolean => {
-      if ((++steps & 4095) !== 0) return false;
-      outOfTime = performance.now() > deadline;
-      return outOfTime;
-    };
-    eachLine(body, (index, start, end) => {
+    let stopped: 'time' | 'abort' | null = null;
+    clock = performance.now();
+    const visit = (index: number, start: number, end: number): boolean => {
       if (end - start > maxLineLen) {
         out.skipped = true;
-        return !overBudget();
+      } else {
+        const line = body.slice(start, end);
+        re.lastIndex = 0;
+        for (let m = re.exec(line); m !== null; m = re.exec(line)) {
+          out.total++;
+          steps++;
+          if (out.hits.length < perFileCap) out.hits.push([index, m.index, m[0].length]);
+        }
       }
-      const line = body.slice(start, end);
-      re.lastIndex = 0;
-      for (let m = re.exec(line); m !== null; m = re.exec(line)) {
-        out.total++;
-        if (out.hits.length < perFileCap) out.hits.push([index, m.index, m[0].length]);
-        if (overBudget()) return false;
-      }
-      return !overBudget();
-    });
-    if (outOfTime) out.skipped = true;
-    literalLeftMs -= performance.now() - started;
-    return { m: out, outOfTime };
+      return ++steps < LITERAL_CHECK_STEPS;
+    };
+    for (let at = eachLine(body, visit); at !== null; at = eachLine(body, visit, at)) {
+      stopped = await checkpoint();
+      if (stopped) break;
+    }
+    charge();
+    if (stopped === 'time') out.skipped = true;
+    return { m: out, stopped };
   };
 
-  const targets = await collectTargets(roots, opts);
+  // Mirrors the caller's signal, and also fires when this search ends for any
+  // reason, so reads still queued for budget give up their place.
+  const stop = new AbortController();
+  const onCallerAbort = (): void => stop.abort();
+  if (signal?.aborted) stop.abort();
+  signal?.addEventListener('abort', onCallerAbort, { once: true });
 
-  // A user-supplied regex never runs on this thread: one exec() can backtrack
-  // for minutes, and nothing interrupts it short of ending the thread it runs
-  // on. The worker is terminated once the search's budget is spent.
-  const session: RegexSession | null = regexMode
-    ? openRegexSession({
-        source: pattern.source,
-        flags: pattern.flags,
-        maxLineLen,
-        perFileCap,
-        budgetMs: opts.regexBudgetMs ?? 3_000,
-        ...(signal ? { signal } : {}),
-      })
-    : null;
+  let releaseSlot: () => void;
+  try {
+    releaseSlot = await searchSlots.acquire(1, stop.signal);
+  } catch (err) {
+    signal?.removeEventListener('abort', onCallerAbort);
+    if (err instanceof LimiterAbortError) return empty;
+    throw err;
+  }
 
-  let batch: Array<[Target, string]> = [];
+  let session: RegexSession | null = null;
+  let batch: Array<[Target, string, () => void]> = [];
   let batchChars = 0;
   const flush = async (): Promise<void> => {
     if (!session || batch.length === 0) return;
     const pending = batch;
     batch = [];
     batchChars = 0;
-    const matches = await session.match(pending.map(([, body]) => body));
-    for (let i = 0; i < pending.length && totalHits < globalCap; i++) {
-      const [t, body] = pending[i] as [Target, string];
-      record(t, body, matches[i] as FileMatches);
+    try {
+      const matches = await session.match(pending.map(([, body]) => body));
+      for (let i = 0; i < pending.length && totalHits < globalCap; i++) {
+        const [t, body] = pending[i] as [Target, string, () => void];
+        record(t, body, matches[i] as FileMatches);
+      }
+    } finally {
+      for (const [, , release] of pending) release();
     }
   };
 
   try {
-    for await (const [t, body] of readAhead(targets, cache, READ_CONCURRENCY)) {
-      if (signal?.aborted || totalHits >= globalCap) break;
+    const targets = await collectTargets(roots, opts);
+
+    // A user-supplied regex never runs on this thread: one exec() can backtrack
+    // for minutes, and nothing interrupts it short of ending the thread it runs
+    // on. The worker is terminated once the search's budget is spent.
+    session = regexMode
+      ? openRegexSession({
+          source: pattern.source,
+          flags: pattern.flags,
+          maxLineLen,
+          perFileCap,
+          budgetMs: opts.regexBudgetMs ?? 3_000,
+          signal: stop.signal,
+        })
+      : null;
+
+    for await (const [t, { body, release }] of readAhead(
+      targets,
+      cache,
+      READ_CONCURRENCY,
+      stop.signal,
+    )) {
+      if (stop.signal.aborted || totalHits >= globalCap) {
+        release();
+        break;
+      }
       if (body === null) continue;
       if (literalRe) {
-        const { m, outOfTime } = matchLiteral(literalRe, body);
-        record(t, body, m);
-        if (outOfTime) {
-          truncated = true;
-          break;
+        let stopped: 'time' | 'abort' | null;
+        try {
+          const res = await matchLiteral(literalRe, body);
+          stopped = res.stopped;
+          record(t, body, res.m);
+        } finally {
+          release();
         }
+        if (stopped === 'time') truncated = true;
+        if (stopped) break;
         continue;
       }
-      batch.push([t, body]);
+      batch.push([t, body, release]);
       batchChars += body.length;
       if (batch.length >= BATCH_FILES || batchChars >= BATCH_CHARS) await flush();
     }
-    if (!signal?.aborted && totalHits < globalCap) await flush();
+    if (!stop.signal.aborted && totalHits < globalCap) await flush();
   } catch (err) {
     if (err instanceof RegexTimeoutError) {
       timedOut = true;
@@ -402,7 +536,11 @@ export async function grepFiles(
       throw err;
     }
   } finally {
+    stop.abort();
+    signal?.removeEventListener('abort', onCallerAbort);
+    for (const [, , release] of batch) release();
     session?.release();
+    releaseSlot();
   }
   if (totalHits >= globalCap) truncated = true;
   return { query, results, truncated, timedOut };
