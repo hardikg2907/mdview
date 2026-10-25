@@ -96,5 +96,8 @@
     "test:unit": "vitest run",
     "vscode:prepublish": "npm run typecheck && node esbuild.config.mjs",
     "package": "vsce package"
+  },
+  "overrides": {
+    "@azure/msal-node": "^7.1.1"
   }
 }
