@@ -1,4 +1,4 @@
-import type Token from 'markdown-it/lib/token.mjs';
+import type { Token } from 'markdown-it';
 import type { HeadingLevel, OutlineNode } from '../shared/types.js';
 
 export function extractOutline(tokens: Token[]): OutlineNode[] {

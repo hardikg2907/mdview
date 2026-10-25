@@ -50,4 +50,11 @@ describe('renderMarkdown', () => {
     expect(html).not.toContain('class="shiki');
     expect(html).not.toContain('<pre');
   });
+
+  it('links bare domains and www hosts, not only full URLs', async () => {
+    const { html } = await renderMarkdown('See example.com and www.example.org or https://example.com/a.');
+    expect(html).toContain('<a href="http://example.com">example.com</a>');
+    expect(html).toContain('<a href="http://www.example.org">www.example.org</a>');
+    expect(html).toContain('<a href="https://example.com/a">https://example.com/a</a>');
+  });
 });

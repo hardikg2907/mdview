@@ -1,4 +1,4 @@
-import MarkdownIt from 'markdown-it';
+import MarkdownIt, { type Token } from 'markdown-it';
 import anchor from 'markdown-it-anchor';
 import taskLists from 'markdown-it-task-lists';
 import { DEFAULT_PALETTE, type Palette } from '../shared/types.js';
@@ -7,7 +7,7 @@ import { highlightCode } from './shiki.js';
 
 export interface RenderResult {
   html: string;
-  tokens: ReturnType<MarkdownIt['parse']>;
+  tokens: Token[];
 }
 
 const md = new MarkdownIt({
@@ -18,8 +18,11 @@ const md = new MarkdownIt({
   highlight: () => '',
 });
 
+// markdown-it 15 turned fuzzy links off; bare `example.com` and `www.` hosts
+// linked before, and readers of existing documents expect that to continue.
+md.linkify.set({ fuzzyLink: true });
+
 md.use(anchor, {
-  permalink: false,
   slugify: (s: string) =>
     s
       .toLowerCase()
