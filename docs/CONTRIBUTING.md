@@ -27,7 +27,11 @@ node bin/mdview.mjs --foreground ./some/folder
 
 The vite dev server proxies `/api/*` to `localhost:7331`, so HMR works for the client while the backend serves files. SSE live-reload works in this mode too.
 
-`npm run build:server` writes `bin/mdview.mjs` plus the chunk files it loads on demand (`bin/chunk-*.mjs`, `bin/server-*.mjs`, …). All of `bin/*.mjs` ships, so keep them together. `src/cli.ts` imports `./server/index.js`, `chokidar` and `open` with `import()` so that `--version`, `ls`, `rm` and `stop` start in tens of milliseconds; do not turn those back into static imports (`tests/server/cli-startup.test.ts` fails if you do). Hashed chunk names change when the code does, so old chunks pile up in `bin/` during development; `npm pack` and `npm publish` clear `bin/` and rebuild first (the `prepack` script).
+`npm run build:server` writes `bin/mdview.mjs` plus the chunk files it loads on demand (`bin/chunk-*.mjs`, `bin/server-*.mjs`, …). All of `bin/*.mjs` ships, so keep them together. `src/cli.ts` imports `./server/index.js`, `chokidar` and `open` with `import()` so that `--version`, `ls`, `rm` and `stop` start in tens of milliseconds; do not turn those back into static imports (`tests/server/cli-startup.test.ts` fails if you do).
+
+Hashed chunk names change when the code does, so old chunks pile up in `bin/` during development; `npm pack` and `npm publish` clear `bin/` and rebuild first (the `prepack` script).
+
+The client build keeps only the woff2 source of every `@font-face` (JetBrains Mono and KaTeX) through `build/vite-woff2-only.ts`, so `dist/client` holds no `.woff` or `.ttf` files. A new font package needs no extra setup.
 
 ## Quality gates
 
@@ -106,6 +110,7 @@ tests/
 test-fixtures/                      ← manual-test markdown files (showcase.md, math.md, …)
 docs/                               ← architecture, contributing, features
 scripts/                            ← capture-screenshots.mjs (npm run capture)
+build/                              ← build-time Vite plugins (woff2-only font CSS)
 apps/vscode/                        ← VS Code extension: separate package, own deps + tests
 ```
 
