@@ -71,7 +71,7 @@ node bin/mdview.mjs ./test-fixtures/showcase.md --no-open
 - Multiple languages render with Shiki highlighting; the font is JetBrains Mono.
 - Hover a code block → "Copy" button appears top-right.
 - Click "Copy" → clipboard receives the code; button briefly says "Copied".
-- Switch palette via the header swatch (flexoki ↔ everforest ↔ catppuccin ↔ high-contrast) → code-block colors update **instantly**, no re-render and no flash. Each palette uses a tailored Shiki theme.
+- Switch palette in the View menu (flexoki ↔ everforest ↔ catppuccin ↔ high-contrast) → code-block colors update **instantly**, no re-render and no flash. Each palette uses a tailored Shiki theme.
 
 ### 7. Mermaid
 - Mermaid block renders as an SVG diagram.
@@ -90,7 +90,7 @@ node bin/mdview.mjs ./test-fixtures/showcase.md --no-open
 
 ### 9. Themes & palettes
 - Theme toggle (sun/moon icon, header right) flips light/dark instantly.
-- Palette picker icon (palette/swatch, header right) opens a menu with eight swatches: flexoki / paper / solarized / everforest / rose-pine / kanagawa / catppuccin / high-contrast. Click any → page palette and code-block colors swap live.
+- The View menu (gear icon, header right) lists eight palette swatches: flexoki / paper / solarized / everforest / rose-pine / kanagawa / catppuccin / high-contrast. Click any → page palette and code-block colors swap live.
 - Ground texture differs by palette, at 100% zoom, on the page background:
   - `flexoki` / `paper` / `solarized` → a fine dot lattice, tinted with that palette's own text colour (never a warm brown wash over a cool ground).
   - `everforest` / `kanagawa` → mottled fibre noise, no visible grid.

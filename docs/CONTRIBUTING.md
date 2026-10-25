@@ -34,7 +34,7 @@ Run all five before sending a change:
 ```bash
 npm run typecheck     # tsc --noEmit on both server and client tsconfigs
 npm run lint          # biome check (lint only — formatter disabled)
-npm test              # vitest run — 436 tests
+npm test              # vitest run — 447 tests
 npm run build         # vite + tsup must both succeed
 npm audit --omit=dev  # 0 vulnerabilities in shipped deps (release blocker, see CLAUDE.md §6)
 ```
@@ -57,6 +57,8 @@ Hooks live in `.husky/` and install automatically the first time you run `npm in
 ```
 src/
 ├── cli.ts                          ← CLI entry: args, port-fallback, graceful shutdown
+├── cli-config.ts / cli-workspace.ts ← `config` and `ls` / `rm` / `stop` subcommands
+├── daemon/                         ← background-server state, workspace file, CLI-side client
 ├── shared/                         ← cross-runtime modules — no Node-only or DOM-only deps
 │   ├── types.ts
 │   ├── search-pattern.ts            ← compilePattern (used by client + server)
@@ -71,7 +73,9 @@ src/
 │   └── math.ts                      ← KaTeX placeholder emission
 ├── server/
 │   ├── index.ts                     ← createServer factory + .mdview.json watcher
-│   ├── config.ts                    ← validateConfig + loadProjectConfig
+│   ├── config.ts                    ← validateConfig + loadEffectiveConfig (global + project)
+│   ├── hosts.ts                     ← isAllowedHost
+│   ├── workspace.ts                 ← open roots, parseWorkspacePath
 │   ├── routes/
 │   │   ├── api-file.ts              ← GET /api/file
 │   │   ├── api-tree.ts              ← GET /api/tree (carries project config)
@@ -213,7 +217,7 @@ node bin/mdview.mjs ./test-fixtures --no-open
 # open http://127.0.0.1:7331/ in a browser
 ```
 
-Verify whatever you changed renders correctly across light + dark themes AND across all four palettes.
+Verify whatever you changed renders correctly across light + dark themes AND across all eight palettes.
 
 ## How to add a feature: worked example
 

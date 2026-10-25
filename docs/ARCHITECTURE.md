@@ -31,15 +31,18 @@ A practical overview for someone (human or agent) about to read or extend the co
 
 The server stays running for the lifetime of one CLI invocation. Killing the process tears everything down.
 
-## Repo layout (post Phase 2)
+## Repo layout
 
 ```
 src/
 ├── cli.ts                          ← CLI entry, args, port fallback, graceful shutdown
+├── cli-config.ts / cli-workspace.ts ← `config` and `ls` / `rm` / `stop` subcommands
+├── daemon/                          ← background-server state, workspace file, CLI-side client
 ├── shared/                          ← cross-runtime modules (no Node-only or DOM-only deps)
 │   ├── types.ts
 │   ├── search-pattern.ts            ← compilePattern (case/word/regex) used by client + server
 │   ├── relative-time.ts             ← formatRelativeTime (Updated N ago)
+│   ├── ignore.ts                    ← DEFAULT_IGNORED_DIRS (client tooltip + server)
 │   └── tree-utils.ts                ← MD_EXT, flattenMdRelPaths
 ├── render/                          ← pure server-agnostic markdown render pipeline
 │   ├── markdown.ts
@@ -51,6 +54,9 @@ src/
 ├── server/
 │   ├── index.ts                     ← createServer factory + .mdview.json watcher
 │   ├── config.ts                    ← loadEffectiveConfig (global + project), mergeConfigs, validateConfig
+│   ├── config-write.ts              ← `mdview config ignore` writer
+│   ├── hosts.ts                     ← isAllowedHost
+│   ├── workspace.ts                 ← open roots, parseWorkspacePath
 │   ├── routes/
 │   │   ├── api-file.ts              ← GET /api/file
 │   │   ├── api-tree.ts              ← GET /api/tree (incl. project config)
@@ -213,7 +219,7 @@ A thin `chokidar` wrapper. Accepts an `ignore` set wired through to chokidar's `
 ### Entry
 
 - **`src/client/main.tsx`** — mounts `<App />` to `#app`, imports JetBrains Mono CSS (400 + 600), then CSS files in order: reset → theme (CSS vars + palettes) → layout (3-pane grid) → content (markdown typography) → components (everything else).
-- **`src/client/App.tsx`** — top-level orchestration. Now slim; most logic delegated to hooks (`usePathRouting`, `useLiveReload`, `useScrollSpy`, `useFocusedSection`, `useTheme`, `usePalette`).
+- **`src/client/App.tsx`** — top-level orchestration. Now slim; most logic delegated to hooks (`usePathRouting`, `useLiveReload`, `useScrollSpy`, `useTheme`, `usePalette`).
 
 ### State model — signals over useState
 
@@ -242,9 +248,9 @@ const { signal, set } = createPersistedSignal('mdview-foo', defaultValue, { pars
 | `currentPathSignal` | `usePathRouting.ts` | Currently open file path |
 | `mainScrollerSignal` | `useScroller.ts` | The `.pane-main` element ref (for shortcuts that need to scroll programmatically) |
 | `activeHeadingId` | `useScrollSpy.ts` | **Topmost-passed** heading — drives outline highlight |
-| `focusedSectionId` | `useFocusedSection.ts` | Heading whose section is at viewport **center** — drives focus mode (separate from `activeHeadingId`) |
+| `focusedHeadingId` | `useScrollSpy.ts` | Heading whose section holds the **top-third reading band** (35% from the viewport top) — drives focus mode (separate from `activeHeadingId`) |
 | `treeCollapsedSignal`, `outlineCollapsedSignal`, `treeWidthSignal`, `outlineWidthSignal` | `useUiState.ts` | Sidebar collapse + width state |
-| `focusModeSignal`, `minimapSignal` | `useUiState.ts` | Reading-mode toggles |
+| `focusModeSignal`, `minimapSignal`, `wideLayoutSignal` | `useUiState.ts` | Reading-mode toggles |
 | `outlineLevelsSignal` | `useOutlineLevels.ts` | Set of heading levels visible in the outline |
 | `searchOpenSignal`, `searchScopeSignal`, `searchCaseSensitiveSignal`, `searchWholeWordSignal`, `searchRegexSignal` | `useSearch.ts` | Search bar state |
 | `paletteOpenSignal` | `useCommandPalette.ts` | ⌘P palette open |
@@ -253,8 +259,8 @@ const { signal, set } = createPersistedSignal('mdview-foo', defaultValue, { pars
 
 ### Components (`src/client/components/`)
 
-- **`Header.tsx`** — brand chip, breadcrumbs, focus / minimap / palette / theme toggles, sidebar collapse buttons. All controls have `data-tooltip` for the custom subtle tooltip.
-- **`PalettePicker.tsx`** — header dropdown with four swatches.
+- **`Header.tsx`** — brand, breadcrumbs, the View menu, the theme toggle and the shortcuts button. All controls have `data-tooltip` for the custom subtle tooltip.
+- **`ViewMenu.tsx`** — the header gear menu: focus mode, minimap and wide-layout toggles, plus a swatch for each entry in `PALETTES`.
 - **`FolderTree.tsx`** — collapsible recursive tree of `TreeNode`s.
 - **`Resizer.tsx`** — pointer-driven drag handle between panes; uses `setPointerCapture` and a ref-stashed latest-props pattern to avoid teardown on every render.
 - **`Content.tsx`** — renders the file's HTML via `innerHTML` (it's server-rendered trusted content) and runs the **wire pipeline** (see below). Hosts the focus-mode effect.
@@ -287,15 +293,19 @@ Each helper is **idempotent** (uses a marker class or dataset flag to skip alrea
 There are **two** "active heading" trackers, deliberately:
 
 - **`useScrollSpy` → `activeHeadingId`**: the *topmost heading you've passed*. Drives the outline highlight + breadcrumb. Threshold = `scroll-margin-top: 16px` (matched in CSS) + 6 px tolerance for sub-pixel rounding. `lockScrollSpy(id, ms)` pins this for ~600 ms during programmatic smooth-scrolls so the outline doesn't flicker mid-jump.
-- **`useFocusedSection` → `focusedSectionId`**: the *heading whose section contains the viewport center*. Drives focus mode. Independent of where the heading itself is visually.
+- **`useScrollSpy` → `focusedHeadingId`**: the *most recent heading that has crossed the top-third reading band* (`FOCUS_BAND_FRACTION = 0.35` of the viewport height, measured from the top). Drives focus mode. Because the band sits below the viewport top, focus moves to a new section as soon as its title enters the reading zone, while `activeHeadingId` still waits for the heading to reach the top edge.
 
-Both use **bounding-rect deltas** (not `offsetTop`, which is relative to the nearest positioned ancestor and was misaligned with `scrollContainer.scrollTop`), cache the heading list, refresh via `ResizeObserver` on the scroller, and use `MutationObserver` on the **scroller (subtree)** — observing `.markdown-content` directly missed initial mount because `<Content>` is gated on file-loaded. Both apply a no-op-write guard to avoid notifying downstream effects when the result didn't change.
+Both are computed by the same `useScrollSpy` effect (`pickActiveId` and `pickFocusedId`) from one cached heading list. Both use **bounding-rect deltas** (not `offsetTop`, which is relative to the nearest positioned ancestor and was misaligned with `scrollContainer.scrollTop`), cache the heading list, refresh via `ResizeObserver` on the scroller, and use `MutationObserver` on the **scroller (subtree)** — observing `.markdown-content` directly missed initial mount because `<Content>` is gated on file-loaded. Each signal gets a no-op-write guard to avoid notifying downstream effects when the result didn't change.
 
 The MutationObserver also watches `attributes` with `attributeFilter: ['hidden']`. Collapsing a section toggles the `hidden` attribute on every trailing sibling of the folded heading — that collapses their layout boxes without producing any `childList` mutation, so without this extension the cached heading offsets would go stale after a fold and `pickActiveId` would highlight the wrong heading.
 
 ### Live reload (`useLiveReload.ts`)
 
-Subscribes to `/api/watch` via `useSSE`. On `change` for the current file, snapshots `mainRef.current.scrollTop`, re-fetches `/api/file`, restores scroll. On `add` / `unlink` / `config`, re-fetches `/api/tree` (which carries the project config too).
+Subscribes to `/api/watch` via `useSSE`. On `change` for the current file, snapshots `mainRef.current.scrollTop`, re-fetches `/api/file`, restores scroll. On `add` / `unlink` / `config` / `workspace`, re-fetches `/api/tree` (which carries the project config too).
+
+`useSSE` opens one `EventSource` for the hook's lifetime and calls the newest handler through a ref. The handler changes on every navigation, so subscribing on handler identity would close and reopen the stream each time, drop events in the gap and briefly report zero connected clients to the server's idle timer.
+
+Tree refetches go through `coalesce` (`lib/coalesce.ts`): a 150 ms trailing debounce plus an in-flight guard. A branch switch emits hundreds of `add` / `unlink` events, and each tree response carries the whole listing. Events that arrive during a fetch schedule exactly one follow-up, so the tree is always refreshed after the last event.
 
 ### Path routing (`usePathRouting.ts`)
 
@@ -323,16 +333,16 @@ Sequence shortcuts (e.g. `gg`) use a module-scoped timestamp + `resetPendingSequ
 
 ## Build pipeline
 
-- **`tsup`** bundles `src/cli.ts` → `bin/mdview.mjs` (Node ESM, ~26 KB minified). `bin/` is gitignored; produced by `npm run build:server`.
+- **`tsup`** bundles `src/cli.ts` → `bin/mdview.mjs` (Node ESM, minified). `bin/` is gitignored; produced by `npm run build:server`.
 - **Vite** builds the client SPA → `dist/client/` (HTML + hashed assets). `dist/` is gitignored; produced by `npm run build:client`.
 - The server bundle imports `dist/client/index.html` at runtime (resolved relative to the binary's own location).
-- `pele` (one chunk per diagram type), `katex` (+ its CSS), Shiki language packs, and JetBrains Mono subsets are split into separate chunks (lazy-loaded).
+- `pele` (one chunk per diagram type), `katex` (+ its CSS) and JetBrains Mono subsets are split into separate chunks (lazy-loaded). Shiki runs on the server only, so no highlighter code or grammar ships to the browser.
 - `prepare` script auto-runs `npm run build` if `bin/mdview.mjs` is missing, so `npm install -g github:user/repo` works without an explicit build step.
 
 ## Tests (`tests/`)
 
 - **`tests/server/`** — vitest unit tests for every logic-heavy module (markdown, math, shiki, frontmatter, outline, resolve, tree, links, grep, config). Node env.
-- **`tests/client/`** — persisted-signal, scroll-spy, outline-nav, outline-filter, search-pattern, relative-time. happy-dom env.
+- **`tests/client/`** — persisted-signal, scroll-spy, outline-nav, outline-filter, search-pattern, relative-time, plus the SSE and live-reload hooks (mocked `EventSource`, rendered with `preact/test-utils`). happy-dom env.
 - Current test count lives in `docs/CONTRIBUTING.md` (one place, so it can't drift). The VS Code extension carries its own suite in `apps/vscode/tests/unit/` under a separate vitest config — **not** run by the root `npm test`.
 - UI components have **no automated tests** — verified via manual walks of `test-fixtures/` (`showcase.md`, `math.md`, `linked-doc.md`).
 

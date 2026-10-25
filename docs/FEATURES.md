@@ -67,9 +67,9 @@ Comprehensive catalog of what `mdview` does today (post Phase 2, May 2026).
 | File-system watch via chokidar | `src/server/watcher.ts` |
 | **`.mdview.json` watch** (separate from main watcher; main watcher ignores dotfiles) | `src/server/index.ts` boot |
 | Server-Sent Events stream | `src/server/routes/sse.ts` |
-| Client SSE subscription | `src/client/hooks/useSSE.ts` |
+| Client SSE subscription — one `EventSource` for the page's lifetime; navigation never reconnects it | `src/client/hooks/useSSE.ts` (newest handler read through a ref) |
 | Re-render preserves scroll position | `useLiveReload.ts` — `mainRef.current.scrollTop` snapshot/restore |
-| Tree refresh on `add`/`unlink`/`config` events | `useLiveReload.ts` calls `fetchTree()` |
+| Tree refresh on `add`/`unlink`/`config`/`workspace` events, coalesced: 150 ms trailing debounce plus one follow-up fetch for events that land mid-fetch | `useLiveReload.ts` → `lib/coalesce.ts` → `fetchTree()` |
 
 ## Themes & palettes
 
@@ -134,7 +134,7 @@ Implementation: shortcuts live in a single registry at `src/client/shortcuts.ts`
 | `--foreground`, `-f` | Run a server in this terminal serving just this folder, stopped with Ctrl-C. No daemon, no state files, no `/api/health`. |
 | `--port <n>` | Bind a specific port; implies `--foreground`. Default 7331, which auto-falls-back through 10 consecutive ports; an explicit `--port` does not fall back and fails loudly instead. `--port 0` takes a kernel-assigned port. |
 | `--no-open` | Don't launch a browser. |
-| `--palette <name>` | `classic` / `paper` / `nord` / `solarized` / `high-contrast`; implies `--foreground`. Applied at API-response time, so it overrides `.mdview.json` and the global config without modifying either on disk. |
+| `--palette <name>` | `flexoki` / `paper` / `solarized` / `everforest` / `rose-pine` / `kanagawa` / `catppuccin` / `high-contrast`; implies `--foreground`. Applied at API-response time, so it overrides `.mdview.json` and the global config without modifying either on disk. |
 | `--vscode` | Sidecar mode for the VS Code extension: implies `--no-open`, emits one JSON ready line (`{"event":"ready","url":…,"port":…}`) instead of human output, drops `frame-ancestors` so a webview can frame the SPA, and shuts down when stdin closes. |
 | `--help` / `--version` | Usage and version. |
 
@@ -182,5 +182,5 @@ Errors are mapped to a one-line `mdview: …` message with a non-zero exit;
 
 ## Build artifacts
 
-- Server CLI bundle: `bin/mdview.mjs` (~26 KB minified). KaTeX is **not** bundled into the CLI — only into the lazy-loaded client chunk.
-- Client SPA bundle: `dist/client/` (initial JS small; pele diagram types + KaTeX + Shiki language packs split into separate lazy chunks; JetBrains Mono served via `@fontsource` with `unicode-range` so only the needed subset is fetched).
+- Server CLI bundle: `bin/mdview.mjs` (minified). KaTeX is **not** bundled into the CLI — only into the lazy-loaded client chunk.
+- Client SPA bundle: `dist/client/` (initial JS small; pele diagram types and KaTeX split into separate lazy chunks; no highlighter ships, because Shiki runs on the server; JetBrains Mono served via `@fontsource` with `unicode-range` so only the needed subset is fetched).

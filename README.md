@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](https://nodejs.org)
 
-A local markdown viewer for reading long, hierarchical docs without losing focus. Run a command, browser opens with a beautifully rendered, navigable view of your file or folder. Edits in your editor show up live. Close terminal to stop.
+A local markdown viewer for reading long, hierarchical docs without losing focus. Run a command, browser opens with a beautifully rendered, navigable view of your file or folder. Edits in your editor show up live. One background server hosts every folder you open; `mdview stop` ends it.
 
 ```
 mdview ./docs              # browse a folder
@@ -154,7 +154,7 @@ unexpected errors.
 | `⇧H` / `⇧L` | Previous / next file in folder |
 | `Ctrl+D` / `Ctrl+U` | Half-page down / up |
 | `Alt` / `⌥` + scroll | Fast scroll (~4×) in the main pane |
-| `f` / `m` | Toggle focus mode / minimap |
+| `f` / `m` / `w` | Toggle focus mode / minimap / wide layout |
 | `e` / `⇧E` | Expand all / collapse all sections |
 | `Tab` (in search) | Cycle Doc ↔ Folder scope |
 | `Enter` / `Shift+Enter` | Next / previous match in search |
@@ -172,7 +172,7 @@ Click the keyboard icon in the header anytime to see the full list.
 - Eight built-in palettes: flexoki / paper / solarized / everforest / rose-pine / kanagawa / catppuccin / high-contrast. Pick one from the header palette swatch. Each defines a full light and dark variant and its own ground texture: a dot grain on the paper-like palettes, fibre noise on Everforest and Kanagawa, an accent wash on Rosé Pine and Catppuccin, and none at all on high-contrast. Code blocks follow the palette (Everforest syntax in Everforest, Catppuccin in Catppuccin, etc.).
 - Reading-progress bar pinned to the bottom of the header.
 - Doc stats strip below the H1 (reading time, word count, heading count, "Updated N ago").
-- Focus mode dims everything except the section at the viewport center.
+- Focus mode dims everything except the section you are reading: the one whose heading last crossed the top-third of the viewport.
 - Optional minimap rail at the right edge: bars per heading, draggable to scroll, viewport indicator follows.
 
 **Navigation**
@@ -240,7 +240,7 @@ mdview config ignore rm  deps       # remove one or more basenames
 
 ## Stack
 
-Node 20+, TypeScript, Fastify 5, markdown-it 14, Shiki 1, js-yaml 4, chokidar 4, Preact 10 + @preact/signals, KaTeX 0.16, pele (lazy), JetBrains Mono via @fontsource, Vite 6, tsup 8, vitest 2.
+Node 20+, TypeScript, Fastify 5, markdown-it 14, Shiki 1, js-yaml 4, chokidar 4, Preact 10 + @preact/signals, KaTeX 0.16, pele (lazy), JetBrains Mono via @fontsource, Vite 6, tsup 8, vitest 3.
 
 ## Documentation
 
