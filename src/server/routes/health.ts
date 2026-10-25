@@ -4,11 +4,15 @@ import type { RootState } from '../workspace.js';
 export interface HealthIdentity {
   pid: number;
   startedAt: number;
+  version: string;
 }
 
 /**
  * Lets the CLI tell "our daemon is listening here" from "something else grabbed
  * that port" or "the pid was recycled".
+ *
+ * The version lets a newer CLI notice a daemon still running old code after an
+ * upgrade, and replace it.
  *
  * It reports ids, never absolute paths: `mdview ls` reads those from the local
  * workspace file, so nothing that can merely reach the port gets a map of the
@@ -24,6 +28,7 @@ export function registerHealth(
       ok: true,
       pid: identity.pid,
       startedAt: identity.startedAt,
+      version: identity.version,
       roots: roots.map((r) => r.root.id),
     }),
   );

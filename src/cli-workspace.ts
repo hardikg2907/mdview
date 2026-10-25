@@ -1,6 +1,8 @@
 import { findLiveDaemon, stopDaemon } from './daemon/client.js';
 import { daemonLogPath } from './daemon/state.js';
 import { MAX_ROOTS, readWorkspace, removeRoot } from './daemon/workspace-file.js';
+import { isValidVersion } from './update/semver.js';
+import { readVersion } from './version.js';
 
 /** Shorten a path under the home directory for display. */
 function tilde(abs: string): string {
@@ -34,6 +36,13 @@ export async function runListCommand(): Promise<number> {
   if (live) {
     console.log(`server:  http://mdview.localhost:${live.state.port}/  (pid ${live.state.pid})`);
     console.log(`logs:    ${daemonLogPath()}`);
+    // Read-only on purpose: `ls` reports, and the next `mdview <path>` does the swap.
+    const own = readVersion();
+    if (isValidVersion(own) && live.health.version !== own) {
+      console.log(
+        `note:    it runs ${live.health.version ?? 'a version that reports none'}, this is ${own}; the next \`mdview <path>\` restarts it`,
+      );
+    }
   } else {
     console.log('server:  not running — the next `mdview <path>` will start it');
   }

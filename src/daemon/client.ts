@@ -1,5 +1,7 @@
-import { type ChildProcess, spawn } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { closeSync, statSync, truncateSync } from 'node:fs';
+import { isValidVersion } from '../update/semver.js';
+import { readVersion } from '../version.js';
 import {
   clearDaemonState,
   type DaemonState,
@@ -19,6 +21,8 @@ const LOG_TRUNCATE_BYTES = 1024 * 1024;
 export interface Health {
   pid: number;
   startedAt: number;
+  /** Absent from daemons older than 0.11, and from anything that fails validation. */
+  version?: string;
   roots: string[];
 }
 
@@ -38,6 +42,8 @@ export async function probeHealth(port: number): Promise<Health | null> {
     return {
       pid: body.pid,
       startedAt: body.startedAt,
+      // Validated because it is printed to the terminal when it differs.
+      ...(isValidVersion(body.version) ? { version: body.version } : {}),
       roots: Array.isArray(body.roots) ? body.roots.filter((r) => typeof r === 'string') : [],
     };
   } catch {
@@ -62,7 +68,7 @@ export async function findLiveDaemon(): Promise<{ state: DaemonState; health: He
   return { state, health };
 }
 
-function spawnDaemon(cliEntry: string): ChildProcess {
+function spawnDaemon(cliEntry: string): void {
   try {
     if (statSync(daemonLogPath()).size > LOG_TRUNCATE_BYTES) {
       truncateSync(daemonLogPath(), 0);
@@ -79,40 +85,94 @@ function spawnDaemon(cliEntry: string): ChildProcess {
       stdio: ['ignore', log, log],
     });
     child.unref();
-    return child;
   } finally {
     closeSync(log);
   }
 }
 
+export interface EnsureDaemonOptions {
+  /** The version this CLI runs; a daemon reporting a different one is replaced. */
+  version?: string;
+  /** Called once, after the replacement is up. `from` is `unknown` for a daemon that reports none. */
+  onRestart?: (from: string, to: string) => void;
+  /** Replaces the real process spawn, for tests. */
+  spawnFn?: (cliEntry: string) => void;
+  startTimeoutMs?: number;
+}
+
+type LiveDaemon = NonNullable<Awaited<ReturnType<typeof findLiveDaemon>>>;
+
 /**
- * Return the running daemon, starting one if there isn't a live one.
+ * An `unknown` own version (package.json unreadable) cannot be compared, so it
+ * never triggers a restart; the daemon is reused as before.
+ */
+function runsOtherVersion(live: LiveDaemon, version: string): boolean {
+  return isValidVersion(version) && live.health.version !== version;
+}
+
+function sameDaemon(a: LiveDaemon, b: LiveDaemon): boolean {
+  return a.state.pid === b.state.pid && a.state.startedAt === b.state.startedAt;
+}
+
+/**
+ * Return the running daemon, starting one if there isn't a live one, and
+ * replacing one that runs a different version of mdview.
+ *
+ * After `npm i -g` the old daemon would otherwise keep serving old code, so a
+ * security fix would not take effect until the user thought to run `mdview stop`.
+ * The open folders survive the swap: they live in workspace.json, which the new
+ * daemon reads at boot.
  *
  * The spawn is serialised through a lock file so two shells running `mdview` at
- * the same moment end up sharing one daemon rather than racing for the port.
+ * the same moment end up sharing one daemon rather than racing for the port. The
+ * same lock covers the restart, so only one of them stops the old daemon.
  */
-export async function ensureDaemon(cliEntry: string): Promise<DaemonState> {
+export async function ensureDaemon(
+  cliEntry: string,
+  options: EnsureDaemonOptions = {},
+): Promise<DaemonState> {
+  const version = options.version ?? readVersion();
+  const timeoutMs = options.startTimeoutMs ?? START_TIMEOUT_MS;
+  const spawnFn = options.spawnFn ?? spawnDaemon;
+
   const existing = await findLiveDaemon();
-  if (existing) return existing.state;
+  if (existing && !runsOtherVersion(existing, version)) return existing.state;
 
   if (!tryTakeSpawnLock()) {
-    // Someone else is mid-spawn; wait for their daemon instead of making a second.
-    const found = await waitFor(() => findLiveDaemon(), START_TIMEOUT_MS);
+    // Someone else is mid-spawn or mid-restart. Wait for the daemon they leave
+    // behind rather than make a second, and never settle for the one that is
+    // still being replaced.
+    const found = await waitFor(async () => {
+      const live = await findLiveDaemon();
+      if (!live) return null;
+      if (!existing || !sameDaemon(live, existing)) return live;
+      return runsOtherVersion(live, version) ? null : live;
+    }, timeoutMs);
     if (found) return found.state;
+    // The holder died mid-restart. The old daemon still serves, which beats failing.
+    const fallback = await findLiveDaemon();
+    if (fallback) return fallback.state;
     throw new Error('Timed out waiting for the mdview background server to start.');
   }
 
   try {
+    // Another CLI may have finished its own spawn or restart between our first
+    // look and taking the lock.
+    const current = await findLiveDaemon();
+    if (current && !runsOtherVersion(current, version)) return current.state;
+
+    if (current) await stopDaemon();
     // A state file left behind by a killed daemon would otherwise be mistaken
     // for the one we are about to start.
     clearDaemonState();
-    spawnDaemon(cliEntry);
-    const found = await waitFor(() => findLiveDaemon(), START_TIMEOUT_MS);
+    spawnFn(cliEntry);
+    const found = await waitFor(() => findLiveDaemon(), timeoutMs);
     if (!found) {
       throw new Error(
         `The mdview background server did not start. See ${daemonLogPath()} for why.`,
       );
     }
+    if (current) options.onRestart?.(current.health.version ?? 'unknown', version);
     return found.state;
   } finally {
     releaseSpawnLock();

@@ -1,5 +1,5 @@
 import dns from 'node:dns/promises';
-import { existsSync, readFileSync, realpathSync, statSync } from 'node:fs';
+import { existsSync, realpathSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { FastifyInstance } from 'fastify';
@@ -10,6 +10,7 @@ import { clearDaemonState, workspaceFilePath, writeDaemonState } from './daemon/
 import { addRoot, readWorkspace, toRootSpecs } from './daemon/workspace-file.js';
 import { deriveRootId, type RootSpec } from './server/workspace.js';
 import { PALETTES, type Palette } from './shared/types.js';
+import { readVersion } from './version.js';
 
 export type ParseResult =
   | { kind: 'run'; args: Args }
@@ -66,24 +67,6 @@ export interface Args {
   /** Internal: this process *is* the background server. */
   daemon: boolean;
   palette?: Palette;
-}
-
-function readVersion(): string {
-  const here = path.dirname(fileURLToPath(import.meta.url));
-  const candidates = [
-    path.resolve(here, '../package.json'),
-    path.resolve(here, '../../package.json'),
-  ];
-  for (const p of candidates) {
-    try {
-      const raw = readFileSync(p, 'utf8');
-      const v = JSON.parse(raw).version;
-      if (typeof v === 'string') return v;
-    } catch {
-      // try next
-    }
-  }
-  return 'unknown';
 }
 
 export const DEFAULT_PORT = 7331;
@@ -452,7 +435,7 @@ async function runDaemon(args: Args): Promise<void> {
   const server = await createServer({
     roots: toRootSpecs(readWorkspace()),
     clientDir,
-    identity: { pid: process.pid, startedAt },
+    identity: { pid: process.pid, startedAt, version: readVersion() },
     onSseClientsChanged: (count) => {
       if (count > 0) {
         if (idleTimer) clearTimeout(idleTimer);
@@ -531,7 +514,10 @@ async function runAttach(args: Args): Promise<void> {
   // Registering the folder first means a daemon we are about to start already
   // has it at boot, and a running one picks it up from the file watcher.
   const added = addRoot(args.target);
-  const state = await ensureDaemon(fileURLToPath(import.meta.url));
+  const state = await ensureDaemon(fileURLToPath(import.meta.url), {
+    onRestart: (from, to) =>
+      console.error(`mdview: restarted the background server (${from} → ${to})`),
+  });
   // Without this the browser can open a deep link before the daemon has applied
   // the workspace change, and the file 404s for no visible reason.
   await waitForRoot(state.port, added.root.id);

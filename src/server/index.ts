@@ -13,7 +13,7 @@ import { ASSET_SECURITY_HEADERS, registerApiAsset } from './routes/api-asset.js'
 import { registerApiFile } from './routes/api-file.js';
 import { registerApiSearch } from './routes/api-search.js';
 import { registerApiTree } from './routes/api-tree.js';
-import { registerHealth } from './routes/health.js';
+import { type HealthIdentity, registerHealth } from './routes/health.js';
 import { registerSse } from './routes/sse.js';
 import { createEventHub, createWatcher } from './watcher.js';
 import {
@@ -46,7 +46,7 @@ export interface ServerOptions {
    */
   embedToken?: string;
   /** Reported by /api/health so the CLI can tell our daemon from a stranger. */
-  identity?: { pid: number; startedAt: number };
+  identity?: HealthIdentity;
   /** Called whenever the number of connected SSE clients changes. */
   onSseClientsChanged?: (count: number) => void;
 }
