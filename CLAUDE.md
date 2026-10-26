@@ -23,7 +23,7 @@ Target platforms: **macOS, Linux, Windows.** Node `>=22.12`.
 | `docs/FEATURES.md` | Canonical feature list with brief descriptions | When adding/removing a user-visible feature |
 | `docs/CONTRIBUTING.md` | Dev workflow, build commands, quality gates, layout | Before your first edit in a session |
 | `VERIFICATION.md` | Manual-test checklist (golden-path + edge cases) | Before claiming a change "works" — and to extend when you add new behavior |
-| `TODO.md` | Roadmap; phase 2 done, phase 3 (workspaces) + phase 4 (editor extensions) pending | When the user asks "what's next" or "is X planned?" |
+| `TODO.md` | Roadmap; phases 2–3 shipped, phase 4 (editor extensions) partly done | When the user asks "what's next" or "is X planned?" |
 | `CHANGELOG.md` | Keep-a-Changelog. `Unreleased` section accumulates between releases | Every change that's user-visible OR security-relevant |
 | `LICENSE` | MIT | Only if relicensing |
 
@@ -82,12 +82,13 @@ Skim these before exploring code. They will answer most "where does X live?" que
 
 ```bash
 npm run typecheck     # both tsconfigs
-npm test              # all vitest suites
+npm run lint          # biome check
+npm test              # all vitest suites (builds once first, via tests/global-setup.ts)
 npm run build         # vite + tsup must both succeed
 npm audit --omit=dev  # 0 vulnerabilities in SHIPPED deps; if not, see §6
 ```
 
-All four must pass. Don't claim a task done before running them. If you skipped one because it's "obviously fine," you didn't do the task.
+All five must pass. Don't claim a task done before running them. If you skipped one because it's "obviously fine," you didn't do the task.
 
 For UI changes the gates above prove correctness but not feature parity — also do the relevant `VERIFICATION.md` rows manually in a browser before declaring done.
 
@@ -116,7 +117,7 @@ While at `0.x.y`, semver is loose by convention — a minor bump (`0.1 → 0.2`)
 ### 5.3 Release checklist (run in order)
 
 1. Confirm working tree is clean (`git status`).
-2. Run all four quality gates from §4. Stop if any fails.
+2. Run all five quality gates from §4. Stop if any fails.
 3. Run the relevant `VERIFICATION.md` rows manually if anything user-visible changed.
 4. Review `CHANGELOG.md` `Unreleased`:
    - Are all the user-visible changes since the last tag captured?

@@ -22,7 +22,7 @@ an older background server by itself, so the fixes take effect after
 - **KaTeX is updated to 0.19, which fixes a prototype-pollution advisory** that could bypass its `trust` restrictions. KaTeX ships inside the client bundle, so `npm audit --omit=dev` never reported it.
 - **A markdown file can no longer run script through an SVG beside it.** A document could frame `/__asset/…/evil.svg`, or link to it, and the SVG's script ran with no policy and could read other files and send them off the machine. Every `/__asset/*` response and every SVG response now carries a sandbox CSP, `nosniff` and `Cross-Origin-Resource-Policy: same-origin`, including when the route is reached through a percent-encoded URL. The page policy adds `frame-src 'none'` and `object-src 'none'`.
 - **Symlinks can no longer lead out of an open folder.** A link committed into a repo (`notes.md -> /etc/hosts`, `logo.png -> ~/.ssh/id_ed25519`) was served as if it lived in the folder. Paths are now checked again after resolving every link. Links that stay inside the folder still work.
-- **A regex folder search can no longer freeze the server.** A backtracking pattern could block every request for minutes. Regex search now runs in a worker thread that is stopped after 3 s, and the panel shows what it found so far. At most two searches run at once; the rest wait their turn.
+- **Folder search can no longer freeze the server or exhaust its memory.** A backtracking regex could block every request for minutes. Regex search now runs in a worker thread that is stopped after 3 s, and the panel shows what it found so far. Searches also share limits: at most two run at once across the whole server, literal and regex alike (later ones wait, and one whose page goes away is dropped), file contents read for searches share one 32 MB budget, and literal matching gives way to other requests every 10 ms. Sixteen parallel searches fired from `<img>` tags used to stall every request for 13 s and take the server past 2 GB; other requests now answer within 0.1 s and memory stays under 0.6 GB.
 - **`.txt` and `.pdf` are no longer served as assets, and nothing under a dot-folder is.** Only image, video and audio types are served.
 - **The file watcher no longer follows symlinks**, so a repo holding `link -> /` no longer walks the whole disk.
 - **`~/.config/mdview` is now private to your user.** The folder is `0700` and its files `0600`, and existing ones are tightened. They list every folder you have opened.
@@ -33,11 +33,10 @@ an older background server by itself, so the fixes take effect after
 - **A crafted markdown file can no longer stall the server while it renders.** An HTML block full of `<a ` or `<img ` with no closing `>` took 12 s at 480 KB and close to a minute at 1 MB, and blocked every other request; any open document could trigger it with an image pointing at `/api/file`. Links and images are now rewritten in one pass over the page: 1 MB takes about 25 ms.
 - **A website can no longer make folder search use a gigabyte of memory.** A search for `a` over a file holding one 15 MB line kept all 15 million matches and took the server past 1 GB. Plain searches now skip lines over 10,000 characters, only count matches past the 20 shown per file, and stop after 1 s. Opening or searching a large file no longer splits it into millions of lines at once, which cost about 500 MB for 15 MB of short lines.
 - **A markdown file can no longer send the tab to another site.** A `<meta http-equiv="refresh">` in a document's HTML navigated the whole tab, and a page's security policy cannot block that. `<meta>` and `<base>` tags are now removed from a document's HTML when it renders.
-- **Opening one file no longer exposes its whole folder.** `mdview ~/README.md` served every image under `$HOME` and watched `$HOME` recursively. A single file is now watched on its own, and only the images and media the document references are served.
+- **Opening one file no longer exposes its whole folder.** `mdview ~/README.md` served every image under `$HOME` and watched `$HOME` recursively. `mdview <file>` now shows only that file and the media it references: the file is watched on its own, and an image in the same folder that the document does not reference is no longer served.
 - **Dot-folders are also checked on the real path**, so an in-folder link into `.git` is refused by `/__asset/*`, and so is a Windows short name such as `GIT~1`.
 - **Every response now carries `X-Content-Type-Options: nosniff`**, not only HTML pages, and the `workspace.json` watcher no longer follows symlinks.
-- - **Shipped dependencies are updated to clear advisories:** `markdown-it` 14.3.2 → 15.0.3 (quadratic-time parsing of inline HTML when `html` is enabled, of a multi-line link reference definition, and further quadratic paths fixed in 15.0.1–15.0.3), `fastify` 5.12.5 → 5.12.7 (header validation bypass via case-sensitive `propertyNames`), and `fast-uri` 3.1.8 → 3.1.9 and 4.2.1 → 4.2.3 (scheme spoofing, path equivalence and host confusion in URI handling). The `markdown-it` ones were reachable: the renderer enables `html`, so a crafted markdown file could block the server. The others were not reachable as mdview is configured (no route declares a schema), but they ship in the install. `shiki` 4, `js-yaml` 5 and `open` 11 are also taken.
-- **Folder search can no longer stall the server or exhaust its memory through many parallel requests.** At most two searches run at once across the whole server, literal and regex alike; later ones wait, and one whose page goes away is dropped. File contents read for searches share one 32 MB budget, and literal matching gives way to other requests every 10 ms. Sixteen parallel searches fired from `<img>` tags used to stall every request for 13 s and take the server past 2 GB; other requests now answer within 0.1 s and memory stays under 0.6 GB.
+- **Shipped dependencies are updated to clear advisories:** `markdown-it` 14.3.2 → 15.0.3 (quadratic-time parsing of inline HTML when `html` is enabled, of a multi-line link reference definition, and further quadratic paths fixed in 15.0.1–15.0.3), `fastify` 5.12.5 → 5.12.7 (header validation bypass via case-sensitive `propertyNames`), and `fast-uri` 3.1.8 → 3.1.9 and 4.2.1 → 4.2.3 (scheme spoofing, path equivalence and host confusion in URI handling). The `markdown-it` ones were reachable: the renderer enables `html`, so a crafted markdown file could block the server. The others were not reachable as mdview is configured (no route declares a schema), but they ship in the install. `shiki` 4, `js-yaml` 5 and `open` 11 are also taken.
 
 ### Removed
 - **Node 20 is no longer supported; mdview now needs Node 22.12 or later.** Node 20 reached end of life on 2026-04-30, and a fresh install of 0.10.0 already failed to start a server on Node 20.0–20.18: `@fastify/static` 10.1.7 pulls `content-disposition` 3, which ships ES modules only, and Node loads those through `require()` without a flag only from 22.12. Run `node --version` before upgrading. The VS Code extension now needs VS Code 1.101 or later, the first release that runs on Node 22.
@@ -55,7 +54,6 @@ an older background server by itself, so the fixes take effect after
 - **The package is about 43% smaller (1.4 MB → 0.8 MB).** JetBrains Mono and KaTeX now ship as woff2 only, which every supported browser already used.
 - **Markdown files over 16 MB are no longer rendered or searched.** Rendering is synchronous, so one huge file stalled every other request.
 - **A single-file target that is itself a symlink is served from the folder its link points into.**
-- **`mdview <file>` shows only that file and the media it references.** An image in the same folder that the document does not reference is no longer served.
 - **Links and images written as raw HTML are now rewritten like markdown ones.** Single-quoted, unquoted or upper-case attributes, and a `>` inside a quoted value, no longer stop a relative `.md` link or image path from resolving. Links inside HTML comments are left alone.
 - **A search that skips a very long line says so** with "More results truncated".
 - **Front matter dates display as written** (`2024-01-02`) instead of as timestamps (`2024-01-02T00:00:00.000Z`). Front matter is now parsed as YAML 1.2 with merge keys (`<<: *defaults`) still applied.
@@ -317,7 +315,17 @@ Initial v1 release plus phase-2 features. Highlights:
 - Per-project `.mdview.json` config (palette, font, line-width, default-collapsed sidebars).
 - Friendly CLI error messages and graceful shutdown.
 
-[Unreleased]: https://github.com/hardikg2907/mdview/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/hardikg2907/mdview/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/hardikg2907/mdview/compare/v0.10.0...v0.11.0
+[0.10.0]: https://github.com/hardikg2907/mdview/compare/v0.9.1...v0.10.0
+[0.9.1]: https://github.com/hardikg2907/mdview/compare/v0.9.0...v0.9.1
+[0.9.0]: https://github.com/hardikg2907/mdview/compare/v0.8.1...v0.9.0
+[0.8.1]: https://github.com/hardikg2907/mdview/compare/v0.8.0...v0.8.1
+[0.8.0]: https://github.com/hardikg2907/mdview/compare/v0.7.1...v0.8.0
+[0.7.1]: https://github.com/hardikg2907/mdview/compare/v0.7.0...v0.7.1
+[0.7.0]: https://github.com/hardikg2907/mdview/compare/v0.6.2...v0.7.0
+[0.6.2]: https://github.com/hardikg2907/mdview/compare/v0.6.1...v0.6.2
+[0.6.1]: https://github.com/hardikg2907/mdview/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/hardikg2907/mdview/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/hardikg2907/mdview/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/hardikg2907/mdview/compare/v0.3.1...v0.4.0

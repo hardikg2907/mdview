@@ -52,6 +52,8 @@ npm run build         # vite + tsup must both succeed
 npm audit --omit=dev  # 0 vulnerabilities in shipped deps (release blocker, see CLAUDE.md §6)
 ```
 
+`npm test` first runs `npm run build` once, through `tests/global-setup.ts`, before any test file starts. Several test files spawn `bin/mdview.mjs`, and one shared build keeps a file from spawning the bin while another rewrites its chunks. The tests that start the CLI take a good part of the run, so expect `npm test` to take tens of seconds, not a few.
+
 `npm run lint:fix` will auto-apply the safe fixes Biome knows about (import order, dead code, optional chains, etc.). Lint config lives in `biome.json`; a11y rules are disabled because the custom keyboard-driven widgets (file tree, command palette, outline) intentionally diverge from generic ARIA patterns.
 
 ### Git hooks (husky)
@@ -60,8 +62,8 @@ Hooks live in `.husky/` and install automatically the first time you run `npm in
 
 | Hook | Runs | Why |
 |---|---|---|
-| `pre-commit` | `npm run typecheck && npm run lint && npm test && npm audit --omit=dev` | Catches type errors, lint regressions, broken tests, and new advisories in shipped deps before the commit lands. ~6–7s on a clean tree. |
-| `pre-push` | `npm run build` | Heavier (~25s). Catches anything that compiles in dev but not through `vite build` / `tsup`. |
+| `pre-commit` | `npm run typecheck && npm run lint && npm test && npm audit --omit=dev` | Catches type errors, lint regressions, broken tests, and new advisories in shipped deps before the commit lands. Dominated by `npm test`. |
+| `pre-push` | `npm run build` | Catches anything that compiles in dev but not through `vite build` / `tsup`. |
 
 `npm audit` requires network — if you're offline (flight, tunneled VPN) it'll fail and block the commit. In that genuine case use `git commit --no-verify` to bypass, then re-run the full gate set the next time you're online and before cutting a release. **Do not habitually `--no-verify`** — the hooks exist because every one of these failure modes has bitten this repo before.
 
@@ -71,11 +73,16 @@ Hooks live in `.husky/` and install automatically the first time you run `npm in
 src/
 ├── cli.ts                          ← CLI entry: args, port-fallback, graceful shutdown
 ├── cli-config.ts / cli-workspace.ts ← `config` and `ls` / `rm` / `stop` subcommands
-├── daemon/                         ← background-server state, workspace file, CLI-side client
+├── cli-update.ts                   ← `mdview update`: fetch, compare, print the install command
+├── version.ts                      ← readVersion, the one source of the package version
+├── update/                         ← semver.ts (strict parse/compare), latest.ts (registry fetch), cache.ts (update-check.json), notice.ts (CLI stderr line)
+├── types/shims.d.ts                ← ambient module declarations
+├── daemon/                         ← background-server state, workspace file, CLI-side client, daily update check
 ├── shared/                         ← cross-runtime modules — no Node-only or DOM-only deps
 │   ├── types.ts
 │   ├── search-pattern.ts            ← compilePattern (used by client + server)
 │   ├── relative-time.ts             ← formatRelativeTime
+│   ├── ignore.ts                    ← DEFAULT_IGNORED_DIRS (client tooltip + server)
 │   └── tree-utils.ts                ← MD_EXT, flattenMdRelPaths
 ├── render/                         ← server-agnostic markdown render pipeline
 │   ├── markdown.ts
@@ -84,10 +91,12 @@ src/
 │   ├── frontmatter.ts
 │   ├── outline.ts
 │   ├── links.ts                     ← tagInternalLinks, rewriteImageSrc
+│   ├── html-tags.ts                 ← linear tag scanner (rewriteTags), stripMetaAndBase
 │   └── math.ts                      ← KaTeX placeholder emission
 ├── server/
 │   ├── index.ts                     ← createServer factory + .mdview.json watcher
 │   ├── config.ts                    ← validateConfig + loadEffectiveConfig (global + project)
+│   ├── config-write.ts              ← `mdview config ignore` writer
 │   ├── hosts.ts                     ← isAllowedHost
 │   ├── workspace.ts                 ← open roots, parseWorkspacePath
 │   ├── routes/
@@ -95,11 +104,16 @@ src/
 │   │   ├── api-tree.ts              ← GET /api/tree (carries project config)
 │   │   ├── api-asset.ts             ← GET /__asset/*
 │   │   ├── api-search.ts            ← GET /api/search
+│   │   ├── health.ts                ← GET /api/health (daemon mode only)
 │   │   └── sse.ts                   ← GET /api/watch
 │   ├── fs/
 │   │   ├── resolve.ts               ← resolveSafePath (security boundary!)
+│   │   ├── ignore.ts                ← DEFAULT_IGNORED_DIRS + isPathIgnored
 │   │   ├── tree.ts                  ← walkFolder
-│   │   └── grep.ts                  ← folder-wide search backend
+│   │   ├── limiter.ts               ← weighted FIFO semaphore (search slots, read budget)
+│   │   ├── grep.ts                  ← folder-wide search backend
+│   │   ├── regex-runner.ts          ← owns the regex worker and its time budget
+│   │   └── regex-worker.ts          ← worker_threads entry, built to bin/regex-worker.mjs
 │   └── watcher.ts                   ← chokidar wrapper + emitSynthetic
 └── client/
     ├── main.tsx                    ← Preact mount + JetBrains Mono CSS
@@ -108,13 +122,16 @@ src/
     ├── components/                 ← UI components (panes + overlays)
     ├── hooks/                      ← signals + effects (use*.ts)
     ├── lib/                        ← DOM augmentation helpers + pure utils
+    ├── public/                     ← bootstrap.js (theme/palette before first paint), favicon
     └── styles/                     ← reset / theme / layout / content / components
 
 tests/
-├── server/                         ← vitest unit tests for server logic
+├── global-setup.ts                 ← runs `npm run build` once before any test file
+├── helpers/                        ← shared test helpers (root fixtures, CLI start-up deadlines)
+├── server/                         ← vitest tests for server logic, including tests that spawn the CLI
 └── client/                         ← vitest tests for pure client logic
 
-test-fixtures/                      ← manual-test markdown files (showcase.md, math.md, …)
+test-fixtures/                      ← manual-test markdown files (showcase.md, demo.md, math.md, …)
 docs/                               ← architecture, contributing, features
 scripts/                            ← capture-screenshots.mjs (npm run capture)
 build/                              ← build-time Vite plugins (woff2-only font CSS)
@@ -258,12 +275,9 @@ Suppose you want to add a "back to top" button that appears after the user scrol
 - **Math not rendering?** Same idea — check for the `katex` chunk loading and the `katex.min.css` `<link>` injection.
 - **Outline highlights wrong heading or focus mode lags?** Both are scroll-spy-related. The pure functions (`pickActiveId`, `nextSameLevelHeading`, `filterOutline`) are tested. The hooks themselves use bounding-rect deltas + `MutationObserver` on the **scroller subtree** (not `.markdown-content` directly — that doesn't exist at hook-mount because `<Content>` is gated on file-loaded).
 
-## Things to know about how the agents got here
+## Roadmap
 
-- Built end-to-end in May 2026 across multiple iterations.
-- Phase 1 (MVP) used a **subagent-driven implementation plan** with batched commits. Original plan at `docs/superpowers/plans/2026-05-06-mdview-implementation.md` for historical reference.
-- Phase 2 push (resizable sidebars, vim shortcuts, math, palettes/config, folder search, focus + minimap, last-updated, JetBrains Mono, outline filter, search options) landed in `a80842f`. The `refactor: drop static export…` commit (`721e76d`) reverted the originally-planned static export feature; bundle cost outweighed value.
-- Phase 3 (workspaces) and Phase 4 (editor extensions) are tracked in [`TODO.md`](../TODO.md).
+Phases 1–3 (the viewer, its second round of features, and workspaces) are shipped. Phase 4 (editor extensions) is partly done: the VS Code extension works but is unpublished. Open work is tracked in [`TODO.md`](../TODO.md).
 
 ## Anti-patterns we explicitly avoid
 

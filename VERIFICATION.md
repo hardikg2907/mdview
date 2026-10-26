@@ -24,12 +24,12 @@ node bin/mdview.mjs ./test-fixtures/showcase.md --no-open
 - `mdview --foreground ~/README.md` (any file in `$HOME`) → the startup line reads `watching: /Users/<you>/README.md`, not the folder. The process does not climb in open file count (`lsof -p <pid> | wc -l` stays small), and saving an unrelated file under `$HOME` sends no SSE event.
 
 ### 1a. Dot-directories
-- `curl -s -o /dev/null -w '%{http_code}\n' "http://127.0.0.1:<port>/api/file?path=.github/PULL_REQUEST_TEMPLATE.md"` (any repo with one) → `404`; the same for `.claude/*.md`.
+- `curl -s -o /dev/null -w '%{http_code}\n' "http://127.0.0.1:<port>/api/file?path=<id>/.github/PULL_REQUEST_TEMPLATE.md"` (any repo with one) → `200`; the same for `.claude/*.md`. `?path=<id>/.env` → `400` (markdown only).
 - An in-root link into a dot-directory (`ln -s .git/description.md notes.md`, or `ln -s .cache/x.png shot.png`) → `/__asset/*` `404`s the image link; `/api/file` serves the markdown one, as it serves any `.md` inside the folder.
-- `mdview ~/repo/.github/PULL_REQUEST_TEMPLATE.md` while `~/repo` is open → adds a separate root for `.github` and the file renders.
+- `mdview ~/repo/.github/PULL_REQUEST_TEMPLATE.md` while `~/repo` is open → prints `open:` for the existing `~/repo` root and a URL with `?file=repo/.github/PULL_REQUEST_TEMPLATE.md`. `mdview ls` shows no new root, and the file renders.
 
 ### 2. Folder mode
-- Folder tree shows nested structure (`assets/`, `linked-doc.md`, `math.md`, `showcase.md`).
+- Folder tree shows nested structure (`assets/`, `demo.md`, `linked-doc.md`, `math.md`, `showcase.md`).
 - Click `linked-doc.md` → renders in the viewer (no full page reload).
 - **Cmd/Ctrl + click `linked-doc.md` in the file tree** → opens that file in a **new tab** with URL `?file=linked-doc.md`. Middle-click and right-click → "Open link in new tab" also work.
 - Internal `[link](./linked-doc.md)` inside `showcase.md` navigates same way.
@@ -67,7 +67,7 @@ node bin/mdview.mjs ./test-fixtures/showcase.md --no-open
 - Header right side shows three icons: a gear (View), theme toggle, and the keyboard `?` button. Nothing else.
 - Click the gear → popover lists Focus mode, Minimap, Wide layout, a divider, and eight palette swatches with checks on the active palette.
 - Toggle "Wide layout" (or press `w`) → main column visibly relaxes from ~70ch to ~100ch; reload persists the choice.
-- Toggle Focus, Minimap, and palettes from inside the menu — behavior matches the previous separate buttons.
+- Toggle Focus, Minimap, and palettes from inside the menu — each toggles its state.
 
 ### 5. Outline level filter
 - Outline header shows six small pills `1 2 3 4 5 6`.
@@ -113,8 +113,8 @@ node bin/mdview.mjs ./test-fixtures/showcase.md --no-open
 - `curl 'http://127.0.0.1:<port>/api/file?path=showcase.md&palette=banana'` returns 200 with the default palette's colours — an unknown palette must not fail the request.
 - Compare response sizes: `?palette=flexoki` on `showcase.md` should be roughly 30 KB, not 200 KB.
 - High-contrast in dark mode → near-pure-white text on near-black background, bold accent. Light mode → mirror.
-- Reload — both theme and palette persist **without a flash of the default** (an inline `<head>` script applies them before first paint).
-- Hard-reload in Safari private mode → theme/palette still applies; check DevTools console for a single `mdview: localStorage access blocked` warning (acceptable, not an error).
+- Reload — both theme and palette persist **without a flash of the default** (the external `bootstrap.js`, referenced from `<head>`, applies them before first paint; the CSP forbids inline script).
+- Hard-reload in Safari private mode → theme/palette still applies; check DevTools console for a single `[mdview] localStorage read blocked; falling back to defaults. Theme/UI prefs will not persist across reloads.` warning (acceptable, not an error).
 - `⌘\` shortcut also toggles theme.
 
 ### 10. Per-project config (`.mdview.json`)
@@ -184,7 +184,7 @@ node bin/mdview.mjs ./test-fixtures/showcase.md --no-open
 - Refresh while focus mode is on → dimming applies as soon as the file loads.
 
 ### 17. Minimap
-- Toggle minimap (header bar-grid button or `m` key).
+- Toggle minimap (View menu → Minimap, or `m` key).
 - A thin rail appears at the right edge with one bar per heading; bar width decays with depth.
 - Active heading bar is accent-coloured + slightly taller.
 - A faint viewport indicator slides as you scroll.
@@ -221,12 +221,12 @@ node bin/mdview.mjs ./test-fixtures/showcase.md --no-open
 - In a second terminal run `mkdir -p test-fixtures/burst && for i in $(seq 1 300); do : > test-fixtures/burst/n$i.md; done; rm -r test-fixtures/burst` → the Network panel shows one or two `/api/tree` requests, not hundreds, and the tree ends with no `burst` folder.
 
 ### 23. Sidebar collapse
-- Click the panel-left icon (header left) → tree collapses to a thin "FILES" rail; click rail to re-expand.
-- Same on the right with the panel-right icon and outline.
+- Click the collapse button in the "Files" head bar (`⌘B` tooltip) → tree collapses to a thin "FILES" rail; click the rail to re-expand.
+- Same on the right with the collapse button in the outline head row (`⌘.` tooltip) → "OUTLINE" rail.
 - Reload — collapse state persists.
 
 ### 24. Tooltips
-- Hover any header control (theme toggle, focus mode, minimap, palette picker, sidebar toggles, keyboard icon) → small dark tooltip appears below after a brief delay.
+- Hover any header control (View gear, theme toggle, keyboard icon) or an in-pane collapse button → small dark tooltip appears after a brief delay.
 - Same for the `Aa` / `ab` / `.*` search options and the `H1`–`H6` outline pills.
 
 ### 25. Shortcuts panel
@@ -248,19 +248,19 @@ node bin/mdview.mjs ./test-fixtures/showcase.md --no-open
 - Keyboard: focus a chevron via Tab and press Space/Enter → toggles. `aria-expanded` reflects state on the button.
 
 ### 27. Errors & shutdown
-- Run `mdview ./does-not-exist` → friendly `mdview: path not found: ...` error, exit code 1.
-- Run two `mdview` instances at the same explicit `--port 7331` → second one prints port-already-in-use guidance, exit code 1. Without `--port`, second instance auto-falls-back to 7332 and prints `port 7331 in use, using 7332 instead`.
-- `Ctrl+C` once → graceful shutdown ("mdview: shutting down…", clean exit). `Ctrl+C` twice → force-exit (130).
+- Run `mdview ./does-not-exist` → friendly `mdview: Path does not exist: <absolute path>` error, exit code 1.
+- Run `mdview --foreground ./test-fixtures --port 7331` in two terminals → the second prints port-already-in-use guidance, exit code 1. Run `mdview --foreground ./test-fixtures` (no `--port`) in two terminals → the second falls back to 7332 and prints `port 7331 in use, using 7332 instead`. Port fallback applies to `--foreground` only: a bare `mdview ./test-fixtures` in a second terminal starts no second server, and attaches to the running background server on its port.
+- `Ctrl+C` once in a `--foreground` run → graceful shutdown ("mdview: shutting down…", clean exit). `Ctrl+C` twice → force-exit (130).
 - Set `MDVIEW_DEBUG=1` and trigger an error → full stack trace printed.
 
 ### 28. `--palette` flag
 - `mdview --palette kanagawa ./test-fixtures` → page renders in the `kanagawa` palette regardless of what `.mdview.json` configures. The on-disk config file is **not** modified.
 - `mdview --palette banana ./test-fixtures` → exits with `Invalid --palette 'banana'. Valid: flexoki, paper, solarized, everforest, rose-pine, kanagawa, catppuccin, high-contrast`, exit code non-zero.
-- `mdview --palette classic ./test-fixtures` and `mdview --palette nord ./test-fixtures` → both now rejected the same way. These two were removed; the error must list the replacements.
+- `mdview --palette classic ./test-fixtures` and `mdview --palette nord ./test-fixtures` → both rejected the same way; the error must list the valid palettes.
 - Without `--palette` → existing behavior (whatever `.mdview.json` or global config says).
 
 ### 29. `--port 0` ephemeral
-- `mdview --port 0 --no-open ./test-fixtures` → server binds on a kernel-assigned port. The actual port appears in the `mdview → http://127.0.0.1:<port>/` line so you can navigate manually.
+- `mdview --port 0 --no-open ./test-fixtures` → server binds on a kernel-assigned port. The actual port appears in the `mdview → http://mdview.localhost:<port>/` line (`http://127.0.0.1:<port>/` when `mdview.localhost` does not resolve to loopback) so you can navigate manually.
 
 ### 30. `--vscode` embed mode (CLI side)
 Set a token first: `export MDVIEW_EMBED_TOKEN=$(node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))")`.
@@ -268,7 +268,7 @@ Set a token first: `export MDVIEW_EMBED_TOKEN=$(node -e "console.log(require('cr
 - `mdview --vscode --port 0 ./test-fixtures` → **single line** of JSON on stdout: `{"event":"ready","url":"http://127.0.0.1:<port>/","port":<port>}`. No "mdview → …" / "watching: …" human lines. No browser tab opens (`--vscode` implies `--no-open`).
 - The token appears nowhere in the ready line, on stderr, or in `ps -o args= -p <pid>`.
 - `curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:<port>/` → `403`; the same with `?token=wrong` → `403`; with `?token=$MDVIEW_EMBED_TOKEN` → `200`. `curl … /api/tree` → `403`; with `-H "x-mdview-embed-token: $MDVIEW_EMBED_TOKEN"` → `200`. `curl … /bootstrap.js` → `200` without a token.
-- `curl -s -D - "http://127.0.0.1:<port>/?token=$MDVIEW_EMBED_TOKEN" | grep -i content-security-policy` → the header has **no** `frame-ancestors` directive at all. Run the same `curl` against a default-mode instance → header contains `frame-ancestors 'none'`. (0.7.1 dropped the directive under `--vscode` rather than widening it to `*`; Chromium 142 rejects the webview origin against a wildcard.)
+- `curl -s -D - "http://127.0.0.1:<port>/?token=$MDVIEW_EMBED_TOKEN" | grep -i content-security-policy` → the header has **no** `frame-ancestors` directive at all. Run the same `curl` against a default-mode instance → header contains `frame-ancestors 'none'`. (Embed mode omits the directive rather than widening it to `*`, because Chromium 142 rejects the webview origin against a wildcard.)
 - `(echo "" ; sleep 1) | node bin/mdview.mjs --vscode --port 0 ./test-fixtures` → the CLI prints its ready JSON, then exits cleanly on its own (exit code 0) when stdin closes. Default-mode invocations are unaffected by stdin close.
 
 ### 31. SPA embed mode (`?embed=vscode`)
@@ -313,7 +313,6 @@ python3 -m http.server 8000
 - DevTools → Console (iframe context): `window.parent === window` → `false`; `new URLSearchParams(location.search).get('embed')` → `'vscode'`.
 - In the parent console, post the same init into the frame twice more (`document.getElementById('f').contentWindow.postMessage({ type: 'mdview/init', webviewPort: 7331, token: '<token>' }, 'http://127.0.0.1:7331')`) → no further `from SPA {type: 'mdview/ready'}` lines: an init after the handshake is ignored.
 - In VS Code with the extension: open a preview, then reload the frame (Command Palette → `Developer: Open Webview Developer Tools`, pick the mdview iframe as the console context, run `location.reload()`), and separately run `Developer: Reload Webviews`. After each, the preview comes back on the editor's current file, clicking an outline heading still moves the editor cursor, and switching to another markdown tab still switches the preview.
-- (Stream B will exercise the postMessage routing for internal-link / outline-heading clicks; the harness only sends the `mdview/init` handshake.)
 
 ### 32. Friendly hostname + Host guard
 
@@ -377,7 +376,7 @@ cd /some/other/repo && mdview .
 - `mdview ./docs/guide.md` where `.` is already open → reuses that folder (`open:`), URL is `?file=<folder>/docs/guide.md`, **no** duplicate folder appears.
 - `kill -9 <pid>` then `mdview .` → detects the stale `daemon.json`, starts a fresh server, folders all still there.
 - Run `mdview .` in four terminals at once from a cold start → one server, four identical URLs.
-- Open 9 folders → the 9th fails with `Workspace is full (8)`.
+- Open 9 folders → the 9th fails with `mdview: Workspace is full (8 folders). Close one with 'mdview rm <name>' first.` and a non-zero exit code.
 - `mdview --no-open .`, then leave it with no tab open for a few minutes → still running. Idle shutdown is off unless asked for.
 - `MDVIEW_IDLE_TIMEOUT=0.05 mdview --no-open .` with no tab open → gone within ~5s; `daemon.json` removed. Repeat with a tab connected → stays up past the timeout.
 - `PORT=7412 mdview .` → server on 7412.
@@ -386,8 +385,9 @@ cd /some/other/repo && mdview .
 ### 37. Regressions the daemon must not cause
 
 - `mdview --foreground --no-open ./test-fixtures` → blocks, prints `watching:`, Ctrl-C stops it. Writes **no** `daemon.json`; `/api/health` 404s.
-- `mdview --port 9000 ./test-fixtures` and `mdview --palette kanagawa ./test-fixtures` → both block in the terminal, exactly as before the daemon existed.
+- `mdview --port 9000 ./test-fixtures` and `mdview --palette kanagawa ./test-fixtures` → both block in the terminal, like `--foreground`.
 - `mdview --vscode --port 0 ./test-fixtures` → still one JSON line with a `http://127.0.0.1:<port>/` URL, still exits on stdin close.
+- `time mdview --version` → prints the version, with `real` well under 0.1 s on an idle machine (about 50 ms). `ls`, `rm` and `stop` start as fast; none of them loads the web server.
 
 ### 37a. Upgrading with an old server running
 
@@ -440,6 +440,9 @@ node bin/mdview.mjs --foreground --no-open --port 7399 /tmp/mdv-untrusted/root
 - **An iframe of an SVG asset in a .md does not run script.** Open `http://127.0.0.1:7399/?file=root/a.md` with DevTools → Network open. The `<iframe>` stays blank and the console shows a `frame-src` CSP violation. The `![svg]` image still renders. No request to `/api/health?exfil=…` appears.
 - Open `http://127.0.0.1:7399/__asset/root/evil.svg` directly in a tab → the SVG draws, but the console shows the script blocked by the sandbox, and no `exfil` request appears.
 - Stop the server, then `ln -s ../outside/secret /tmp/mdv-untrusted/root/leak.md && ln -s ../outside/secret /tmp/mdv-untrusted/root/leak.png` and restart it. `curl -s -H 'Host: 127.0.0.1' 'http://127.0.0.1:7399/api/file?path=root/leak.md'` and `…/__asset/root/leak.png` → both `400`, and neither body contains `TOP-SECRET`. A link that stays inside (`ln -s a.md /tmp/mdv-untrusted/root/alias.md`) still opens at `?file=root/alias.md`.
+- **Asset responses carry the sandbox headers, whichever way the route is reached.** `curl -sI http://127.0.0.1:7399/__asset/root/evil.svg` and `curl -sI 'http://127.0.0.1:7399/%5F%5Fasset/root/evil.svg'` both show `content-security-policy: default-src 'none'; style-src 'unsafe-inline'; sandbox; frame-ancestors 'none'`, `x-content-type-options: nosniff` and `cross-origin-resource-policy: same-origin`. A missing asset (`…/__asset/root/nope.png`, a `404`) carries all three too.
+- **Only media is served as an asset.** `echo hi > /tmp/mdv-untrusted/root/notes.txt; printf '%%PDF' > /tmp/mdv-untrusted/root/doc.pdf`, then `curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:7399/__asset/root/notes.txt` and the same for `doc.pdf` → `404` each.
+- **A markdown file over 16 MB is refused.** `node -e "require('fs').writeFileSync('/tmp/mdv-untrusted/root/big.md','a'.repeat(17*1024*1024))"`, then `curl -s -o /dev/null -w '%{http_code}\n' 'http://127.0.0.1:7399/api/file?path=root/big.md'` → `413`.
 
 ## Tests
 
@@ -450,4 +453,4 @@ npm run typecheck   # both tsconfigs clean
 
 ## Known follow-ups
 
-See [`TODO.md`](TODO.md) for the phase 3 (workspaces) and phase 4 (editor extensions) roadmap.
+See [`TODO.md`](TODO.md) for the roadmap: phases 2–3 are shipped, and phase 4 (editor extensions) is partly done.

@@ -26,7 +26,7 @@ Comprehensive catalog of what `mdview` does today.
 | Feature | Implementation |
 |---------|----------------|
 | **Focus mode — dims everything except the section under your eyes** | `lib/focus-mode.ts` (`applyFocus` / `clearFocus`) driven by `focusedHeadingId` from `useScrollSpy`. Distinct from `activeHeadingId` (used by breadcrumb/outline/minimap): focus uses a **top-third reading band** (`FOCUS_BAND_FRACTION = 0.35`) so the highlight rolls forward to a new section the moment its title enters the natural reading zone, instead of clinging to a heading that scrolled off-screen pages ago. Navigation indicators still answer "where am I in the doc?" (top edge); focus answers "what am I reading right now?" (reading zone). Toggled by `f` or the View menu. |
-| **Minimap rail with viewport indicator** | `Minimap.tsx`; bars per heading, click/drag to scroll; toggled by `m` or header button |
+| **Minimap rail with viewport indicator** | `Minimap.tsx`; bars per heading, click/drag to scroll; toggled by `m` or the View menu |
 | **Collapsible sections** — every heading folds its trailing content | `lib/collapsible-sections.ts` wire. For each top-level heading in `.markdown-content`, a chevron `<button class="section-toggle">` is prepended; clicking it toggles `hidden` on every trailing sibling up to the next heading of equal-or-shallower level. State is per-tab, kept in a module-scoped `Set<string>`; survives same-file live-reload, resets on path change via `currentPathSignal`. `expandSectionContaining(id)` is called from `App.tsx` `handleJump` / `handleInternalNav` / hash-restore so anchor links land in visible targets. `beforeprint` snapshots & expands; `afterprint` restores. Keyboard: `e` / `⇧E` (`expandAll` / `collapseAll`). |
 
 ## Rendering
@@ -46,7 +46,7 @@ Comprehensive catalog of what `mdview` does today.
 | Heading permalinks (hover `#` to copy URL) | `lib/permalinks.ts` |
 | Custom-styled task list checkboxes | `content.css` — accent fill when checked |
 | Editorial typography (serif body, italic accent H1, paper-grain) | `theme.css` + `content.css` |
-| **JetBrains Mono in code blocks** | `@fontsource/jetbrains-mono` (latin/cyrillic/greek subsets, weights 400/600), bundled via Vite, listed first in `--font-mono` |
+| **JetBrains Mono in code blocks** | `@fontsource/jetbrains-mono` (latin / latin-ext / cyrillic / greek subsets, weights 400/600), bundled via Vite, listed first in `--font-mono` |
 
 ## Search
 
@@ -162,7 +162,7 @@ to, and only the bare `mdview [path]` form changed.
 - **Runs until stopped.** `mdview stop` ends it; otherwise it stays put, which keeps the URL reliable. `MDVIEW_IDLE_TIMEOUT` opts into exiting after N minutes with no tab connected, for anyone who'd rather it didn't sit there holding watchers.
 - **Upgrades take effect.** `/api/health` reports the daemon's version. When `mdview <path>` finds a daemon on a different version (or one that reports none, as 0.10.0 and older do) it stops it, starts a new one and prints one `mdview: restarted the background server (old → new)` line to stderr. Open folders survive because they live in `workspace.json`. `mdview ls` reports a mismatch without acting; `stop` and `rm` ignore versions.
 - **Optional daily update notice.** Off by default; `mdview config update-check on`, global config only. The background server checks the registry about daily and writes `update-check.json`. The CLI reads that file (no network) and prints one stderr line, at most once a day per version, in a terminal.
-- **State** lives only in `~/.config/mdview/` — `daemon.json` (pid, port, start time), `workspace.json` (the open folders), `daemon.log` (truncated past 1 MB), `update-check.json` (latest known version; written only while the update check is on).
+- **State** lives only in `~/.config/mdview/` — `config.json` (the global config), `daemon.json` (pid, port, start time), `daemon.lock` (held while a server starts), `workspace.json` (the open folders), `daemon.log` (truncated past 1 MB), `update-check.json` (latest known version; written only while the update check is on).
 - **The workspace file is the control plane.** The CLI writes it; the server watches it. There is deliberately no HTTP endpoint that changes what is served, so there is no request a page in your browser could forge — see Security & boundaries.
 
 Subcommand: `mdview config path`, `mdview config ignore list|add|rm`, `mdview config update-check [on|off]` — see
@@ -173,8 +173,16 @@ Errors are mapped to a one-line `mdview: …` message with a non-zero exit;
 
 ## Security & boundaries
 
-- All filesystem reads go through `resolveSafePath` (rejects absolute paths and traversal).
-- Dot-directories and dotfiles are hidden from the tree and refused by `/api/file` and `/__asset/*`, judged on both the requested and the real path.
+- All filesystem reads go through `resolveSafePath`. It rejects absolute paths and traversal, then checks containment again on real paths, so a symlink inside a folder cannot lead out of it. Links that stay inside still work.
+- `/api/file` serves `.md`, `.markdown` and `.mdx` only, judged on the real path, and answers 413 for a file over 16 MB. It serves markdown inside dot-directories (a README can link to `.github/CONTRIBUTING.md`) even though the tree hides them.
+- `/__asset/*` serves images, video and audio only. It refuses any path with a dot segment, judged on both the requested and the real path, so a link into a `.git` folder and a Windows short name such as `GIT~1` are refused too. A single-file root serves only the paths its document references.
+- Every `/__asset/*` response, and every SVG response, carries a sandbox CSP, `nosniff` and `Cross-Origin-Resource-Policy: same-origin`. An SVG opened as a page runs no script and cannot read other files.
+- The page CSP allows scripts from `'self'` only (no inline script) and sets `frame-src` and `object-src` to `'none'`.
+- A single-file root (`mdview ~/README.md`) is scoped to its one document. It is watched through its folder one level deep, filtered to that file, and never recursively.
+- Watchers (each root's tree and `.mdview.json`, and `workspace.json`) do not follow symlinks.
+- `<meta>` and `<base>` are removed from a document's raw HTML at render time, because a `<meta http-equiv="refresh">` would send the tab to another site.
+- Front matter is YAML only, with a node budget and a character budget.
+- Folder regex search runs in a worker thread that is stopped after 3 s. All folder searches share two slots and one 32 MB read budget, and literal search is bounded too.
 - Every response carries `x-content-type-options: nosniff`.
 - `--vscode` embed mode serves its page and API only to requests that carry the per-launch token the extension passes in the environment.
 - Server binds to `127.0.0.1` only.
@@ -186,8 +194,9 @@ Errors are mapped to a one-line `mdview: …` message with a non-zero exit;
 - External links always use `rel="noopener noreferrer"`.
 - `innerHTML` only used to inject server-rendered (trusted) HTML.
 - `.mdview.json` parser validates types and rejects unsafe `lineWidth` strings before they hit CSS.
+- The registry answer for `mdview update` and the daily check is untrusted. It must be plain semver, the read is capped at 64 KB and 5 s, redirects are refused, and errors never echo the response. A `.mdview.json` cannot turn the check on.
 
 ## Build artifacts
 
-- Server CLI bundle: `bin/mdview.mjs` (minified). KaTeX is **not** bundled into the CLI — only into the lazy-loaded client chunk.
+- Server CLI bundle: `bin/mdview.mjs` (not minified), split into `bin/*.mjs` chunks that load on demand, plus `bin/regex-worker.mjs` for folder regex search. All of `bin/*.mjs` ships; source maps do not. KaTeX is **not** bundled into the CLI — only into the lazy-loaded client chunk.
 - Client SPA bundle: `dist/client/` (initial JS small; pele diagram types and KaTeX split into separate lazy chunks; no highlighter ships, because Shiki runs on the server; JetBrains Mono served via `@fontsource` with `unicode-range` so only the needed subset is fetched).

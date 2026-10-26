@@ -2,7 +2,7 @@
 
 [![Version](https://img.shields.io/github/v/tag/hardikg2907/mdview?label=version)](https://github.com/hardikg2907/mdview/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Node](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](https://nodejs.org)
+[![Node](https://img.shields.io/badge/node-%3E%3D22.12-brightgreen)](https://nodejs.org)
 
 A local markdown viewer for reading long, hierarchical docs without losing focus. Run a command, browser opens with a beautifully rendered, navigable view of your file or folder. Edits in your editor show up live. One background server hosts every folder you open; `mdview stop` ends it.
 
@@ -66,14 +66,16 @@ mdview <path>              # open a file or folder; the shell comes straight bac
                            #   (a single file shows only that file and the media it references)
 mdview                     # current directory
 mdview ls                  # what's open, and where the server is
-mdview rm <name>           # stop serving a folder
+mdview rm <name|path>      # stop serving a folder
 mdview stop                # stop the background server
 mdview update              # is there a newer release? prints the install command
-mdview --foreground        # run in this terminal instead (Ctrl-C to stop)
+mdview config <…>          # read or edit the global config (see Config)
+mdview --foreground, -f    # run in this terminal instead (Ctrl-C to stop)
 mdview --no-open           # don't auto-launch the browser
 mdview --port 9000         # one-off server on a specific port (implies --foreground)
 mdview --palette kanagawa  # palette for this run (implies --foreground)
-mdview --help              # show usage
+mdview --version, -v       # print the version
+mdview --help, -h          # show usage
 ```
 
 ### One server, many folders
@@ -115,8 +117,8 @@ server runs an older version, restarts it and prints one line
 (`mdview: restarted the background server (0.10.0 → 0.11.0)`). Your open folders
 stay open. `mdview ls` only reports the mismatch.
 
-Its state lives in `~/.config/mdview/` (`daemon.json`, `workspace.json`, `update-check.json`,
-`daemon.log`) and nowhere else. `workspace.json` is also how the CLI talks to
+Its state lives in `~/.config/mdview/` (`config.json`, `daemon.json`, `daemon.lock`,
+`workspace.json`, `update-check.json`, `daemon.log`) and nowhere else. `workspace.json` is also how the CLI talks to
 the server: `mdview <path>` writes the file and the server picks the change up,
 which is why there is no HTTP endpoint that can change what's being served.
 
@@ -235,7 +237,7 @@ Two layered files, both optional, same schema:
 
 The global file also takes `"updateCheck": true` (see [Updates](#updates)). A per-project file ignores it.
 
-All fields optional. Validated on load — invalid values fall back silently with a warning. Edit the per-project file while the server is running and the SPA picks up palette/font/lineWidth changes live; `ignore` is read once at startup (the file watcher's skip list is frozen — restart mdview after editing).
+All fields optional. Validated on load: an unknown key is dropped without a word, and an invalid value is dropped with a warning in the server's output (`daemon.log` for the background server). `lineWidth` takes a short CSS length such as `70ch` or `900px` — at most 32 characters, made only of letters, digits, `_`, `%`, `.` and `-`. Edit the per-project file while the server is running and the SPA picks up palette/font/lineWidth changes live; `ignore` is read once at startup (the file watcher's skip list is frozen — restart mdview after editing).
 
 `ignore` extends the built-in skip list (which already covers `node_modules`, `dist`, `build`, `out`, `target`, `coverage`, `vendor`, `__pycache__`, `venv`, `Pods`, `DerivedData`, `_build`, plus every dotfile/dotdir). Add your own basenames here — handy when running mdview at a repo root with non-standard build dirs to avoid `EMFILE: too many open files` from the OS file-watch limit.
 
@@ -289,14 +291,15 @@ Node 22.12+, TypeScript 7, Fastify 5, markdown-it 15, Shiki 4, js-yaml 5, chokid
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — how the system is put together
 - [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) — dev workflow + how to add features
 - [`docs/FEATURES.md`](docs/FEATURES.md) — comprehensive feature catalog
-- [`TODO.md`](TODO.md) — roadmap (phase 3, phase 4)
+- [`TODO.md`](TODO.md) — roadmap (phases 2–3 shipped, phase 4 partly done)
 - [`VERIFICATION.md`](VERIFICATION.md) — manual verification scenarios
 
 ## Tests
 
 ```bash
-npm test            # vitest, server + client
+npm test            # vitest, server + client (builds once first)
 npm run typecheck   # both tsconfigs
+npm run lint        # biome check
 npm run build       # vite (client) + tsup (server CLI)
 ```
 

@@ -29,7 +29,7 @@ A practical overview for someone (human or agent) about to read or extend the co
                                      └────────────────────────┘
 ```
 
-The server stays running for the lifetime of one CLI invocation. Killing the process tears everything down.
+By default the server is a detached background process that outlives the CLI: `mdview <path>` registers the folder, starts the server if none runs, and exits. One server hosts every folder, until `mdview stop`. `--foreground`, `--port`, `--palette` and `--vscode` instead run a server of their own in the CLI process, and ending that process tears it down. See "The background server" below.
 
 ## Repo layout
 
@@ -42,6 +42,7 @@ src/
 ├── cli-update.ts                    ← `mdview update`: fetch, compare, print the install command
 ├── version.ts                       ← readVersion, the one source of the package version
 ├── update/                          ← semver.ts (strict parse/compare), latest.ts (hardened registry fetch), cache.ts (update-check.json), notice.ts (CLI stderr line)
+├── types/shims.d.ts                 ← ambient module declarations (task-lists plugin, `?url` imports)
 ├── daemon/                          ← background-server state, workspace file, CLI-side client, update-check.ts (daily check loop)
 ├── shared/                          ← cross-runtime modules (no Node-only or DOM-only deps)
 │   ├── types.ts
@@ -69,13 +70,16 @@ src/
 │   │   ├── api-tree.ts              ← GET /api/tree (incl. project config)
 │   │   ├── api-asset.ts             ← GET /__asset/*
 │   │   ├── api-search.ts            ← GET /api/search (folder grep)
+│   │   ├── health.ts                ← GET /api/health (daemon identity, registered in daemon mode only)
 │   │   └── sse.ts                   ← GET /api/watch
 │   ├── fs/
-│   │   ├── resolve.ts               ← resolveSafePath (security boundary!)
+│   │   ├── resolve.ts               ← resolveSafePath (security boundary!), hasDotSegment, MAX_MARKDOWN_BYTES
 │   │   ├── ignore.ts                ← DEFAULT_IGNORED_DIRS + isPathIgnored (shared with watcher + walkFolder)
 │   │   ├── tree.ts                  ← walkFolder
 │   │   ├── limiter.ts               ← weighted FIFO semaphore (search slots, read budget)
-│   │   └── grep.ts                  ← folder-wide search backend
+│   │   ├── grep.ts                  ← folder-wide search backend
+│   │   ├── regex-runner.ts          ← owns the regex worker: batches, time budget, terminate
+│   │   └── regex-worker.ts          ← worker_threads entry that runs a search regex (built to bin/regex-worker.mjs)
 │   └── watcher.ts                   ← chokidar wrapper + emitSynthetic for config events
 └── client/
     ├── main.tsx                     ← Preact mount + JetBrains Mono CSS
@@ -84,10 +88,13 @@ src/
     ├── components/                  ← UI components (panes + overlays)
     ├── hooks/                       ← signals + effects (use*.ts)
     ├── lib/                         ← DOM augmentation helpers (wire*.ts) + pure utils
+    ├── public/                      ← bootstrap.js (theme/palette before first paint), favicon
     └── styles/                      ← reset / theme / layout / content / components
 
 tests/
-├── server/                          ← vitest unit tests (markdown, math, grep, config, …)
+├── global-setup.ts                  ← runs `npm run build` once before any test file
+├── helpers/                         ← shared test helpers (root fixtures, CLI start-up deadlines)
+├── server/                          ← vitest unit tests (markdown, math, grep, config, …) and tests that spawn the CLI
 └── client/                          ← persisted-signal, scroll-spy, outline-nav, search-pattern, …
 
 apps/
@@ -205,7 +212,7 @@ applied in that root's own walk and watcher.
 
 | Route | Purpose |
 |-------|---------|
-| `GET /api/file?path=...` | `path` is workspace-scoped (`<rootId>/<path>`). Read the file, parse frontmatter, render to HTML, extract outline, tag internal links, rewrite image src. Returns a `RenderedFile` (incl. `lastModified` mtime). |
+| `GET /api/file?path=...&palette=...` | `path` is workspace-scoped (`<rootId>/<path>`). Read the file, parse frontmatter, render to HTML, extract outline, tag internal links, rewrite image src. `palette` selects which palette's code colours are rendered; it is checked against the allow-list, and an unknown value renders the default palette instead of failing. Markdown extensions only (400 otherwise), 404 for a missing file, 413 over 16 MB. Returns a `RenderedFile` (incl. `lastModified` mtime). |
 | `GET /api/tree` | Walk every open root; return `{ roots, tree, config }`. With one root its contents sit at the top level, exactly as before workspaces existed; with several, each root is a top-level folder node whose `relPath` is its bare id. `config` comes from the primary root. |
 | `GET /api/search?q=...&case=...&word=...&regex=...` | Grep across every folder root; hits come back root-qualified. Caps per-file (20) and global (200) — the global cap is a budget for the whole search, not per root. Lines over 10,000 characters are skipped in both modes, and a literal search stops after 1 s of matching; either sets `truncated`. At most two searches run at once across the server; later ones wait, and one whose client goes away leaves the queue. Single-file roots are skipped. Returns `{ query, results, truncated, timedOut }`; `timedOut` means a regex search hit its time budget and `results` is partial. |
 | `GET /api/watch` | One Server-Sent Events stream carrying every root's `WatchEvent`s, with root-scoped `relPath`s. Includes a synthetic `config` event when a root's `.mdview.json` changes, and a `workspace` event when the set of open roots changes. |
@@ -213,7 +220,7 @@ applied in that root's own walk and watcher.
 | `GET /api/health` | Registered only when `createServer` is given an `identity` (i.e. in daemon mode). Reports `{ok, pid, startedAt, version, roots: [id]}` — ids only, never absolute paths. |
 | `GET /*` | Falls through to the static SPA bundle; SPA fallback for unknown routes (so client routing works on refresh). |
 
-All request paths that touch the filesystem go through `resolveSafePath(rootAbsPath, rel)` — see `src/server/fs/resolve.ts` — which rejects absolute paths and traversal attempts.
+All request paths that touch the filesystem go through `resolveSafePath(rootAbsPath, rel)` — see `src/server/fs/resolve.ts` — which rejects absolute paths and traversal attempts, and checks containment again on real paths.
 
 ### Rendering pipeline (`src/render/`)
 
@@ -228,7 +235,7 @@ The renderer lives in `src/render/`, **outside** `src/server/`, because it has n
 
 ### Filesystem (`src/server/fs/`)
 
-- **`resolve.ts`** — `resolveSafePath(root, rel)` is the security boundary. Rejects absolute paths, normalizes the result, ensures it stays within `root`. Used by every fs read/write.
+- **`resolve.ts`** — `resolveSafePath(root, rel)` is the security boundary. Rejects absolute paths, normalizes the result, and checks lexically that it stays within `root`. It then runs `realpath` on both the root and the target and checks containment again, so a symlink inside the root cannot lead out of it; a link that stays inside still resolves. It returns the real path, which callers read and judge extensions on. A missing file or dangling link rejects with the filesystem's `ENOENT` (callers answer 404); an escape rejects with `OutsideRootError` (callers answer 400). Also exports `hasDotSegment` and `MAX_MARKDOWN_BYTES`. Used by every fs read.
 - **`tree.ts`** — `walkFolder(root, { ignore, relBase })` recursively walks the directory, skipping dotfiles and any directory whose basename is in the supplied ignore set (defaults to `DEFAULT_IGNORED_DIRS`). Sorts dirs first then alpha. Marks markdown files with `isMarkdown: true`. `relBase` prefixes the emitted relPaths with the root id — it affects the wire path only, never which directory is read.
 - **`grep.ts`** — `grepFiles(roots, query, opts)` searches across roots. Reuses `walkFolder` + `flattenMdRelPaths` + the shared `compilePattern`. Walks each root unprefixed so paths stay resolvable against it, then prefixes on the way out. Caps per-file and global. Strips frontmatter before grepping. Every search, literal or regex, first takes one of two slots in `searchSlots` (a `Limiter` from `limiter.ts`, first come first served); later searches queue, and a queued search whose client goes away leaves the queue and returns empty. A search keeps up to 8 reads in flight ahead of the matcher while still reporting files in walk order, and skips files over 16 MB. Each read is charged by file size to `searchReadBudget`, one 32 MB byte budget shared by all searches, and holds it until the matcher is done with that body; files queue for it in walk order, so the file the matcher waits on is never stuck behind later ones. Front-matter-stripped bodies live in a `ContentCache` (32M characters, least-recently-used out first) keyed by path and checked against mtime and size; `createServer` also invalidates entries from watcher events. A cache hit costs no budget. The route aborts the search when the client closes the request. Both modes walk a body's lines by offset instead of splitting it, skip lines over 10,000 characters (`maxLineLen`), and count hits past the per-file cap without storing them. Literal matching runs on the main thread under a 1 s matching budget (`literalBudgetMs`) and hands the thread back every 10 ms of matching, even inside one file, checking for an abort each time; spending the budget ends the search with `truncated` set, not `timedOut`. Regex matching runs in `regex-worker.ts` (bundled to `bin/regex-worker.mjs`) through `regex-runner.ts`, which keeps one warm worker and terminates a worker at its search's time budget; the search slots bound how many workers run at once — see the security model.
 - **`ignore.ts`** — `DEFAULT_IGNORED_DIRS` (re-exported from `src/shared/ignore.ts` so the client tooltip can list the same names), `buildIgnoreSet(extra)` to union user-supplied basenames into the defaults, and `isPathIgnored(abs, root, set)` for the chokidar `ignored` callback. Plain basename equality — no globs, no regex.

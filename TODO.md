@@ -65,7 +65,7 @@ notes are in `docs/superpowers/specs/2026-05-24-vscode-extension-design.md`.
 
 - [x] **Code-block payload scales with the palette count** (fixed in 0.9.0). `render/shiki.ts` used to render every palette, putting one CSS variable per (palette, mode) on every token — 16 of them at 8 palettes. It now renders only the requested palette's light/dark pair, so a token carries two. `/api/file` takes a `palette` query param, validated against the allow-list; the client refetches on a palette change and the light/dark toggle still repaints with no request. `test-fixtures/showcase.md` went from **204 KB to 30 KB** (6.8x), and is now smaller than it was at five palettes.
 
-- [x] **Pre-commit hooks** (landed 0.6.1) — husky v9 with `pre-commit` (`typecheck && lint && test && audit`, ~7s) and `pre-push` (`build`, ~25s). Linter is biome (single binary, no plugin chain), a11y off because the custom widgets are intentionally non-standard. Audit was added to the commit hook too, with an offline-bypass note in CONTRIBUTING.
+- [x] **Pre-commit hooks** (landed 0.6.1) — husky v9 with `pre-commit` (`typecheck && lint && test && audit`) and `pre-push` (`build`). Linter is biome (single binary, no plugin chain), a11y off because the custom widgets are intentionally non-standard. Audit was added to the commit hook too, with an offline-bypass note in CONTRIBUTING.
 
 ---
 
