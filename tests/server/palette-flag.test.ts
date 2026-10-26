@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import path, { resolve } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { PALETTES } from '../../src/shared/types.js';
+import { CLI_DEADLINE_MS, CLI_TEST_TIMEOUT_MS } from '../helpers/cli-timing.js';
 
 const REPO_ROOT = resolve(__dirname, '../../');
 const BIN = resolve(REPO_ROOT, 'bin/mdview.mjs');
@@ -54,9 +55,19 @@ function spawnCliReady(args: string[]): Promise<Ready> {
     const finalize = (err: Error) => {
       if (resolved) return;
       resolved = true;
+      clearTimeout(deadline);
       child.kill();
       reject(err);
     };
+    const deadline = setTimeout(
+      () =>
+        finalize(
+          new Error(
+            `no ready line within ${CLI_DEADLINE_MS / 1000}s; stderr: ${stderrBuf.trim() || '(empty)'}`,
+          ),
+        ),
+      CLI_DEADLINE_MS,
+    );
     child.stdout.on('data', (chunk: Buffer) => {
       stdoutBuf += chunk.toString();
       const nl = stdoutBuf.indexOf('\n');
@@ -66,6 +77,7 @@ function spawnCliReady(args: string[]): Promise<Ready> {
           const parsed = JSON.parse(firstLine);
           if (parsed.event === 'ready' && typeof parsed.url === 'string' && typeof parsed.port === 'number') {
             resolved = true;
+            clearTimeout(deadline);
             resolveResult({ child, port: parsed.port, url: parsed.url });
             return;
           }
@@ -81,7 +93,6 @@ function spawnCliReady(args: string[]): Promise<Ready> {
         finalize(new Error(`mdview exited with code ${code}: ${stderrBuf.trim() || '(no stderr)'}`));
       }
     });
-    setTimeout(() => finalize(new Error(`no ready line within 5s; stderr: ${stderrBuf.trim() || '(empty)'}`)), 5000);
   });
 }
 
@@ -109,17 +120,22 @@ function spawnCliExpectExit(args: string[]): Promise<ExitResult> {
         resolveResult({ code, stderr: stderrBuf, stdout: stdoutBuf });
       }
     });
-    setTimeout(() => {
+    const deadline = setTimeout(() => {
       if (!settled) {
         settled = true;
         child.kill();
-        reject(new Error(`did not exit within 5s; stderr: ${stderrBuf.trim() || '(empty)'}`));
+        reject(
+          new Error(
+            `did not exit within ${CLI_DEADLINE_MS / 1000}s; stderr: ${stderrBuf.trim() || '(empty)'}`,
+          ),
+        );
       }
-    }, 5000);
+    }, CLI_DEADLINE_MS);
+    child.once('exit', () => clearTimeout(deadline));
   });
 }
 
-describe('--palette flag', () => {
+describe('--palette flag', { timeout: CLI_TEST_TIMEOUT_MS }, () => {
   it('overrides .mdview.json palette with rose-pine', async () => {
     const { child, port } = await spawnCliReady(['--palette', 'rose-pine', fixtureRoot]);
     try {

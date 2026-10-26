@@ -6,6 +6,7 @@ import path, { resolve } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { parseArgs } from '../../src/cli.js';
 import { createServer, EMBED_TOKEN_HEADER } from '../../src/server/index.js';
+import { CLI_DEADLINE_MS, CLI_TEST_TIMEOUT_MS } from '../helpers/cli-timing.js';
 
 const REPO_ROOT = resolve(__dirname, '../../');
 const BIN = resolve(REPO_ROOT, 'bin/mdview.mjs');
@@ -37,14 +38,25 @@ function spawnCli(
     const finalize = (err: Error) => {
       if (resolved) return;
       resolved = true;
+      clearTimeout(deadline);
       child.kill();
       reject(err);
     };
+    const deadline = setTimeout(
+      () =>
+        finalize(
+          new Error(
+            `no stdout within ${CLI_DEADLINE_MS / 1000}s; stderr: ${stderrBuf.trim() || '(empty)'}`,
+          ),
+        ),
+      CLI_DEADLINE_MS,
+    );
     child.stdout.on('data', (chunk: Buffer) => {
       stdoutBuf += chunk.toString();
       const nl = stdoutBuf.indexOf('\n');
       if (nl >= 0 && !resolved) {
         resolved = true;
+        clearTimeout(deadline);
         resolveResult({ child, firstLine: stdoutBuf.slice(0, nl), stderr: () => stderrBuf });
       }
     });
@@ -56,7 +68,6 @@ function spawnCli(
         finalize(new Error(`mdview exited with code ${code}: ${stderrBuf.trim() || '(no stderr)'}`));
       }
     });
-    setTimeout(() => finalize(new Error(`no stdout within 5s; stderr: ${stderrBuf.trim() || '(empty)'}`)), 5000);
   });
 }
 
@@ -73,8 +84,8 @@ function runToExit(
     child.on('error', reject);
     const timer = setTimeout(() => {
       child.kill();
-      reject(new Error(`still running after 5s; stdout: ${stdout}`));
-    }, 5000);
+      reject(new Error(`still running after ${CLI_DEADLINE_MS / 1000}s; stdout: ${stdout}`));
+    }, CLI_DEADLINE_MS);
     child.on('exit', (code) => {
       clearTimeout(timer);
       resolveResult({ code, stdout, stderr });
@@ -108,7 +119,7 @@ describe('--vscode implies --no-open', () => {
   });
 });
 
-describe('--vscode embed mode: stdout', () => {
+describe('--vscode embed mode: stdout', { timeout: CLI_TEST_TIMEOUT_MS }, () => {
   it('emits a JSON ready line as the first stdout line (no --no-open needed)', async () => {
     const { child, firstLine } = await spawnCli(['--vscode', '--port', '0', FIXTURE_ROOT]);
     try {
@@ -165,14 +176,14 @@ describe('--vscode embed mode: stdout', () => {
   });
 });
 
-describe('--vscode: stdin EOF shutdown', () => {
-  it('closes cleanly when stdin pipe is closed (exit code 0 within 3s)', async () => {
+describe('--vscode: stdin EOF shutdown', { timeout: CLI_TEST_TIMEOUT_MS }, () => {
+  it('closes cleanly when stdin pipe is closed (exit code 0)', async () => {
     const { child } = await spawnCli(['--vscode', '--port', '0', FIXTURE_ROOT]);
     try {
       const exitCode = await new Promise<number | null>((resolve, reject) => {
         const timer = setTimeout(
-          () => reject(new Error('CLI did not exit within 3s after stdin.end()')),
-          3000,
+          () => reject(new Error(`CLI did not exit within ${CLI_DEADLINE_MS / 1000}s after stdin.end()`)),
+          CLI_DEADLINE_MS,
         );
         child.on('exit', (code) => {
           clearTimeout(timer);

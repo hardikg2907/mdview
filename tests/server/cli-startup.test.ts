@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { CLI_DEADLINE_MS, CLI_TEST_TIMEOUT_MS } from '../helpers/cli-timing.js';
 
 const REPO_ROOT = resolve(__dirname, '../../');
 const BIN = resolve(REPO_ROOT, 'bin/mdview.mjs');
@@ -51,8 +52,11 @@ describe('CLI start-up', () => {
   });
 
   it('still runs from the split bundle', () => {
-    const out = execFileSync(process.execPath, [BIN, '--version'], { encoding: 'utf8' }).trim();
+    const out = execFileSync(process.execPath, [BIN, '--version'], {
+      encoding: 'utf8',
+      timeout: CLI_DEADLINE_MS,
+    }).trim();
     const { version } = JSON.parse(readFileSync(resolve(REPO_ROOT, 'package.json'), 'utf8'));
     expect(out).toBe(version);
-  });
+  }, CLI_TEST_TIMEOUT_MS);
 });
