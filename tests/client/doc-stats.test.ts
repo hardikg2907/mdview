@@ -76,4 +76,11 @@ describe('computeDocStats', () => {
     const stats = computeDocStats(html, [h('a', 1, [h('a1', 2)])]);
     expect(stats.headings).toBe(2);
   });
+
+  it('skips HTML comments, quoted > in attributes, and splits on &nbsp; entities', () => {
+    const html =
+      '<!-- four hidden comment words --><p><a title="x > y">alpha</a>&nbsp;beta&#160;gamma &amp; delta</p>';
+    // Rendered text: "alpha beta gamma & delta" => 5 words
+    expect(computeDocStats(html, []).words).toBe(5);
+  });
 });

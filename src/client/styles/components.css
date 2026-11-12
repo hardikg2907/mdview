@@ -986,9 +986,13 @@ mark.search-hit.is-active {
   z-index: 10;
 }
 .reading-progress__bar {
+  width: 100%;
   height: 100%;
   background: linear-gradient(90deg, var(--accent), var(--accent-strong));
-  transition: width 60ms linear;
+  transform-origin: left center;
+  transform: scaleX(0);
+  transition: transform 60ms linear;
+  will-change: transform;
   box-shadow: 0 0 8px var(--accent-tint);
 }
 

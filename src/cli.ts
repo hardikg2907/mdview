@@ -361,6 +361,11 @@ async function runForeground(args: Args): Promise<void> {
   const root = detectRoot(args.target);
   const clientDir = requireClientDir();
 
+  // Embed mode stays on the literal address: the extension reconstructs the
+  // expected prefix from the port it was given and rejects the handshake if the
+  // URL doesn't match, so a friendly hostname there would break the contract.
+  const hostPromise = args.embedMode ? Promise.resolve('127.0.0.1') : resolveDisplayHost();
+
   const { createServer } = await loadServer();
   const { app } = await createServer({
     roots: [root],
@@ -368,12 +373,10 @@ async function runForeground(args: Args): Promise<void> {
     ...(args.palette === undefined ? {} : { paletteOverride: args.palette }),
     ...(embedToken === undefined ? {} : { embedToken }),
   });
-  const boundPort = await listen(app, args.port, args.portExplicit);
-
-  // Embed mode stays on the literal address: the extension reconstructs the
-  // expected prefix from the port it was given and rejects the handshake if the
-  // URL doesn't match, so a friendly hostname there would break the contract.
-  const host = args.embedMode ? '127.0.0.1' : await resolveDisplayHost();
+  const [boundPort, host] = await Promise.all([
+    listen(app, args.port, args.portExplicit),
+    hostPromise,
+  ]);
   const url =
     root.kind === 'file'
       ? `http://${host}:${boundPort}/?file=${encodeURIComponent(`${root.id}/${root.filePath}`)}`
@@ -489,6 +492,9 @@ async function runDaemon(args: Args): Promise<void> {
   wsWatcher.on('add', reload);
   wsWatcher.on('change', reload);
   wsWatcher.on('unlink', reload);
+  wsWatcher.on('error', (err) => {
+    console.error(`[mdview] workspace watcher error: ${String(err)}`);
+  });
 
   let shuttingDown = false;
   const shutdown = async (why: string): Promise<void> => {
@@ -538,15 +544,19 @@ async function runAttach(args: Args): Promise<void> {
   // Registering the folder first means a daemon we are about to start already
   // has it at boot, and a running one picks it up from the file watcher.
   const added = addRoot(args.target);
+  const hostPromise = resolveDisplayHost();
   const state = await ensureDaemon(fileURLToPath(import.meta.url), {
     onRestart: (from, to) =>
       console.error(`mdview: restarted the background server (${from} → ${to})`),
   });
   // Without this the browser can open a deep link before the daemon has applied
-  // the workspace change, and the file 404s for no visible reason.
-  await waitForRoot(state.port, added.root.id);
+  // the workspace change, and the file 404s for no visible reason. Skip the
+  // extra round-trip when the health check inside ensureDaemon already saw it.
+  if (!state.roots.includes(added.root.id)) {
+    await waitForRoot(state.port, added.root.id);
+  }
 
-  const host = await resolveDisplayHost();
+  const host = await hostPromise;
   const base = `http://${host}:${state.port}/`;
   // A folder has no particular file to open, so name the path to focus and let
   // the SPA pick the first document under it. Without this the browser would

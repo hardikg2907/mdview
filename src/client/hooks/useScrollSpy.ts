@@ -26,6 +26,22 @@ export function lockScrollSpy(id: string, ms = 600): void {
   scrollSpyLockedUntil = performance.now() + ms;
 }
 
+function pickLastAtOrAbove(positions: HeadingPos[], threshold: number): string {
+  let lo = 0;
+  let hi = positions.length - 1;
+  let ans = 0;
+  while (lo <= hi) {
+    const mid = (lo + hi) >>> 1;
+    if (positions[mid]!.top <= threshold) {
+      ans = mid;
+      lo = mid + 1;
+    } else {
+      hi = mid - 1;
+    }
+  }
+  return positions[ans]!.id;
+}
+
 export function pickActiveId(
   positions: HeadingPos[],
   scrollTop: number,
@@ -47,12 +63,7 @@ export function pickActiveId(
   // tolerance for sub-pixel rounding from smooth-scroll easing landings.
   const offset = 16;
   const tolerance = 6;
-  let active = positions[0]!.id;
-  for (const p of positions) {
-    if (p.top - offset <= scrollTop + tolerance) active = p.id;
-    else break;
-  }
-  return active;
+  return pickLastAtOrAbove(positions, scrollTop + tolerance + offset);
 }
 
 /**
@@ -82,33 +93,29 @@ export function pickFocusedId(
     return positions[positions.length - 1]!.id;
   }
   const bandY = scrollTop + clientHeight * FOCUS_BAND_FRACTION;
-  let focused = positions[0]!.id;
-  for (const p of positions) {
-    if (p.top <= bandY) focused = p.id;
-    else break;
-  }
-  return focused;
+  return pickLastAtOrAbove(positions, bandY);
 }
 
 export function useScrollSpy(scrollContainer: HTMLElement | null): void {
   useEffect(() => {
     if (!scrollContainer) return;
-    let raf = 0;
-    let cachedHeadings: HTMLHeadingElement[] = [];
+    let scrollRaf = 0;
+    let refreshRaf = 0;
     let cachedPositions: HeadingPos[] = [];
 
     function refreshCache(): void {
       const scrollerRect = scrollContainer!.getBoundingClientRect();
       const scrollTop = scrollContainer!.scrollTop;
-      cachedHeadings = Array.from(
-        scrollContainer!.querySelectorAll<HTMLHeadingElement>(
-          '.markdown-content :is(h1,h2,h3,h4,h5,h6)[id]',
-        ),
+      const headings = scrollContainer!.querySelectorAll<HTMLHeadingElement>(
+        '.markdown-content :is(h1,h2,h3,h4,h5,h6)[id]',
       );
-      cachedPositions = cachedHeadings.map((h) => {
+      const next: HeadingPos[] = new Array(headings.length);
+      for (let i = 0; i < headings.length; i++) {
+        const h = headings[i]!;
         const r = h.getBoundingClientRect();
-        return { id: h.id, top: r.top - scrollerRect.top + scrollTop };
-      });
+        next[i] = { id: h.id, top: r.top - scrollerRect.top + scrollTop };
+      }
+      cachedPositions = next;
     }
 
     function compute(): void {
@@ -124,34 +131,32 @@ export function useScrollSpy(scrollContainer: HTMLElement | null): void {
     }
 
     function onScroll(): void {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(compute);
+      if (scrollRaf) return;
+      scrollRaf = requestAnimationFrame(() => {
+        scrollRaf = 0;
+        compute();
+      });
+    }
+
+    function scheduleRefresh(): void {
+      if (refreshRaf) return;
+      refreshRaf = requestAnimationFrame(() => {
+        refreshRaf = 0;
+        refreshCache();
+        compute();
+      });
     }
 
     // Initial cache + compute after layout settles.
     refreshCache();
     compute();
 
-    // Re-cache when the rendered content changes (file swap, mermaid/math
-    // load, image dimensions resolved, etc.).
-    const ro = new ResizeObserver(() => {
-      refreshCache();
-      compute();
-    });
+    // Coalesce bursts of DOM/layout changes (wire pipeline mutations, mermaid
+    // & math renders, image loads, collapsible folds) into at most one forced
+    // layout measurement per animation frame.
+    const ro = new ResizeObserver(scheduleRefresh);
     ro.observe(scrollContainer);
-    const mo = new MutationObserver(() => {
-      refreshCache();
-      compute();
-    });
-    // Observe the scroller (subtree) — catches `.markdown-content` being
-    // added on first file-load AND its innerHTML being swapped on each
-    // file change. Observing `.markdown-content` directly misses the first
-    // case because it doesn't exist yet at hook-mount time.
-    // `hidden` attribute changes get observed too: collapsible-sections toggles
-    // `hidden` on trailing siblings of folded headings, which collapses their
-    // layout boxes without changing childList. Without this, the cached
-    // heading offsets stay stale after a fold and the outline / breadcrumb
-    // pick the wrong active heading.
+    const mo = new MutationObserver(scheduleRefresh);
     mo.observe(scrollContainer, {
       childList: true,
       subtree: true,
@@ -161,7 +166,8 @@ export function useScrollSpy(scrollContainer: HTMLElement | null): void {
 
     scrollContainer.addEventListener('scroll', onScroll, { passive: true });
     return () => {
-      cancelAnimationFrame(raf);
+      cancelAnimationFrame(scrollRaf);
+      cancelAnimationFrame(refreshRaf);
       ro.disconnect();
       mo.disconnect();
       scrollContainer.removeEventListener('scroll', onScroll);

@@ -13,6 +13,12 @@ export interface SseHooks {
  */
 export function registerSse(app: FastifyInstance, hub: Watcher, hooks: SseHooks = {}): void {
   let clients = 0;
+  const activeCleanups = new Set<() => void>();
+
+  app.addHook('onClose', async () => {
+    for (const cleanup of [...activeCleanups]) cleanup();
+  });
+
   app.get('/api/watch', (req, reply) => {
     reply.raw.writeHead(200, {
       'Content-Type': 'text/event-stream',
@@ -38,12 +44,14 @@ export function registerSse(app: FastifyInstance, hub: Watcher, hooks: SseHooks 
     const cleanup = () => {
       if (closed) return;
       closed = true;
+      activeCleanups.delete(cleanup);
       clearInterval(heartbeat);
       hub.off('event', send);
       clients--;
       hooks.onClientsChanged?.(clients);
       try { reply.raw.end(); } catch { /* already closed */ }
     };
+    activeCleanups.add(cleanup);
 
     const send = (e: WatchEvent) => {
       if (closed) return;
@@ -63,6 +71,7 @@ export function registerSse(app: FastifyInstance, hub: Watcher, hooks: SseHooks 
         cleanup();
       }
     }, 15_000);
+    heartbeat.unref();
 
     hub.on('event', send);
 

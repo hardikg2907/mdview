@@ -1,8 +1,9 @@
 import path from 'node:path';
 import type { FastifyInstance } from 'fastify';
+import { flattenMdRelPaths } from '../../shared/tree-utils.js';
 import type { Palette, ProjectConfig, TreeNode } from '../../shared/types.js';
 import { walkFolder } from '../fs/tree.js';
-import { type RootState, toWorkspacePath } from '../workspace.js';
+import { type CachedRootTree, type RootState, toWorkspacePath } from '../workspace.js';
 
 /**
  * Apply the CLI palette override as the final layer in the precedence chain:
@@ -15,6 +16,35 @@ function applyOverrides(
 ): ProjectConfig | null {
   if (!paletteOverride) return config;
   return { ...(config ?? {}), palette: paletteOverride };
+}
+
+/**
+ * Walk (or return cached) folder tree + unprefixed markdown path list for a
+ * directory root. Caching only activates once the root's chokidar watcher has
+ * finished its initial scan so early file creations cannot slip past invalidation.
+ */
+export async function loadRootTree(state: RootState): Promise<CachedRootTree> {
+  if (state.liveWatcher && state.treeCache) return state.treeCache;
+  if (state.treeInflight) return state.treeInflight;
+
+  const { id } = state.root;
+  const prefixLen = id.length + 1;
+  const canCacheAtStart = state.liveWatcher === true;
+  const job = walkFolder(state.absPath, { ignore: state.ignoreSet, relBase: id })
+    .then((prefixed) => {
+      const unprefixedMdPaths = flattenMdRelPaths(prefixed).map((p) => p.slice(prefixLen));
+      const built: CachedRootTree = { prefixed, unprefixedMdPaths };
+      if (canCacheAtStart && state.liveWatcher && state.treeInflight === job) {
+        state.treeCache = built;
+      }
+      return built;
+    })
+    .finally(() => {
+      if (state.treeInflight === job) state.treeInflight = undefined;
+    });
+
+  state.treeInflight = job;
+  return job;
 }
 
 /** The children of one root, as workspace-scoped nodes. */
@@ -30,7 +60,8 @@ async function rootChildren(state: RootState): Promise<TreeNode[]> {
       },
     ];
   }
-  return walkFolder(state.absPath, { ignore: state.ignoreSet, relBase: id });
+  const { prefixed } = await loadRootTree(state);
+  return prefixed;
 }
 
 export function registerApiTree(
@@ -56,15 +87,14 @@ export function registerApiTree(
       });
     }
 
-    const tree: TreeNode[] = [];
-    for (const state of roots) {
-      tree.push({
+    const tree: TreeNode[] = await Promise.all(
+      roots.map(async (state) => ({
         name: state.root.name,
         relPath: state.root.id,
-        type: 'dir',
+        type: 'dir' as const,
         children: await rootChildren(state),
-      });
-    }
+      })),
+    );
     return reply.send({ roots: roots.map((r) => r.root), tree, config });
   });
 }

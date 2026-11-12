@@ -1,3 +1,4 @@
+import { effect } from '@preact/signals';
 import { useEffect, useMemo, useRef } from 'preact/hooks';
 import { formatAbsoluteTime, formatRelativeTime } from '../../shared/relative-time.js';
 import type { RenderedFile } from '../../shared/types.js';
@@ -15,28 +16,38 @@ interface Props {
 
 export function Content({ file, onInternalNavigate }: Props) {
   const ref = useRef<HTMLDivElement | null>(null);
+  const navRef = useRef(onInternalNavigate);
+  navRef.current = onInternalNavigate;
 
   const stats = useMemo(() => computeDocStats(file.html, file.outline), [file]);
 
   useEffect(() => {
-    if (!ref.current) return;
-    ref.current.innerHTML = file.html;
-    void runWires(ref.current, { onInternalNavigate }, defaultWires);
+    const el = ref.current;
+    if (!el) return;
+    const ctl = new AbortController();
+    el.innerHTML = file.html;
+    void runWires(
+      el,
+      { onInternalNavigate: (rel, hash) => navRef.current(rel, hash), signal: ctl.signal },
+      defaultWires,
+    );
+    return () => ctl.abort();
   }, [file]);
 
-  // Apply focus mode on toggle and on focused-heading change. `focusedHeadingId`
-  // tracks the top-third reading band (not the viewport top), so the bright
-  // section is always the one under the reader's eyes — rolls forward to the
-  // next section as soon as its title enters the natural reading zone, instead
-  // of clinging to a heading that scrolled off-screen pages ago.
+  // Apply focus mode via a direct signal effect rather than reading signals in
+  // render: scrolling across headings never re-renders `<Content>`, and when
+  // focus mode is off `focusedHeadingId` isn't even subscribed.
   useEffect(() => {
-    if (!ref.current) return;
-    if (focusModeSignal.value) {
-      applyFocus(ref.current, focusedHeadingId.value);
-    } else {
-      clearFocus(ref.current);
-    }
-  }, [focusModeSignal.value, focusedHeadingId.value, file]);
+    const el = ref.current;
+    if (!el) return;
+    return effect(() => {
+      if (focusModeSignal.value) {
+        applyFocus(el, focusedHeadingId.value);
+      } else {
+        clearFocus(el);
+      }
+    });
+  }, [file]);
 
   return (
     <article class="markdown-body">

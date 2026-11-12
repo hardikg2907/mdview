@@ -154,6 +154,24 @@ describe('GET /api/file (markdown-only)', () => {
     });
     expect(res.statusCode).toBe(200);
   });
+
+  it('serves repeat requests from RenderedFileCache and invalidates when file mtime/size changes', async () => {
+    const target = path.join(root, 'cached-doc.md');
+    writeFileSync(target, '# First version\n\nalpha');
+    const first = await app.inject({ method: 'GET', url: '/api/file?path=cached-doc.md' });
+    expect(first.statusCode).toBe(200);
+    expect(first.json().title).toBe('First version');
+
+    const second = await app.inject({ method: 'GET', url: '/api/file?path=cached-doc.md' });
+    expect(second.statusCode).toBe(200);
+    expect(second.body).toBe(first.body);
+
+    writeFileSync(target, '# Updated version with extra text\n\nbeta gamma');
+    const third = await app.inject({ method: 'GET', url: '/api/file?path=cached-doc.md' });
+    expect(third.statusCode).toBe(200);
+    expect(third.json().title).toBe('Updated version with extra text');
+    expect(third.body).toContain('beta gamma');
+  });
 });
 
 describe.skipIf(process.platform === 'win32')('GET /api/file (symlinks)', () => {

@@ -227,6 +227,16 @@ function onColorThemeChanged(theme: vscode.ColorTheme): void {
   }
 }
 
+function onConfigurationChanged(e: vscode.ConfigurationChangeEvent): void {
+  for (const ctx of previews.values()) {
+    if (!e.affectsConfiguration('mdview.palette', ctx.folder.uri)) continue;
+    const cfg = readConfig(ctx.folder.uri);
+    ctx.paletteSetting = cfg.palette;
+    const palette = resolvePalette(cfg.palette, vscode.window.activeColorTheme.kind);
+    ctx.panel.postToSpa({ type: 'mdview/palette-changed', palette });
+  }
+}
+
 function onWorkspaceFoldersChanged(e: vscode.WorkspaceFoldersChangeEvent): void {
   for (const removed of e.removed) {
     disposePreview(removed.uri.toString());
@@ -254,6 +264,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.window.onDidChangeActiveTextEditor(onActiveEditorChanged),
     vscode.window.onDidChangeTextEditorSelection(onSelectionChanged),
     vscode.window.onDidChangeActiveColorTheme(onColorThemeChanged),
+    vscode.workspace.onDidChangeConfiguration(onConfigurationChanged),
     vscode.workspace.onDidChangeWorkspaceFolders(onWorkspaceFoldersChanged),
   );
 }

@@ -9,16 +9,15 @@ import { wirePermalinks } from './permalinks.js';
 import type { Wire } from './wire-pipeline.js';
 
 export const defaultWires: Wire[] = [
-  // First so the synchronous body sets `activeRoot` and restores collapsed
-  // state before any async wire (mermaid / math import) suspends the pipeline
-  // — `App.tsx` schedules a rAF for hash-restore expansion that would
-  // otherwise fire while the collapsible-sections wire is still queued.
+  // Synchronous wires run first so collapsed state, link routing, copy buttons,
+  // permalinks, and image lightbox are interactive immediately — before any
+  // lazy async chunk import (pele / katex) suspends the pipeline.
   wireCollapsibleSections,
-  { name: 'mermaid', run: (root) => renderMermaidIn(root) },
-  { name: 'math', run: (root) => renderMathIn(root) },
   { name: 'internal-links', run: (root, ctx) => wireInternalLinks(root, ctx.onInternalNavigate) },
+  { name: 'external-links', run: (root) => markExternalLinks(root) },
   { name: 'copy-buttons', run: (root) => wireCopyButtons(root) },
   { name: 'permalinks', run: (root) => wirePermalinks(root) },
-  { name: 'external-links', run: (root) => markExternalLinks(root) },
   { name: 'image-lightbox', run: (root) => wireImageLightbox(root) },
+  { name: 'mermaid', run: (root, ctx) => renderMermaidIn(root, ctx.signal) },
+  { name: 'math', run: (root, ctx) => renderMathIn(root, ctx.signal) },
 ];

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { rewriteImageSrc, tagInternalLinks } from '../../src/render/links.js';
+import { rewriteImageSrc, rewriteLinksAndImages, tagInternalLinks } from '../../src/render/links.js';
 import { renderMarkdown } from '../../src/render/markdown.js';
 
 describe('tagInternalLinks', () => {
@@ -210,7 +210,7 @@ describe('link and image rewriting stays linear on adversarial HTML', () => {
     for (let run = 0; run < 3; run++) {
       const start = performance.now();
       const { html } = await renderMarkdown(md);
-      rewriteImageSrc(tagInternalLinks(html, 'r/doc.md'), 'r/doc.md');
+      rewriteLinksAndImages(html, 'r/doc.md');
       best = Math.min(best, performance.now() - start);
     }
     return best;
@@ -223,5 +223,18 @@ describe('link and image rewriting stays linear on adversarial HTML', () => {
     // 4x the input is 16x the time when quadratic. The floor absorbs timer
     // noise on runs that finish in a few milliseconds.
     expect(large).toBeLessThan(Math.max(small * 8, 250));
+  });
+});
+
+describe('rewriteLinksAndImages (single pass)', () => {
+  it('produces identical output to running tagInternalLinks then rewriteImageSrc', () => {
+    const sample = [
+      '<p><a href="other.md#sec">doc</a> and <a href="https://example.com">ext</a></p>',
+      '<p><img src="../assets/pic.png" alt="p"> and <IMG SRC=\'logo.svg\' /></p>',
+      '<!-- <a href="ignored.md"><img src="ignored.png"> -->',
+      '<pre><code><span style="color:red">const x = 1;</span></code></pre>',
+    ].join('\n');
+    const twoPass = rewriteImageSrc(tagInternalLinks(sample, 'w/guides/intro.md'), 'w/guides/intro.md');
+    expect(rewriteLinksAndImages(sample, 'w/guides/intro.md')).toBe(twoPass);
   });
 });

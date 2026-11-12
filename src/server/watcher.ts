@@ -27,6 +27,8 @@ export interface CreateWatcherOptions {
    * all it shows.
    */
   only?: string;
+  /** Invoked once chokidar finishes its initial scan and is actively watching. */
+  onReady?: () => void;
 }
 
 /**
@@ -112,6 +114,9 @@ export function createWatcher(rootAbsPath: string, opts: CreateWatcherOptions = 
   watcher.on('change', (p) => emit('change', p));
   watcher.on('add', (p) => emit('add', p));
   watcher.on('unlink', (p) => emit('unlink', p));
+  watcher.on('addDir', (p) => emit('add', p));
+  watcher.on('unlinkDir', (p) => emit('unlink', p));
+  if (opts.onReady) watcher.once('ready', opts.onReady);
 
   return {
     on: (event, listener) => emitter.on(event, listener),

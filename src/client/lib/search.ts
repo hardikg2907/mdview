@@ -9,15 +9,28 @@ export interface SearchHit {
 const MARK_CLASS = 'search-hit';
 const ACTIVE_CLASS = 'is-active';
 
+/**
+ * Hard cap on in-document DOM `<mark>` wrappers so broad regexes (e.g. `.` or
+ * `\w`) on large documents cannot stall layout with hundreds of thousands of nodes.
+ */
+export const MAX_DOC_HITS = 5000;
+
 export function clearHighlights(root: HTMLElement): void {
   const marks = root.querySelectorAll(`mark.${MARK_CLASS}`);
-  marks.forEach((m) => {
+  if (marks.length === 0) return;
+  const parents = new Set<Node>();
+  for (const m of marks) {
     const parent = m.parentNode;
-    if (!parent) return;
+    if (!parent) continue;
+    parents.add(parent);
     while (m.firstChild) parent.insertBefore(m.firstChild, m);
     parent.removeChild(m);
+  }
+  // Normalize each affected parent once instead of per-<mark> (which was O(M^2)
+  // when thousands of matches fell inside the same <p> or <pre><code> block).
+  for (const parent of parents) {
     parent.normalize();
-  });
+  }
 }
 
 function isInsideMark(node: Node): boolean {
@@ -58,10 +71,11 @@ export function findHits(
   });
 
   let current: Node | null = walker.nextNode();
-  while (current) {
+  while (current && hits.length < MAX_DOC_HITS) {
     const text = current.nodeValue ?? '';
     for (const m of pattern.matchAll(text)) {
       hits.push({ node: current as Text, start: m.index, end: m.index + m.length });
+      if (hits.length >= MAX_DOC_HITS) break;
     }
     current = walker.nextNode();
   }
@@ -69,62 +83,68 @@ export function findHits(
   return hits;
 }
 
+interface IndexedHit {
+  start: number;
+  end: number;
+  index: number;
+}
+
 export function highlightHits(hits: SearchHit[], activeIndex: number): HTMLElement[] {
   const marks: HTMLElement[] = [];
-  // Group hits by text node so we can wrap from the end forward (preserves indices).
-  const byNode = new Map<Text, SearchHit[]>();
-  hits.forEach((h) => {
-    const arr = byNode.get(h.node) ?? [];
-    arr.push(h);
-    byNode.set(h.node, arr);
-  });
+  if (hits.length === 0) return marks;
 
-  // Track which hit-index corresponds to which mark we create.
-  const indexOfHit = new Map<SearchHit, number>();
-  hits.forEach((h, i) => {
-    indexOfHit.set(h, i);
-  });
+  const limit = Math.min(hits.length, MAX_DOC_HITS);
+  const byNode = new Map<Text, IndexedHit[]>();
+  for (let i = 0; i < limit; i++) {
+    const h = hits[i]!;
+    let arr = byNode.get(h.node);
+    if (!arr) {
+      arr = [];
+      byNode.set(h.node, arr);
+    }
+    arr.push({ start: h.start, end: h.end, index: i });
+  }
 
-  byNode.forEach((nodeHits, textNode) => {
-    nodeHits.sort((a, b) => a.start - b.start);
-    let cursor = 0;
+  for (const [textNode, nodeHits] of byNode) {
     const parent = textNode.parentNode;
-    if (!parent) return;
+    if (!parent) continue;
+    const raw = textNode.nodeValue ?? '';
+    if (nodeHits.length > 1) {
+      nodeHits.sort((a, b) => a.start - b.start);
+    }
+    let cursor = 0;
     const frag = document.createDocumentFragment();
-    nodeHits.forEach((h) => {
+    for (const h of nodeHits) {
       if (h.start > cursor) {
-        frag.appendChild(document.createTextNode(textNode.nodeValue!.slice(cursor, h.start)));
+        frag.appendChild(document.createTextNode(raw.slice(cursor, h.start)));
       }
       const mark = document.createElement('mark');
-      mark.className = MARK_CLASS;
-      const i = indexOfHit.get(h)!;
-      if (i === activeIndex) mark.classList.add(ACTIVE_CLASS);
-      mark.dataset.hit = String(i);
-      mark.textContent = textNode.nodeValue!.slice(h.start, h.end);
+      mark.className = h.index === activeIndex ? `${MARK_CLASS} ${ACTIVE_CLASS}` : MARK_CLASS;
+      mark.dataset.hit = String(h.index);
+      mark.textContent = raw.slice(h.start, h.end);
       frag.appendChild(mark);
       marks.push(mark);
       cursor = h.end;
-    });
-    if (cursor < (textNode.nodeValue?.length ?? 0)) {
-      frag.appendChild(document.createTextNode(textNode.nodeValue!.slice(cursor)));
+    }
+    if (cursor < raw.length) {
+      frag.appendChild(document.createTextNode(raw.slice(cursor)));
     }
     parent.replaceChild(frag, textNode);
-  });
+  }
 
   return marks;
 }
 
 export function setActiveMark(root: HTMLElement, activeIndex: number): HTMLElement | null {
-  const all = root.querySelectorAll<HTMLElement>(`mark.${MARK_CLASS}`);
-  let active: HTMLElement | null = null;
-  all.forEach((m) => {
-    const i = Number(m.dataset.hit ?? -1);
-    if (i === activeIndex) {
-      m.classList.add(ACTIVE_CLASS);
-      active = m;
-    } else {
+  const prev = root.querySelectorAll<HTMLElement>(`mark.${MARK_CLASS}.${ACTIVE_CLASS}`);
+  for (const m of prev) {
+    if (Number(m.dataset.hit ?? -1) !== activeIndex) {
       m.classList.remove(ACTIVE_CLASS);
     }
-  });
-  return active;
+  }
+  const next = root.querySelector<HTMLElement>(
+    `mark.${MARK_CLASS}[data-hit="${activeIndex}"]`,
+  );
+  if (next) next.classList.add(ACTIVE_CLASS);
+  return next;
 }

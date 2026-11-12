@@ -3,6 +3,7 @@ import path from 'node:path';
 import { MD_EXT } from '../../shared/tree-utils.js';
 import type { TreeNode } from '../../shared/types.js';
 import { DEFAULT_IGNORED_DIRS, isDirIgnored } from './ignore.js';
+import { Limiter } from './limiter.js';
 
 export interface WalkOptions {
   /** Directory basenames to skip. Defaults to DEFAULT_IGNORED_DIRS. Dotfiles
@@ -16,10 +17,13 @@ export interface WalkOptions {
 }
 
 export const MAX_WALK_DEPTH = 64;
+/** Bounds concurrent readdir() calls across all levels of one walk so deep trees never hit EMFILE. */
+const WALK_CONCURRENCY = 16;
 
 export async function walkFolder(root: string, opts: WalkOptions = {}): Promise<TreeNode[]> {
   const ignore = opts.ignore ?? DEFAULT_IGNORED_DIRS;
-  return walkInner(root, opts.relBase ?? '', ignore, 0);
+  const slots = new Limiter(WALK_CONCURRENCY);
+  return walkInner(root, opts.relBase ?? '', ignore, 0, slots);
 }
 
 async function walkInner(
@@ -27,10 +31,12 @@ async function walkInner(
   relBase: string,
   ignore: ReadonlySet<string>,
   depth: number,
+  slots: Limiter,
 ): Promise<TreeNode[]> {
   if (depth >= MAX_WALK_DEPTH) return [];
 
   let entries: import('node:fs').Dirent[];
+  const release = await slots.acquire(1);
   try {
     entries = await readdir(absDir, { withFileTypes: true });
   } catch (err) {
@@ -42,9 +48,13 @@ async function walkInner(
       return [];
     }
     throw err;
+  } finally {
+    release();
   }
 
   const out: TreeNode[] = [];
+  const subdirs: Array<{ name: string; childAbs: string; childRel: string }> = [];
+
   for (const entry of entries) {
     if (entry.isDirectory()) {
       if (isDirIgnored(entry.name, ignore)) continue;
@@ -58,17 +68,10 @@ async function walkInner(
     const childRel = relBase ? `${relBase}/${entry.name}` : entry.name;
 
     if (entry.isDirectory()) {
-      const children = await walkInner(
-        path.join(absDir, entry.name),
-        childRel,
-        ignore,
-        depth + 1,
-      );
-      out.push({
+      subdirs.push({
         name: entry.name,
-        relPath: childRel,
-        type: 'dir',
-        children,
+        childAbs: path.join(absDir, entry.name),
+        childRel,
       });
     } else if (entry.isFile()) {
       const ext = path.extname(entry.name).toLowerCase();
@@ -79,6 +82,18 @@ async function walkInner(
         isMarkdown: MD_EXT.has(ext),
       });
     }
+  }
+
+  if (subdirs.length > 0) {
+    const walkedDirs = await Promise.all(
+      subdirs.map(async (d) => ({
+        name: d.name,
+        relPath: d.childRel,
+        type: 'dir' as const,
+        children: await walkInner(d.childAbs, d.childRel, ignore, depth + 1, slots),
+      })),
+    );
+    out.push(...walkedDirs);
   }
 
   out.sort((a, b) => {

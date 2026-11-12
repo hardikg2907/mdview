@@ -13,7 +13,7 @@ import { Resizer } from './components/Resizer.js';
 import { SearchBar } from './components/SearchBar.js';
 import { ShortcutsPanel } from './components/ShortcutsPanel.js';
 import { useAltWheelScroll } from './hooks/useAltWheelScroll.js';
-import { fileError, fileLoading, fileSignal, loadFile } from './hooks/useFile.js';
+import { clearFile, fileError, fileLoading, fileSignal, loadFile } from './hooks/useFile.js';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts.js';
 import { useLiveReload } from './hooks/useLiveReload.js';
 import { paletteSignal, usePalette } from './hooks/usePalette.js';
@@ -84,6 +84,10 @@ export function App() {
   // the active palette only. The light/dark toggle is not in here — both its
   // variants ship in every response, so it repaints with no request.
   useEffect(() => {
+    if (currentPath === null) {
+      clearFile();
+      return;
+    }
     void loadFile(currentPath);
   }, [currentPath, paletteSignal.value]);
   useEffect(() => { closeSearch(); }, [currentPath]);

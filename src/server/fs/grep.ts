@@ -210,6 +210,10 @@ export interface GrepRoot {
   absPath: string;
   id: string;
   ignore?: ReadonlySet<string>;
+  /** Optional cached realpath(absPath) from RootState. */
+  realRoot?: string;
+  /** Optional pre-walked unprefixed markdown paths from RootState.treeCache. */
+  mdRelPaths?: readonly string[];
 }
 
 interface Target {
@@ -315,8 +319,12 @@ async function collectTargets(roots: readonly GrepRoot[], opts: GrepOptions): Pr
   for (const root of roots) {
     let realRoot: string;
     try {
-      realRoot = await realpath(root.absPath);
+      realRoot = root.realRoot ?? (await realpath(root.absPath));
     } catch {
+      continue;
+    }
+    if (root.mdRelPaths) {
+      for (const relPath of root.mdRelPaths) out.push({ root, realRoot, relPath });
       continue;
     }
     // Walk unprefixed so paths stay resolvable against this root, then prefix
@@ -337,14 +345,16 @@ export async function grepFiles(
   const snippetRadius = opts.snippetRadius ?? 60;
   const maxLineLen = opts.maxLineLen ?? 10_000;
   const regexMode = opts.regex ?? false;
+  const caseSensitive = opts.caseSensitive ?? false;
+  const wholeWord = opts.wholeWord ?? false;
   const cache = opts.cache ?? new ContentCache();
   const signal = opts.signal;
 
   const empty: FolderSearchResults = { query, results: [], truncated: false, timedOut: false };
   if (!query) return empty;
   const pattern = compilePattern(query, {
-    caseSensitive: opts.caseSensitive ?? false,
-    wholeWord: opts.wholeWord ?? false,
+    caseSensitive,
+    wholeWord,
     regex: regexMode,
   });
   if (!pattern.valid) return empty;
@@ -356,12 +366,17 @@ export async function grepFiles(
 
   // globalCap is a budget for the whole search, not per root — it exists to
   // bound the work and the response, and both are workspace-wide.
-  const record = (t: Target, body: string, m: FileMatches): void => {
+  const record = (
+    t: Target,
+    body: string,
+    m: FileMatches,
+    precomputedLines?: ReadonlyMap<number, string>,
+  ): void => {
     // A skipped line may hold matches, so the search as a whole is incomplete
     // even when this file reports none.
     if (m.skipped) truncated = true;
     if (m.total === 0) return;
-    const lines = linesAt(body, m.hits.map(([lineIdx]) => lineIdx));
+    const lines = precomputedLines ?? linesAt(body, m.hits.map(([lineIdx]) => lineIdx));
     const hits: SearchHit[] = [];
     let fileTruncated = m.skipped || m.total > m.hits.length;
     for (const [lineIdx, col, len] of m.hits) {
@@ -395,6 +410,8 @@ export async function grepFiles(
   // is charged, so searches taking turns on the thread do not spend each
   // other's budget.
   const literalRe = regexMode ? null : new RegExp(pattern.source, pattern.flags);
+  const plainCaseSens = !regexMode && !wholeWord && caseSensitive;
+  const singleLineQuery = !query.includes('\n') && !query.includes('\r');
   let literalLeftMs = opts.literalBudgetMs ?? 1_000;
   let sliceMs = 0;
   let clock = 0;
@@ -420,20 +437,59 @@ export async function grepFiles(
   const matchLiteral = async (
     re: RegExp,
     body: string,
-  ): Promise<{ m: FileMatches; stopped: 'time' | 'abort' | null }> => {
+  ): Promise<{
+    m: FileMatches;
+    lines: Map<number, string>;
+    stopped: 'time' | 'abort' | null;
+  }> => {
     const out: FileMatches = { total: 0, hits: [], skipped: false };
+    const lineMap = new Map<number, string>();
     let stopped: 'time' | 'abort' | null = null;
     clock = performance.now();
+
+    // Fast skip for files under maxLineLen that contain zero matches at all:
+    // avoids slicing every line in 99% of files during workspace search.
+    if (singleLineQuery && body.length <= maxLineLen) {
+      const hasAny = plainCaseSens
+        ? body.indexOf(query) >= 0
+        : ((re.lastIndex = 0), re.test(body));
+      steps++;
+      if (!hasAny) {
+        if (steps >= LITERAL_CHECK_STEPS) stopped = await checkpoint();
+        else charge();
+        if (stopped === 'time') out.skipped = true;
+        return { m: out, lines: lineMap, stopped };
+      }
+    }
+
+    const qLen = query.length;
     const visit = (index: number, start: number, end: number): boolean => {
       if (end - start > maxLineLen) {
         out.skipped = true;
+      } else if (plainCaseSens && singleLineQuery) {
+        let pos = start;
+        const limit = end - qLen;
+        while (pos <= limit) {
+          const idx = body.indexOf(query, pos);
+          if (idx < 0 || idx > limit) break;
+          out.total++;
+          steps++;
+          if (out.hits.length < perFileCap) {
+            if (!lineMap.has(index)) lineMap.set(index, body.slice(start, end));
+            out.hits.push([index, idx - start, qLen]);
+          }
+          pos = idx + qLen;
+        }
       } else {
         const line = body.slice(start, end);
         re.lastIndex = 0;
         for (let m = re.exec(line); m !== null; m = re.exec(line)) {
           out.total++;
           steps++;
-          if (out.hits.length < perFileCap) out.hits.push([index, m.index, m[0].length]);
+          if (out.hits.length < perFileCap) {
+            if (!lineMap.has(index)) lineMap.set(index, line);
+            out.hits.push([index, m.index, m[0].length]);
+          }
         }
       }
       return ++steps < LITERAL_CHECK_STEPS;
@@ -444,7 +500,7 @@ export async function grepFiles(
     }
     charge();
     if (stopped === 'time') out.skipped = true;
-    return { m: out, stopped };
+    return { m: out, lines: lineMap, stopped };
   };
 
   // Mirrors the caller's signal, and also fires when this search ends for any
@@ -515,7 +571,7 @@ export async function grepFiles(
         try {
           const res = await matchLiteral(literalRe, body);
           stopped = res.stopped;
-          record(t, body, res.m);
+          record(t, body, res.m, res.lines);
         } finally {
           release();
         }

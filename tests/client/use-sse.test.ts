@@ -28,8 +28,14 @@ class FakeEventSource {
   }
 }
 
-function Probe({ onEvent }: { onEvent: (e: WatchEvent) => void }) {
-  useSSE(onEvent);
+function Probe({
+  onEvent,
+  onReconnect,
+}: {
+  onEvent: (e: WatchEvent) => void;
+  onReconnect?: () => void;
+}) {
+  useSSE(onEvent, onReconnect);
   return null;
 }
 
@@ -79,5 +85,17 @@ describe('useSSE', () => {
     FakeEventSource.instances[0]?.emit('add', '{not json');
 
     expect(onEvent).not.toHaveBeenCalled();
+  });
+
+  it('invokes onReconnect only on subsequent open events after the initial open', async () => {
+    const onReconnect = vi.fn();
+    await act(() => render(h(Probe, { onEvent: vi.fn(), onReconnect }), host));
+    const es = FakeEventSource.instances[0]!;
+
+    es.emit('open', '');
+    expect(onReconnect).not.toHaveBeenCalled();
+
+    es.emit('open', '');
+    expect(onReconnect).toHaveBeenCalledTimes(1);
   });
 });
