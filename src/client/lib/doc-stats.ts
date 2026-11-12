@@ -17,9 +17,9 @@ export function countHeadings(nodes: OutlineNode[]): number {
 }
 
 export function computeDocStats(html: string, outline: OutlineNode[]): DocStats {
-  const tmp = document.createElement('div');
-  tmp.innerHTML = html;
-  const text = (tmp.textContent ?? '').trim();
+  const tpl = document.createElement('template');
+  tpl.innerHTML = html;
+  const text = (tpl.content.textContent ?? '').trim();
   const words = text.length === 0 ? 0 : text.split(/\s+/).filter(Boolean).length;
   const readingMinutes = Math.max(1, Math.round(words / WPM));
   const headings = countHeadings(outline);

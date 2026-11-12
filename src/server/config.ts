@@ -1,10 +1,12 @@
-import { readFile } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { type FontFamily, PALETTES, type Palette, type ProjectConfig } from '../shared/types.js';
+import { OutsideRootError, resolveSafePath } from './fs/resolve.js';
 
 export const CONFIG_FILENAME = '.mdview.json';
 export const GLOBAL_CONFIG_FILENAME = 'config.json';
+export const MAX_CONFIG_BYTES = 64 * 1024;
 
 const FONT_FAMILIES: readonly FontFamily[] = ['serif', 'sans', 'mono'];
 
@@ -13,6 +15,26 @@ const FONT_FAMILIES: readonly FontFamily[] = ['serif', 'sans', 'mono'];
 // is plain string equality on directory names, so wildcards would silently
 // match nothing and confuse the user.
 const IGNORE_ENTRY_PATTERN = /^[A-Za-z0-9_.\-+]{1,64}$/;
+
+/**
+ * Strip C0, DEL and C1 control bytes before printing an untrusted value (such
+ * as a field from a cloned repo's `.mdview.json`) to a terminal, so an invalid
+ * config value cannot smuggle ANSI/OSC escape sequences into stderr.
+ */
+export function sanitizeForLog(value: unknown, maxLen = 120): string {
+  const raw = String(value);
+  const sliced = raw.length > maxLen ? `${raw.slice(0, maxLen)}…` : raw;
+  let out = '';
+  for (let i = 0; i < sliced.length; i++) {
+    const code = sliced.charCodeAt(i);
+    if (code <= 0x1f || (code >= 0x7f && code <= 0x9f)) {
+      out += `\\x${code.toString(16).padStart(2, '0')}`;
+    } else {
+      out += sliced[i];
+    }
+  }
+  return out;
+}
 
 function isObject(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -48,7 +70,7 @@ export function validateConfig(
     if (typeof p === 'string' && PALETTES.includes(p as Palette)) {
       out.palette = p as Palette;
     } else {
-      console.warn(`[mdview] ${source}: ignoring invalid palette: ${String(p)}`);
+      console.warn(`[mdview] ${source}: ignoring invalid palette: ${sanitizeForLog(p)}`);
     }
   }
 
@@ -57,7 +79,7 @@ export function validateConfig(
     if (typeof f === 'string' && FONT_FAMILIES.includes(f as FontFamily)) {
       out.fontFamily = f as FontFamily;
     } else {
-      console.warn(`[mdview] ${source}: ignoring invalid fontFamily: ${String(f)}`);
+      console.warn(`[mdview] ${source}: ignoring invalid fontFamily: ${sanitizeForLog(f)}`);
     }
   }
 
@@ -68,7 +90,7 @@ export function validateConfig(
     if (typeof w === 'string' && w.length > 0 && w.length <= 32 && /^[\w%.-]+$/.test(w)) {
       out.lineWidth = w;
     } else {
-      console.warn(`[mdview] ${source}: ignoring invalid lineWidth: ${String(w)}`);
+      console.warn(`[mdview] ${source}: ignoring invalid lineWidth: ${sanitizeForLog(w)}`);
     }
   }
 
@@ -97,7 +119,7 @@ export function validateConfig(
         ) {
           cleaned.push(entry);
         } else {
-          console.warn(`[mdview] ${source}: ignoring invalid ignore entry: ${String(entry)}`);
+          console.warn(`[mdview] ${source}: ignoring invalid ignore entry: ${sanitizeForLog(entry)}`);
         }
       }
       if (cleaned.length > 0) out.ignore = cleaned;
@@ -114,7 +136,9 @@ export function validateConfig(
     } else if (typeof raw.updateCheck === 'boolean') {
       out.updateCheck = raw.updateCheck;
     } else {
-      console.warn(`[mdview] ${source}: ignoring invalid updateCheck: ${String(raw.updateCheck)}`);
+      console.warn(
+        `[mdview] ${source}: ignoring invalid updateCheck: ${sanitizeForLog(raw.updateCheck)}`,
+      );
     }
   }
 
@@ -128,24 +152,47 @@ async function loadConfigFromPath(
 ): Promise<ProjectConfig | null> {
   let raw: string;
   try {
+    const st = await stat(filePath);
+    if (!st.isFile()) {
+      console.warn(`[mdview] ${source}: ignoring non-regular file`);
+      return null;
+    }
+    if (st.size > MAX_CONFIG_BYTES) {
+      console.warn(`[mdview] ${source}: ignoring config over ${MAX_CONFIG_BYTES} bytes`);
+      return null;
+    }
     raw = await readFile(filePath, 'utf8');
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null;
-    console.warn(`[mdview] failed to read ${source}: ${(err as Error).message}`);
+    console.warn(`[mdview] failed to read ${source}: ${sanitizeForLog((err as Error).message)}`);
     return null;
   }
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch (err) {
-    console.warn(`[mdview] ${source} is not valid JSON: ${(err as Error).message}`);
+    console.warn(`[mdview] ${source} is not valid JSON: ${sanitizeForLog((err as Error).message)}`);
     return null;
   }
   return validateConfig(parsed, source, scope);
 }
 
 export async function loadProjectConfig(rootAbsPath: string): Promise<ProjectConfig | null> {
-  return loadConfigFromPath(path.join(rootAbsPath, CONFIG_FILENAME), CONFIG_FILENAME, 'project');
+  let safePath: string;
+  try {
+    safePath = await resolveSafePath(rootAbsPath, CONFIG_FILENAME);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    if (err instanceof OutsideRootError) {
+      console.warn(`[mdview] ${CONFIG_FILENAME}: refusing symlink outside root`);
+      return null;
+    }
+    console.warn(
+      `[mdview] failed to resolve ${CONFIG_FILENAME}: ${sanitizeForLog((err as Error).message)}`,
+    );
+    return null;
+  }
+  return loadConfigFromPath(safePath, CONFIG_FILENAME, 'project');
 }
 
 export async function loadGlobalConfig(): Promise<ProjectConfig | null> {

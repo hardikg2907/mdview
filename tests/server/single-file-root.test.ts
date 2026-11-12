@@ -312,3 +312,38 @@ describe('single-file root in a real server: an edit updates what may be served'
     expect(dropped).toBe(true);
   });
 });
+
+describe('single-file root: ignores parent directory .mdview.json', () => {
+  it('does not load .mdview.json from the parent directory when opening a single file', async () => {
+    const sharedDir = realpathSync(mkdtempSync(path.join(tmpdir(), 'mdview-single-cfg-')));
+    const clientDir = mkdtempSync(path.join(tmpdir(), 'mdview-single-cfg-client-'));
+    const prevXdg = process.env.XDG_CONFIG_HOME;
+    process.env.XDG_CONFIG_HOME = path.join(sharedDir, 'empty-xdg');
+    writeFileSync(path.join(sharedDir, 'README.md'), '# Standalone\n');
+    writeFileSync(
+      path.join(sharedDir, '.mdview.json'),
+      JSON.stringify({ palette: 'rose-pine', lineWidth: '50ch' }),
+    );
+    writeFileSync(path.join(clientDir, 'index.html'), '<!doctype html><title>t</title>');
+
+    const { app } = await createServer({
+      roots: [{ absPath: sharedDir, kind: 'file', id: 'shared', filePath: 'README.md' }],
+      clientDir,
+    });
+    try {
+      const res = await app.inject({
+        method: 'GET',
+        url: '/api/tree',
+        headers: { host: '127.0.0.1:7331' },
+      });
+      expect(res.statusCode).toBe(200);
+      expect(res.json().config).toBeNull();
+    } finally {
+      await app.close();
+      if (prevXdg === undefined) delete process.env.XDG_CONFIG_HOME;
+      else process.env.XDG_CONFIG_HOME = prevXdg;
+      rmSync(sharedDir, { recursive: true, force: true });
+      rmSync(clientDir, { recursive: true, force: true });
+    }
+  });
+});

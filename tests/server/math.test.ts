@@ -57,4 +57,12 @@ describe('math rendering', () => {
     const { html } = await renderMarkdown(md);
     expect(html).not.toContain('math-inline');
   });
+
+  it('converts thousands of $$...$$ blocks in linear time', async () => {
+    const md = Array.from({ length: 2_500 }, (_, i) => `$$x_${i} = ${i}$$`).join('\n\n');
+    const start = performance.now();
+    const { html } = await renderMarkdown(md);
+    expect(performance.now() - start).toBeLessThan(2_000);
+    expect((html.match(/class="math-block"/g) ?? []).length).toBe(2_500);
+  });
 });

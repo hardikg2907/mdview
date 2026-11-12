@@ -76,14 +76,60 @@ describe('markExternalLinks', () => {
     expect(root.querySelectorAll('a.is-external').length).toBe(2);
   });
 
-  it('skips SVG anchors without throwing and still marks HTML anchors', () => {
+  it('handles SVG anchors without throwing, sets safe target/rel on them, and marks HTML anchors', () => {
     const root = setup(
       '<svg><a href="https://example.com"><text>x</text></a></svg><a href="https://example.org">y</a>',
     );
-    expect(root.querySelector('svg a')).not.toBeInstanceOf(HTMLAnchorElement);
+    const svgAnchor = root.querySelector('svg a')!;
+    expect(svgAnchor).not.toBeInstanceOf(HTMLAnchorElement);
     expect(() => markExternalLinks(root)).not.toThrow();
-    const a = Array.from(root.querySelectorAll('a')).find((n) => n.getAttribute('href') === 'https://example.org')!;
+    expect(svgAnchor.getAttribute('target')).toBe('_blank');
+    expect(svgAnchor.getAttribute('rel')).toBe('noopener noreferrer');
+    expect(svgAnchor.querySelector('.external-icon')).toBeNull();
+    const a = Array.from(root.querySelectorAll('a')).find(
+      (n) => n.getAttribute('href') === 'https://example.org',
+    )!;
     expect(a.getAttribute('target')).toBe('_blank');
     expect(a.classList.contains('is-external')).toBe(true);
+  });
+
+  it('marks protocol-relative // links and <area> links with target=_blank and noopener noreferrer', () => {
+    const root = setup(
+      '<a href="//example.com/path">p</a><map name="m"><area href="https://example.com" shape="rect" coords="0,0,10,10"></map>',
+    );
+    markExternalLinks(root);
+    const a = root.querySelector('a')!;
+    expect(a.getAttribute('target')).toBe('_blank');
+    expect(a.getAttribute('rel')).toBe('noopener noreferrer');
+    expect(a.classList.contains('is-external')).toBe(true);
+
+    const area = root.querySelector('area')!;
+    expect(area.getAttribute('target')).toBe('_blank');
+    expect(area.getAttribute('rel')).toBe('noopener noreferrer');
+  });
+
+  it('strips javascript:, data:, and vbscript: href and xlink:href attributes', () => {
+    const root = setup(
+      '<a id="js" href="javascript:void(0)">j</a>' +
+        '<a id="obf" href="  java&#10;script:void(0)">o</a>' +
+        '<a id="dt" href="data:text/html,hi">d</a>' +
+        '<svg><a id="svgjs" xlink:href="javascript:void(0)"><text>s</text></a></svg>',
+    );
+    markExternalLinks(root);
+    expect(root.querySelector('#js')!.hasAttribute('href')).toBe(false);
+    expect(root.querySelector('#obf')!.hasAttribute('href')).toBe(false);
+    expect(root.querySelector('#dt')!.hasAttribute('href')).toBe(false);
+    expect(root.querySelector('#svgjs')!.hasAttribute('xlink:href')).toBe(false);
+  });
+
+  it('enforces noopener noreferrer on raw HTML target=_blank and rewrites _top/_parent to _blank', () => {
+    const root = setup(
+      '<a id="op" href="other.md" target="_blank" rel="opener">o</a>' +
+        '<a id="top" href="other.md" target="_top">t</a>',
+    );
+    markExternalLinks(root);
+    expect(root.querySelector('#op')!.getAttribute('rel')).toBe('noopener noreferrer');
+    expect(root.querySelector('#top')!.getAttribute('target')).toBe('_blank');
+    expect(root.querySelector('#top')!.getAttribute('rel')).toBe('noopener noreferrer');
   });
 });

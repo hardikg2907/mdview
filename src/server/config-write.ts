@@ -1,6 +1,6 @@
-import { chmod, mkdir, readFile, writeFile } from 'node:fs/promises';
-import path from 'node:path';
-import { globalConfigPath } from './config.js';
+import { readFile, stat } from 'node:fs/promises';
+import { writeJsonAtomic } from '../daemon/state.js';
+import { globalConfigPath, MAX_CONFIG_BYTES } from './config.js';
 
 // Same allow-list as validateConfig — keep them in sync. CLI args are also
 // untrusted input, so applying the schema at the write boundary is required by
@@ -21,6 +21,13 @@ export function isValidIgnoreEntry(s: string): boolean {
 async function readGlobalRaw(filePath: string): Promise<Record<string, unknown>> {
   let raw: string;
   try {
+    const st = await stat(filePath);
+    if (!st.isFile()) {
+      throw new Error(`Existing config at ${filePath} is not a regular file.`);
+    }
+    if (st.size > MAX_CONFIG_BYTES) {
+      throw new Error(`Existing config at ${filePath} exceeds ${MAX_CONFIG_BYTES} bytes.`);
+    }
     raw = await readFile(filePath, 'utf8');
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') return {};
@@ -39,17 +46,7 @@ async function readGlobalRaw(filePath: string): Promise<Record<string, unknown>>
 }
 
 async function writeGlobalRaw(filePath: string, data: Record<string, unknown>): Promise<void> {
-  // Owner-only, like everything else in the state directory. Modes given to
-  // mkdir and writeFile apply on creation only, so an existing directory or
-  // file from an earlier version is tightened explicitly.
-  const dir = path.dirname(filePath);
-  await mkdir(dir, { recursive: true, mode: 0o700 });
-  await chmod(dir, 0o700);
-  // 2-space indent + trailing newline — friendly to git diff and editors that
-  // append a final newline on save.
-  const json = JSON.stringify(data, null, 2) + '\n';
-  await writeFile(filePath, json, { encoding: 'utf8', mode: 0o600 });
-  await chmod(filePath, 0o600);
+  writeJsonAtomic(filePath, data);
 }
 
 function readIgnoreArray(cfg: Record<string, unknown>): string[] {

@@ -2,6 +2,7 @@ import { EventEmitter } from 'node:events';
 import path from 'node:path';
 import chokidar, { type FSWatcher } from 'chokidar';
 import type { WatchEvent } from '../shared/types.js';
+import { sanitizeForLog } from './config.js';
 import { DEFAULT_IGNORED_DIRS, isPathIgnored } from './fs/ignore.js';
 
 export interface Watcher {
@@ -87,15 +88,15 @@ export function createWatcher(rootAbsPath: string, opts: CreateWatcherOptions = 
     const e = err as NodeJS.ErrnoException;
     if (e?.code === 'EMFILE' || e?.code === 'ENOSPC') {
       console.error(
-        `[mdview] file watcher hit ${e.code} while watching ${rootAbsPath}\n` +
-          `  Path: ${e.path ?? '(unknown)'}\n` +
+        `[mdview] file watcher hit ${e.code} while watching ${sanitizeForLog(rootAbsPath, 240)}\n` +
+          `  Path: ${sanitizeForLog(e.path ?? '(unknown)', 240)}\n` +
           `  Likely cause: a heavy directory (build output, deps) wasn't ignored.\n` +
           `  Fix: add the directory name to "ignore" in ~/.config/mdview/config.json, e.g.\n` +
           `    { "ignore": ["deps", "_site"] }\n` +
           `  Built-in skips already cover ${[...DEFAULT_IGNORED_DIRS].join(', ')}.`,
       );
     } else {
-      console.error(`[mdview] watcher error: ${e?.message ?? String(err)}`);
+      console.error(`[mdview] watcher error: ${sanitizeForLog(e?.message ?? err)}`);
     }
   });
 

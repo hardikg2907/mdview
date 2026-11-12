@@ -27,8 +27,8 @@ export async function renderMathIn(root: HTMLElement): Promise<void> {
   const katex = mod.default;
 
   for (const node of inlineNodes) {
-    const src = decodeURIComponent(node.dataset.source ?? '');
     try {
+      const src = decodeURIComponent(node.dataset.source ?? '');
       katex.render(src, node, { displayMode: false, throwOnError: false });
     } catch (err) {
       node.textContent = `[math error: ${(err as Error).message}]`;
@@ -37,8 +37,8 @@ export async function renderMathIn(root: HTMLElement): Promise<void> {
   }
 
   for (const node of blockNodes) {
-    const src = decodeURIComponent(node.dataset.source ?? '');
     try {
+      const src = decodeURIComponent(node.dataset.source ?? '');
       katex.render(src, node, { displayMode: true, throwOnError: false });
     } catch (err) {
       node.textContent = `[math error: ${(err as Error).message}]`;

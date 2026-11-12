@@ -18,4 +18,12 @@ describe('parseArgs --port 0', () => {
   it('still rejects non-integer ports', () => {
     expect(() => parseArgs(['--port', '7.5', './'])).toThrow(/--port/i);
   });
+
+  it('accepts 65535 and rejects ports above 65535', () => {
+    const ok = parseArgs(['--port', '65535', './']);
+    expect(ok.kind).toBe('run');
+    if (ok.kind === 'run') expect(ok.args.port).toBe(65535);
+    expect(() => parseArgs(['--port', '65536', './'])).toThrow(/--port/i);
+    expect(() => parseArgs(['--port', '70000', './'])).toThrow(/--port/i);
+  });
 });

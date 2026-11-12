@@ -53,8 +53,6 @@
     "fastify": "^5.12.7",
     "js-yaml": "^5.5.0",
     "markdown-it": "^15.0.3",
-    "markdown-it-anchor": "^10.0.0",
-    "markdown-it-task-lists": "^2.1.1",
     "open": "^11.0.4",
     "shiki": "^4.5.0"
   },

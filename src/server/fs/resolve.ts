@@ -56,7 +56,14 @@ export async function resolveSafePath(
   relPath: string,
   opts: ResolveOptions = {},
 ): Promise<string> {
-  if (path.isAbsolute(relPath)) {
+  if (relPath.includes('\0')) {
+    throw new OutsideRootError('Refusing path containing NUL byte');
+  }
+  if (
+    path.isAbsolute(relPath) ||
+    (process.platform === 'win32' &&
+      (path.win32.isAbsolute(relPath) || /^[A-Za-z]:/.test(relPath)))
+  ) {
     throw new OutsideRootError(`Refusing absolute path: ${relPath}`);
   }
   const absRoot = path.resolve(root);

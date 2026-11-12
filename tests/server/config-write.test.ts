@@ -176,4 +176,18 @@ describe('update-check setting', () => {
     await expect(setUpdateCheck(true, cfgPath)).rejects.toThrow(/not valid JSON/);
     expect(readFileSync(cfgPath, 'utf8')).toBe('not json');
   });
+
+  it('handles concurrent atomic writes without colliding on temp filenames', async () => {
+    await Promise.all([
+      addIgnoreEntries(['alpha'], cfgPath),
+      addIgnoreEntries(['beta'], cfgPath),
+      setUpdateCheck(true, cfgPath),
+    ]);
+    const parsed = JSON.parse(readFileSync(cfgPath, 'utf8'));
+    expect(typeof parsed).toBe('object');
+    expect(parsed).not.toBeNull();
+    if (process.platform !== 'win32') {
+      expect(statSync(cfgPath).mode & 0o777).toBe(0o600);
+    }
+  });
 });

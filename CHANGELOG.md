@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- **Websites you visit can no longer probe open folders or hold connections against a running server.** Outside `--vscode` embed mode (which already requires a per-launch token), requests to `/api/*` and `/__asset/*` carrying a `Sec-Fetch-Site` header other than `same-origin` or `none` are now rejected with `403` before reaching any route, blocking cross-site search timing oracles, cross-site render triggers, and cross-site SSE connection holds. `/api/*` and `/api/watch` also now send `Cross-Origin-Resource-Policy: same-origin`. Top-level navigation and bookmarked URLs still open normally.
+- **A markdown file can no longer trigger outbound DNS or TCP connections through `<link>` tags.** `<link rel="dns-prefetch">` and `<link rel="preconnect">` in raw HTML are not blocked by `default-src` or `connect-src`; `stripMetaAndBase` now removes `<link>` start tags alongside `<meta>` and `<base>`.
+- **Large task lists, repeated headings, and math-heavy files can no longer stall the server.** `markdown-it-task-lists` and `markdown-it-anchor` had quadratic token walks over checkbox items and duplicate headings (and `# __proto__` collided in `markdown-it-anchor`'s slug map), and block-math token replacement spliced the token array in a loop. All three are now single linear passes in `src/render/markdown.ts` and `src/render/math.ts`, and the two external plugins are removed.
+- **Project `.mdview.json` files are confined to the open folder, capped at 64 KB, and ignored for single-file targets.** A symlinked `.mdview.json` pointing outside the root is now refused via `resolveSafePath`, `mdview <file>` no longer reads or watches a `.mdview.json` in the parent directory (such as `$HOME` or `/tmp`), and invalid config values or watcher errors have C0/DEL/C1 terminal control sequences escaped before reaching stderr.
+- **Client link handling hardens raw HTML and SVG links.** `markExternalLinks` now strips `javascript:`, `vbscript:`, and `data:` `href`/`xlink:href` attributes, covers protocol-relative `//` URLs, SVG `<a>` elements, and `<area>` elements, enforces `rel="noopener noreferrer"` on raw HTML links with `target`, and rewrites `target="_top"` / `target="_parent"` to `_blank`.
+- **Path and state-file hardening across CLI, server, and VS Code extension:** `resolveSafePath` rejects NUL bytes and Windows drive-prefixed paths, `apps/vscode` `validateRelPath` rejects Windows drive-prefixed paths, atomic JSON writes in `~/.config/mdview/` use unique per-write temp names with explicit `0600` permissions (including `mdview config` writes), and shipped dependencies (`@fastify/static` / `glob` / `minimatch`, plus `@hardikg/mdview@^0.11.0` in `apps/vscode`) are updated so `npm audit --omit=dev` reports 0 vulnerabilities in both packages.
+
+### Fixed
+- **Repeated query parameters on `/api/file` and `/api/search` now return `400` instead of `500`**, an unreadable subdirectory or deep directory chain no longer aborts `/api/tree` or `/api/search`, `--port` rejects values above `65535`, malformed percent-encoding in raw HTML Mermaid or KaTeX `data-source` attributes renders a local error instead of throwing `URIError`, and live-reload re-runs no longer stack duplicate click listeners in `wireInternalLinks`.
+
 ## [0.11.0] — 2026-10-25
 
 A security release. Upgrade if you open markdown you did not write: a file in

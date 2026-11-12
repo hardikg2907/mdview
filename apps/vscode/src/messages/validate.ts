@@ -18,8 +18,8 @@ const DOT_DOT_RE = /(?:^|[/\\])\.\.(?:[/\\]|$)/;
 export function validateRelPath(v: unknown): string | null {
   if (typeof v !== 'string') return null;
   if (v.length === 0 || v.length > MAX_REL_PATH) return null;
-  // Must not be absolute.
-  if (v.startsWith('/') || v.startsWith('\\')) return null;
+  // Must not be absolute or Windows drive-prefixed (C:\foo or C:foo).
+  if (v.startsWith('/') || v.startsWith('\\') || /^[A-Za-z]:/.test(v)) return null;
   // Must not contain '..' as a path segment.
   if (DOT_DOT_RE.test(v)) return null;
   // Also catch bare '..'

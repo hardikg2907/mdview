@@ -138,6 +138,22 @@ describe('GET /api/file (markdown-only)', () => {
     expect(res.statusCode).toBe(413);
     expect(res.json().error).toMatch(/too large/);
   });
+
+  it('400s cleanly instead of 500ing when ?path is repeated as an array', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/file?path=README.md&path=code.md',
+    });
+    expect(res.statusCode).toBe(400);
+  });
+
+  it('falls back to default palette instead of 500ing when ?palette is repeated', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/file?path=code.md&palette=everforest&palette=paper',
+    });
+    expect(res.statusCode).toBe(200);
+  });
 });
 
 describe.skipIf(process.platform === 'win32')('GET /api/file (symlinks)', () => {

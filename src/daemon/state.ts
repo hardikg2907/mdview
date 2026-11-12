@@ -76,15 +76,24 @@ export function openPrivateAppend(file: string): number {
   return fd;
 }
 
+let tmpSeq = 0;
+
 /**
  * Write JSON so a reader never sees a half-written file: a fresh temp file gets
  * the content and the mode, then one rename swaps it in.
  */
 export function writeJsonAtomic(file: string, value: unknown): void {
   ensurePrivateDir(path.dirname(file));
-  const tmp = `${file}.${process.pid}.tmp`;
-  writeFileSync(tmp, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600 });
-  renameSync(tmp, file);
+  const tmp = `${file}.${process.pid}.${++tmpSeq}.tmp`;
+  rmSync(tmp, { force: true });
+  try {
+    writeFileSync(tmp, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600 });
+    chmodSync(tmp, 0o600);
+    renameSync(tmp, file);
+  } catch (err) {
+    rmSync(tmp, { force: true });
+    throw err;
+  }
 }
 
 /** Parse JSON from disk, treating anything unreadable or malformed as absent. */
