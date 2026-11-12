@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.1] — 2026-11-12
+
 ### Security
 - **Websites you visit can no longer probe open folders or hold connections against a running server.** Outside `--vscode` embed mode (which already requires a per-launch token), requests to `/api/*` and `/__asset/*` carrying a `Sec-Fetch-Site` header other than `same-origin` or `none` are now rejected with `403` before reaching any route, blocking cross-site search timing oracles, cross-site render triggers, and cross-site SSE connection holds. `/api/*` and `/api/watch` also now send `Cross-Origin-Resource-Policy: same-origin`. Top-level navigation and bookmarked URLs still open normally.
 - **A markdown file can no longer trigger outbound DNS or TCP connections through `<link>` tags.** `<link rel="dns-prefetch">` and `<link rel="preconnect">` in raw HTML are not blocked by `default-src` or `connect-src`; `stripMetaAndBase` now removes `<link>` start tags alongside `<meta>` and `<base>`.
@@ -334,7 +336,8 @@ Initial v1 release plus phase-2 features. Highlights:
 - Per-project `.mdview.json` config (palette, font, line-width, default-collapsed sidebars).
 - Friendly CLI error messages and graceful shutdown.
 
-[Unreleased]: https://github.com/hardikg2907/mdview/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/hardikg2907/mdview/compare/v0.11.1...HEAD
+[0.11.1]: https://github.com/hardikg2907/mdview/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/hardikg2907/mdview/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/hardikg2907/mdview/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/hardikg2907/mdview/compare/v0.9.0...v0.9.1
