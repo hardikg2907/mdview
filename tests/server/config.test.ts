@@ -1,11 +1,14 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   loadEffectiveConfig,
   loadGlobalConfig,
+  loadProjectConfig,
+  MAX_CONFIG_BYTES,
   mergeConfigs,
+  sanitizeForLog,
   validateConfig,
 } from '../../src/server/config.js';
 
@@ -190,4 +193,56 @@ describe('updateCheck', () => {
       palette: 'kanagawa',
     });
   });
+});
+
+describe('config security hardening', () => {
+  let tmp: string;
+
+  beforeEach(() => {
+    tmp = mkdtempSync(path.join(tmpdir(), 'mdview-cfgsec-'));
+    mkdirSync(path.join(tmp, 'repo'));
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    rmSync(tmp, { recursive: true, force: true });
+  });
+
+  it('escapes C0, DEL, and C1 terminal control sequences in warnings', () => {
+    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const osc = `${String.fromCharCode(0x1b)}]52;c;ZGF0YQ==${String.fromCharCode(0x07)}`;
+    const csi8 = `${String.fromCharCode(0x9b)}2J`;
+    expect(sanitizeForLog(osc)).toContain('\\x1b');
+    expect(sanitizeForLog(osc)).toContain('\\x07');
+    expect(sanitizeForLog(csi8)).toContain('\\x9b');
+
+    validateConfig({ palette: osc });
+    const logged = String(spy.mock.calls[0]?.[0] ?? '');
+    expect(logged.includes(String.fromCharCode(0x1b))).toBe(false);
+    expect(logged.includes(String.fromCharCode(0x07))).toBe(false);
+    expect(logged).toContain('\\x1b');
+  });
+
+  it('ignores an oversized .mdview.json over MAX_CONFIG_BYTES', async () => {
+    const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const padding = 'x'.repeat(MAX_CONFIG_BYTES + 128);
+    writeFileSync(
+      path.join(tmp, 'repo', '.mdview.json'),
+      JSON.stringify({ palette: 'kanagawa', extra: padding }),
+    );
+    expect(await loadProjectConfig(path.join(tmp, 'repo'))).toBeNull();
+    expect(spy).toHaveBeenCalled();
+  });
+
+  it.skipIf(process.platform === 'win32')(
+    'refuses a .mdview.json symlink pointing outside the root',
+    async () => {
+      const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const outside = path.join(tmp, 'outside-config.json');
+      writeFileSync(outside, JSON.stringify({ palette: 'solarized' }));
+      symlinkSync(outside, path.join(tmp, 'repo', '.mdview.json'));
+      expect(await loadProjectConfig(path.join(tmp, 'repo'))).toBeNull();
+      expect(spy).toHaveBeenCalled();
+    },
+  );
 });

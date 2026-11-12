@@ -15,17 +15,34 @@ export interface WalkOptions {
   relBase?: string;
 }
 
+export const MAX_WALK_DEPTH = 64;
+
 export async function walkFolder(root: string, opts: WalkOptions = {}): Promise<TreeNode[]> {
   const ignore = opts.ignore ?? DEFAULT_IGNORED_DIRS;
-  return walkInner(root, opts.relBase ?? '', ignore);
+  return walkInner(root, opts.relBase ?? '', ignore, 0);
 }
 
 async function walkInner(
   absDir: string,
   relBase: string,
   ignore: ReadonlySet<string>,
+  depth: number,
 ): Promise<TreeNode[]> {
-  const entries = await readdir(absDir, { withFileTypes: true });
+  if (depth >= MAX_WALK_DEPTH) return [];
+
+  let entries: import('node:fs').Dirent[];
+  try {
+    entries = await readdir(absDir, { withFileTypes: true });
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (
+      depth > 0 &&
+      (code === 'EACCES' || code === 'EPERM' || code === 'ENOENT' || code === 'ENOTDIR')
+    ) {
+      return [];
+    }
+    throw err;
+  }
 
   const out: TreeNode[] = [];
   for (const entry of entries) {
@@ -41,7 +58,12 @@ async function walkInner(
     const childRel = relBase ? `${relBase}/${entry.name}` : entry.name;
 
     if (entry.isDirectory()) {
-      const children = await walkInner(path.join(absDir, entry.name), childRel, ignore);
+      const children = await walkInner(
+        path.join(absDir, entry.name),
+        childRel,
+        ignore,
+        depth + 1,
+      );
       out.push({
         name: entry.name,
         relPath: childRel,

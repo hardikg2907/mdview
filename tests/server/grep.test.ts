@@ -478,6 +478,11 @@ describe('GET /api/search — regex time budget', () => {
     expect(res.json()).toMatchObject({ truncated: false, timedOut: false });
     expect(res.json().results).toHaveLength(1);
   });
+
+  it('400s instead of 500ing when ?q is repeated as an array', async () => {
+    const res = await app.inject({ url: '/api/search?q=normal&q=other' });
+    expect(res.statusCode).toBe(400);
+  });
 });
 
 describe('grepFiles — reads and cache', () => {

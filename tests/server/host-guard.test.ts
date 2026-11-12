@@ -144,5 +144,49 @@ describe('Host guard on a live server', () => {
     });
     expect(headers['content-type']).toBe('text/event-stream');
     expect(headers['x-content-type-options']).toBe('nosniff');
+    expect(headers['cross-origin-resource-policy']).toBe('same-origin');
+  });
+
+  it('sends Cross-Origin-Resource-Policy: same-origin on JSON API responses', async () => {
+    for (const url of ['/api/tree', '/api/file?path=README.md', '/api/health']) {
+      const res = await app.inject({ url, headers: { host: 'localhost' } });
+      expect(res.headers['cross-origin-resource-policy'], url).toBe('same-origin');
+    }
+  });
+
+  it('403s cross-site and same-site Sec-Fetch-Site requests to API and asset routes', async () => {
+    for (const site of ['cross-site', 'same-site']) {
+      for (const url of [
+        '/api/tree',
+        '/api/file?path=README.md',
+        '/api/search?q=Test',
+        '/api/watch',
+        '/__asset/x.png',
+        '/%61pi/tree',
+        '/%5F%5Fasset/x.png',
+      ]) {
+        const res = await app.inject({
+          url,
+          headers: { host: '127.0.0.1:7331', 'sec-fetch-site': site },
+        });
+        expect(res.statusCode, `${site} ${url}`).toBe(403);
+        expect(res.body).toBe('Forbidden');
+      }
+    }
+  });
+
+  it('allows same-origin, none, and absent Sec-Fetch-Site on API routes, plus cross-site top-level navigation to /', async () => {
+    for (const site of ['same-origin', 'none']) {
+      const res = await app.inject({
+        url: '/api/tree',
+        headers: { host: '127.0.0.1:7331', 'sec-fetch-site': site },
+      });
+      expect(res.statusCode, site).toBe(200);
+    }
+    const nav = await app.inject({
+      url: '/',
+      headers: { host: '127.0.0.1:7331', 'sec-fetch-site': 'cross-site' },
+    });
+    expect(nav.statusCode).toBe(200);
   });
 });

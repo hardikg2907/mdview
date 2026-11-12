@@ -24,27 +24,30 @@ function inlineMathHtml(latex: string): string {
  * a single `$$...$$` span (with no other text).
  */
 function convertBlockMath(tokens: Token[]): void {
-  for (let i = 0; i < tokens.length - 2; i++) {
+  // Compact in place rather than splicing per block: splicing shifts the rest
+  // of `tokens` on every `$$…$$` paragraph and goes quadratic on math-heavy files.
+  let write = 0;
+  let read = 0;
+  while (read < tokens.length) {
     if (
-      tokens[i]!.type === 'paragraph_open' &&
-      tokens[i + 1]!.type === 'inline' &&
-      tokens[i + 2]!.type === 'paragraph_close'
+      read + 2 < tokens.length &&
+      tokens[read]!.type === 'paragraph_open' &&
+      tokens[read + 1]!.type === 'inline' &&
+      tokens[read + 2]!.type === 'paragraph_close'
     ) {
-      const inline = tokens[i + 1]!;
-      const trimmed = inline.content.trim();
+      const trimmed = tokens[read + 1]!.content.trim();
       const m = trimmed.match(BLOCK_RE);
       if (m) {
-        // Replace the 3 tokens with a single html_block. Mutate in place.
-        const replacement = new (tokens[i]!.constructor as typeof Token)(
-          'html_block',
-          '',
-          0,
-        );
+        const replacement = new (tokens[read]!.constructor as typeof Token)('html_block', '', 0);
         replacement.content = blockMathHtml(m[1]!);
-        tokens.splice(i, 3, replacement);
+        tokens[write++] = replacement;
+        read += 3;
+        continue;
       }
     }
+    tokens[write++] = tokens[read++]!;
   }
+  tokens.length = write;
 }
 
 /**

@@ -150,7 +150,9 @@ export function parseArgs(argv: string[], defaultPort: number = DEFAULT_PORT): P
       const v = argv[++i];
       if (!v) throw new Error('--port requires a number');
       args.port = Number(v);
-      if (!Number.isInteger(args.port) || args.port < 0) throw new Error('Invalid --port');
+      if (!Number.isInteger(args.port) || args.port < 0 || args.port > 65535) {
+        throw new Error('Invalid --port');
+      }
       args.portExplicit = true;
       continue;
     }
@@ -275,6 +277,7 @@ async function listen(
   }
   for (let attempt = 0; attempt < 10; attempt++) {
     const tryPort = port + attempt;
+    if (tryPort > 65535) break;
     try {
       await app.listen({ host: '127.0.0.1', port: tryPort });
       if (attempt > 0) {

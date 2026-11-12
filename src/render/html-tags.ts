@@ -182,10 +182,10 @@ function hasNameAt(s: string, at: number, name: string): boolean {
   return true;
 }
 
-const STRIPPED = ['meta', 'base'];
-const HAS_STRIPPED = /<(?:meta|base)/i;
+const STRIPPED = ['meta', 'base', 'link'];
+const HAS_STRIPPED = /<(?:meta|base|link)/i;
 // A `<` followed by a prefix of a stripped name, at the very end of the output.
-const DANGLING_PREFIX = /<(?:m(?:e(?:ta?)?)?|b(?:a(?:se?)?)?)?$/i;
+const DANGLING_PREFIX = /<(?:m(?:e(?:ta?)?)?|b(?:a(?:se?)?)?|l(?:i(?:nk?)?)?)?$/i;
 
 /** Remove and return the last `count` characters of `out`, which holds no empty chunks. */
 function popChars(out: string[], count: number): string {
@@ -204,7 +204,7 @@ function popChars(out: string[], count: number): string {
 }
 
 /**
- * Remove every `<meta>` and `<base>` start tag from a raw HTML fragment.
+ * Remove every `<meta>`, `<base>` and `<link>` start tag from a raw HTML fragment.
  *
  * Deliberately context-free: a fragment is one piece of a larger document, so
  * whether a given `<meta` sits in text or inside a quoted attribute depends on

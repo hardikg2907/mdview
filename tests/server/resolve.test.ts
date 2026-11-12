@@ -48,6 +48,10 @@ describe('resolveSafePath', () => {
     await expect(resolveSafePath(root, '/etc/passwd')).rejects.toThrow(/absolute/);
   });
 
+  it('rejects paths containing a NUL byte with OutsideRootError', async () => {
+    await expect(resolveSafePath(root, 'docs/intro.md\0.png')).rejects.toThrow(OutsideRootError);
+  });
+
   it('treats empty as root', async () => {
     expect(await resolveSafePath(root, '')).toBe(realRoot);
   });

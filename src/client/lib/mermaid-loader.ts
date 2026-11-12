@@ -16,13 +16,13 @@ export async function renderMermaidIn(root: HTMLElement): Promise<void> {
 
 async function renderBlock(pele: typeof import('pele/lazy'), block: HTMLDivElement): Promise<void> {
   if (block.dataset.rendered) return;
-  const source = decodeURIComponent(block.dataset.source ?? '');
   const style = getComputedStyle(block);
   const fontFamily = style.getPropertyValue('--pele-font').trim() || style.fontFamily;
   const fontFamilyMono = style.getPropertyValue('--pele-font-mono').trim() || undefined;
   const contentWidth =
     block.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
   try {
+    const source = decodeURIComponent(block.dataset.source ?? '');
     const { svg } = await pele.renderAsync(source, {
       idPrefix: `mermaid-${++counter}-`,
       // Diagram text can come from untrusted files: links are limited to

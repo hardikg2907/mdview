@@ -1,8 +1,8 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { walkFolder } from '../../src/server/fs/tree.js';
+import { MAX_WALK_DEPTH, walkFolder } from '../../src/server/fs/tree.js';
 
 let root: string;
 
@@ -83,5 +83,41 @@ describe('walkFolder', () => {
       .find((n) => n.name === 'guides')!
       .children!.find((n) => n.name === 'intro.md')!;
     expect(intro.relPath).toBe('guides/intro.md');
+  });
+
+  it.skipIf(process.platform === 'win32' || process.getuid?.() === 0)(
+    'treats an unreadable child directory as empty instead of failing the walk',
+    async () => {
+      const locked = path.join(root, 'locked');
+      mkdirSync(locked);
+      writeFileSync(path.join(locked, 'secret.md'), '# s');
+      chmodSync(locked, 0o000);
+      try {
+        const tree = await walkFolder(root);
+        const node = tree.find((n) => n.name === 'locked');
+        expect(node).toMatchObject({ name: 'locked', type: 'dir', children: [] });
+        expect(tree.find((n) => n.name === 'README.md')).toBeDefined();
+      } finally {
+        chmodSync(locked, 0o700);
+      }
+    },
+  );
+
+  it('stops recursing past MAX_WALK_DEPTH', async () => {
+    let cur = root;
+    for (let i = 0; i < MAX_WALK_DEPTH + 4; i++) {
+      cur = path.join(cur, 'd');
+    }
+    mkdirSync(cur, { recursive: true });
+    writeFileSync(path.join(cur, 'bottom.md'), '# deep');
+
+    const tree = await walkFolder(root);
+    let depth = 0;
+    let node = tree.find((n) => n.name === 'd');
+    while (node && node.children && node.children.length > 0) {
+      depth++;
+      node = node.children[0];
+    }
+    expect(depth).toBeLessThanOrEqual(MAX_WALK_DEPTH);
   });
 });

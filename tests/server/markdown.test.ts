@@ -93,14 +93,55 @@ describe('renderMarkdown — <meta> and <base> in raw HTML', () => {
     expect(html).not.toMatch(META_OR_BASE);
   });
 
-  it('keeps elements whose names only start with meta or base', async () => {
-    const { html } = await renderMarkdown('<svg><metadata>m</metadata></svg>\n\n<basefont>');
+  it('keeps elements whose names only start with meta, base, or link', async () => {
+    const { html } = await renderMarkdown(
+      '<svg><metadata>m</metadata></svg>\n\n<basefont>\n\n<linkedin>x</linkedin>',
+    );
     expect(html).toContain('<metadata>m</metadata>');
     expect(html).toContain('<basefont>');
+    expect(html).toContain('<linkedin>x</linkedin>');
+  });
+
+  it('drops outbound <link> resource hints in block and inline raw HTML', async () => {
+    const { html } = await renderMarkdown(
+      '<link rel="dns-prefetch" href="//example.invalid">\n\nText <link rel="preconnect" href="https://example.invalid"> here',
+    );
+    expect(html).not.toMatch(/<link(?=[\t\n\f\r />]|$)/i);
+    expect(html).toContain('<p>Text  here</p>');
   });
 
   it('keeps a meta tag shown as code', async () => {
     const { html } = await renderMarkdown('`<meta charset="utf-8">`');
     expect(html).toContain('<code>&lt;meta charset=&quot;utf-8&quot;&gt;</code>');
+  });
+});
+
+describe('renderMarkdown — linear heading anchors and task lists', () => {
+  it('assigns unique ids for repeated headings and Object.prototype names', async () => {
+    const { html } = await renderMarkdown(
+      '# `__proto__`\n\n## `__proto__`\n\n# constructor\n\n## constructor\n',
+    );
+    expect(html).toContain('id="__proto__"');
+    expect(html).toContain('id="__proto__-1"');
+    expect(html).toContain('id="constructor"');
+    expect(html).toContain('id="constructor-1"');
+  });
+
+  it('renders 15,000 task-list items in linear time', async () => {
+    const doc = '- [ ] task item\n'.repeat(15_000);
+    const start = performance.now();
+    const { html } = await renderMarkdown(doc);
+    expect(performance.now() - start).toBeLessThan(2_000);
+    expect(html).toContain('class="contains-task-list"');
+    expect(html).toContain('class="task-list-item-checkbox"');
+  });
+
+  it('renders 5,000 duplicate headings in linear time', async () => {
+    const doc = '# Same Heading\n'.repeat(5_000);
+    const start = performance.now();
+    const { html } = await renderMarkdown(doc);
+    expect(performance.now() - start).toBeLessThan(2_000);
+    expect(html).toContain('id="same-heading"');
+    expect(html).toContain('id="same-heading-4999"');
   });
 });

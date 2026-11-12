@@ -104,15 +104,18 @@ export async function documentAssetRefs(
 }
 
 export function registerApiFile(app: FastifyInstance, roots: readonly RootState[]): void {
-  app.get<{ Querystring: { path?: string; palette?: string } }>(
+  app.get<{ Querystring: { path?: unknown; palette?: unknown } }>(
     '/api/file',
     async (req, reply) => {
+    if (req.query.path !== undefined && typeof req.query.path !== 'string') {
+      return reply.code(400).send({ error: 'Invalid ?path' });
+    }
     const requested = req.query.path?.trim() ?? '';
     // Untrusted query value: checked against the allow-list, never used to
     // build a key or a path. An unknown palette renders the default rather
     // than failing the request — the document is what was asked for, and the
     // colours are recoverable by picking a palette again.
-    const rawPalette = req.query.palette?.trim() ?? '';
+    const rawPalette = typeof req.query.palette === 'string' ? req.query.palette.trim() : '';
     const palette: Palette = (PALETTES as readonly string[]).includes(rawPalette)
       ? (rawPalette as Palette)
       : DEFAULT_PALETTE;

@@ -4,7 +4,7 @@ import type { Readable } from 'node:stream';
 import chokidar, { type FSWatcher } from 'chokidar';
 import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify';
 import type { Palette, WatchEvent } from '../shared/types.js';
-import { CONFIG_FILENAME, loadEffectiveConfig } from './config.js';
+import { CONFIG_FILENAME, loadEffectiveConfig, loadGlobalConfig, mergeConfigs } from './config.js';
 import { ContentCache } from './fs/grep.js';
 import { buildIgnoreSet } from './fs/ignore.js';
 import { closeRegexWorkers } from './fs/regex-runner.js';
@@ -107,6 +107,24 @@ function queryToken(req: FastifyRequest): unknown {
   return (req.query as Record<string, unknown> | undefined)?.token;
 }
 
+/**
+ * True when a browser reports that the request came from another origin.
+ *
+ * Non-browser local clients (the CLI's `/api/health` probe, curl, tests) send
+ * no `Sec-Fetch-Site` header and pass. Every modern browser stamps subresource
+ * requests (`<img>`, `<script>`, `fetch`) from external pages with `cross-site`
+ * (or `same-site` across sibling subdomains), which would otherwise reach
+ * `/api/search` (3 s regex worker XS-Search timing side-channel), `/api/file`
+ * (render work / existence timing) and `/api/watch` (held SSE streams).
+ */
+function isCrossSiteFetch(req: FastifyRequest): boolean {
+  const sfs = req.headers['sec-fetch-site'];
+  if (sfs === undefined) return false;
+  if (typeof sfs !== 'string') return true;
+  const normalized = sfs.trim().toLowerCase();
+  return normalized !== 'same-origin' && normalized !== 'none';
+}
+
 export async function createServer(opts: ServerOptions): Promise<MdviewServer> {
   const app = Fastify({ logger: false });
   const embedToken = opts.embedToken;
@@ -126,12 +144,19 @@ export async function createServer(opts: ServerOptions): Promise<MdviewServer> {
     }
     // The matched route is checked as well as the raw URL: the router decodes
     // `/%61pi/...` onto an API route while the raw URL keeps the escapes.
+    const isApi =
+      req.url.startsWith('/api/') || Boolean(req.routeOptions.url?.startsWith('/api/'));
+    const isAsset =
+      req.url.startsWith('/__asset/') || req.routeOptions.url === '/__asset/*';
     if (
       embedMode &&
-      (req.url.startsWith('/api/') || req.routeOptions.url?.startsWith('/api/')) &&
+      isApi &&
       !embedTokenMatches(req.headers[EMBED_TOKEN_HEADER]) &&
       !embedTokenMatches(queryToken(req))
     ) {
+      return reply.code(403).type('text/plain; charset=utf-8').send('Forbidden');
+    }
+    if (!embedMode && (isApi || isAsset) && isCrossSiteFetch(req)) {
       return reply.code(403).type('text/plain; charset=utf-8').send('Forbidden');
     }
   });
@@ -149,7 +174,7 @@ export async function createServer(opts: ServerOptions): Promise<MdviewServer> {
   // URL keeps the escapes. Any SVG is sandboxed whatever route sent it.
   app.addHook('onSend', async (req, reply, payload) => {
     reply.header('x-content-type-options', 'nosniff');
-    const ct = String(reply.getHeader('content-type') ?? '');
+    const ct = String(reply.getHeader('content-type') ?? '').toLowerCase();
     // Gated on the response type rather than on paths, so the shell at `/`,
     // `/index.html` and the SPA fallback for any unknown path are all covered.
     // The token rides in the query because a frame navigation cannot carry a
@@ -171,6 +196,9 @@ export async function createServer(opts: ServerOptions): Promise<MdviewServer> {
     ) {
       reply.headers(ASSET_SECURITY_HEADERS);
       return payload;
+    }
+    if (req.url.startsWith('/api/') || req.routeOptions.url?.startsWith('/api/')) {
+      reply.header('cross-origin-resource-policy', 'same-origin');
     }
     if (ct.startsWith('text/html')) {
       reply.header('content-security-policy', cspHtml);
@@ -204,9 +232,14 @@ export async function createServer(opts: ServerOptions): Promise<MdviewServer> {
   });
 
   async function openRoot(spec: RootSpec, id: string): Promise<RootState> {
-    const config = await loadEffectiveConfig(spec.absPath);
-    const ignoreSet = buildIgnoreSet(config?.ignore ?? []);
     const root = describeRoot(spec, id);
+    // A single-file root's absPath is its parent folder ($HOME, /tmp, ~/Downloads),
+    // which belongs to more than that one file and may be shared or untrusted.
+    const config =
+      root.kind === 'file'
+        ? mergeConfigs(await loadGlobalConfig(), null)
+        : await loadEffectiveConfig(spec.absPath);
+    const ignoreSet = buildIgnoreSet(config?.ignore ?? []);
     const state: RootState = {
       root,
       absPath: spec.absPath,
@@ -225,29 +258,31 @@ export async function createServer(opts: ServerOptions): Promise<MdviewServer> {
       hub.emitSynthetic(e);
     });
 
-    // Dedicated chokidar watch for .mdview.json — the main watcher ignores
-    // dotfiles, so we'd never see it otherwise. One per root, because each root
-    // carries its own config file.
-    const configWatcher: FSWatcher = chokidar.watch(path.join(spec.absPath, CONFIG_FILENAME), {
-      ignoreInitial: true,
-      persistent: true,
-      // A `.mdview.json` that links to a directory would otherwise be walked
-      // and watched recursively.
-      followSymlinks: false,
-      awaitWriteFinish: { stabilityThreshold: 60, pollInterval: 30 },
-    });
-    const reloadConfig = async (): Promise<void> => {
-      // Note: only the scalar fields hot-reload. `ignore` is read once at
-      // startup — changing it requires reopening the root, because the
-      // FSWatcher was constructed against the original set.
-      state.config = await loadEffectiveConfig(spec.absPath);
-      const event: WatchEvent = { kind: 'config', relPath: `${id}/${CONFIG_FILENAME}` };
-      hub.emitSynthetic(event);
-    };
-    configWatcher.on('add', () => void reloadConfig());
-    configWatcher.on('change', () => void reloadConfig());
-    configWatcher.on('unlink', () => void reloadConfig());
-    configWatchers.set(id, configWatcher);
+    if (root.kind === 'dir') {
+      // Dedicated chokidar watch for .mdview.json — the main watcher ignores
+      // dotfiles, so we'd never see it otherwise. One per folder root, because
+      // each folder carries its own config file.
+      const configWatcher: FSWatcher = chokidar.watch(path.join(spec.absPath, CONFIG_FILENAME), {
+        ignoreInitial: true,
+        persistent: true,
+        // A `.mdview.json` that links to a directory would otherwise be walked
+        // and watched recursively.
+        followSymlinks: false,
+        awaitWriteFinish: { stabilityThreshold: 60, pollInterval: 30 },
+      });
+      const reloadConfig = async (): Promise<void> => {
+        // Note: only the scalar fields hot-reload. `ignore` is read once at
+        // startup — changing it requires reopening the root, because the
+        // FSWatcher was constructed against the original set.
+        state.config = await loadEffectiveConfig(spec.absPath);
+        const event: WatchEvent = { kind: 'config', relPath: `${id}/${CONFIG_FILENAME}` };
+        hub.emitSynthetic(event);
+      };
+      configWatcher.on('add', () => void reloadConfig());
+      configWatcher.on('change', () => void reloadConfig());
+      configWatcher.on('unlink', () => void reloadConfig());
+      configWatchers.set(id, configWatcher);
+    }
 
     return state;
   }

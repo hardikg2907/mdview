@@ -5,10 +5,10 @@ import type { RootState } from '../workspace.js';
 const MAX_QUERY_LEN = 200;
 
 interface SearchQS {
-  q?: string;
-  case?: string;
-  word?: string;
-  regex?: string;
+  q?: unknown;
+  case?: unknown;
+  word?: unknown;
+  regex?: unknown;
 }
 
 export interface ApiSearchOptions {
@@ -18,7 +18,7 @@ export interface ApiSearchOptions {
   regexBudgetMs?: number;
 }
 
-function isTrue(v: string | undefined): boolean {
+function isTrue(v: unknown): boolean {
   return v === '1' || v === 'true';
 }
 
@@ -29,6 +29,9 @@ export function registerApiSearch(
 ): void {
   const cache = opts.cache ?? new ContentCache();
   app.get<{ Querystring: SearchQS }>('/api/search', async (req, reply) => {
+    if (req.query.q !== undefined && typeof req.query.q !== 'string') {
+      return reply.code(400).send({ error: 'Invalid ?q' });
+    }
     const q = (req.query.q ?? '').trim();
     if (q.length === 0) {
       return reply.send({ query: '', results: [], truncated: false, timedOut: false });

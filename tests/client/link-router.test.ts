@@ -153,4 +153,16 @@ describe('wireInternalLinks', () => {
     expect(ev.defaultPrevented).toBe(false);
     expect(calls).toEqual([]);
   });
+
+  it('is idempotent on the same root and uses the latest onNavigate handler', () => {
+    const root = setup('<a href="other.md" data-internal-link="other.md">x</a>');
+    const stale: string[] = [];
+    const latest: string[] = [];
+    wireInternalLinks(root, (rel) => stale.push(rel));
+    wireInternalLinks(root, (rel) => latest.push(rel));
+
+    root.querySelector('a')!.click();
+    expect(stale).toEqual([]);
+    expect(latest).toEqual(['other.md']);
+  });
 });

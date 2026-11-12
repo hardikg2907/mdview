@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { renderMathIn } from '../../src/client/lib/katex-loader.js';
 import { renderMermaidIn } from '../../src/client/lib/mermaid-loader.js';
 
 function setup(...sources: string[]): HTMLElement {
@@ -72,5 +73,28 @@ describe('renderMermaidIn', () => {
     const root = document.createElement('div');
     root.innerHTML = '<p>no diagrams</p>';
     await expect(renderMermaidIn(root)).resolves.toBeUndefined();
+  });
+
+  it('catches malformed percent-encoding in raw HTML data-source without rejecting', async () => {
+    const root = document.createElement('div');
+    root.innerHTML = '<div class="mermaid-block" data-source="%E0%A4%A"></div>';
+    document.body.appendChild(root);
+    await expect(renderMermaidIn(root)).resolves.toBeUndefined();
+    const block = root.querySelector<HTMLElement>('.mermaid-block')!;
+    expect(block.querySelector('pre.mermaid-error')).not.toBeNull();
+    expect(block.dataset.rendered).toBe('true');
+  });
+});
+
+describe('renderMathIn — malformed data-source', () => {
+  it('catches malformed percent-encoding on inline and block math placeholders', async () => {
+    const root = document.createElement('div');
+    root.innerHTML =
+      '<span class="math-inline" data-source="%E0%A4%A"></span>' +
+      '<div class="math-block" data-source="%E0%A4%A"></div>';
+    document.body.appendChild(root);
+    await expect(renderMathIn(root)).resolves.toBeUndefined();
+    expect(root.querySelector('.math-inline')!.textContent).toContain('[math error:');
+    expect(root.querySelector('.math-block')!.textContent).toContain('[math error:');
   });
 });

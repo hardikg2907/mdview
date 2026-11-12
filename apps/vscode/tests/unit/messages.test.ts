@@ -44,6 +44,12 @@ describe('validateRelPath', () => {
     expect(validateRelPath('\\windows\\system32')).toBeNull();
   });
 
+  it('rejects Windows drive-prefixed paths', () => {
+    expect(validateRelPath('C:\\Windows\\System32\\drivers\\etc\\hosts')).toBeNull();
+    expect(validateRelPath('C:foo.md')).toBeNull();
+    expect(validateRelPath('d:/notes.md')).toBeNull();
+  });
+
   it('rejects ".." as bare segment', () => {
     expect(validateRelPath('..')).toBeNull();
   });

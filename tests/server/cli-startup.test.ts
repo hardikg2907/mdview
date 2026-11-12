@@ -14,8 +14,6 @@ const SERVER_ONLY_PACKAGES = [
   '@fastify/static',
   'shiki',
   'markdown-it',
-  'markdown-it-anchor',
-  'markdown-it-task-lists',
   'js-yaml',
   'chokidar',
   'open',
