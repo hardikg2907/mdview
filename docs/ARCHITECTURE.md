@@ -56,7 +56,7 @@ src/
 │   ├── byte-lru.ts                  ← size-capped LRU behind the highlight cache
 │   ├── frontmatter.ts
 │   ├── outline.ts
-│   ├── links.ts                     ← tagInternalLinks, rewriteImageSrc
+│   ├── links.ts                     ← rewriteLinksAndImages, tagInternalLinks, rewriteImageSrc
 │   ├── html-tags.ts                 ← linear tag scanner (rewriteTags), stripMetaAndBase
 │   └── math.ts                      ← KaTeX placeholder emission
 ├── server/
@@ -66,9 +66,9 @@ src/
 │   ├── hosts.ts                     ← isAllowedHost
 │   ├── workspace.ts                 ← open roots, parseWorkspacePath
 │   ├── routes/
-│   │   ├── api-file.ts              ← GET /api/file
-│   │   ├── api-tree.ts              ← GET /api/tree (incl. project config)
-│   │   ├── api-asset.ts             ← GET /__asset/*
+│   │   ├── api-file.ts              ← GET /api/file + RenderedFileCache
+│   │   ├── api-tree.ts              ← GET /api/tree (incl. project config + loadRootTree cache)
+│   │   ├── api-asset.ts             ← GET /__asset/* (with weak ETag / 304)
 │   │   ├── api-search.ts            ← GET /api/search (folder grep)
 │   │   ├── health.ts                ← GET /api/health (daemon identity, registered in daemon mode only)
 │   │   └── sse.ts                   ← GET /api/watch
@@ -111,7 +111,7 @@ does not cover it.
 ### Entry & boot
 
 - **`src/cli.ts`** — argument parser, port-fallback listener, browser launcher, SIGINT/SIGTERM shutdown with timeout, friendly error messages (port-in-use, ENOENT, EACCES). `MDVIEW_DEBUG=1` enables full stack traces. fastify, chokidar, `open` and the render pipeline load with `import()` only in the commands that start a server or open a browser, so `--version`, `ls`, `rm` and `stop` skip them. After `listen`, `warmHighlighter()` runs in the background, so the first document finds Shiki ready.
-- **`src/server/index.ts`** — `createServer({ roots, clientDir, … })` factory. Opens one `RootState` per root, composes routes over the root list, registers `@fastify/static` for the bundled SPA at `/`, hooks `onClose` to close every watcher. Boots a **second chokidar watcher per root** dedicated to that root's `.mdview.json`, because the main watcher's `ignored` filter excludes dotfiles.
+- **`src/server/index.ts`** — `createServer({ roots, clientDir, … })` factory. Opens one `RootState` per root, composes routes over the root list, registers `@fastify/static` for the bundled SPA at `/`, hooks `onClose` to close every watcher and terminate open SSE streams. Boots a **second chokidar watcher per root** dedicated to that root's `.mdview.json` (folder roots only), because the main watcher's `ignored` filter excludes dotfiles.
 
 ### The background server (`src/daemon/`, `src/cli.ts`)
 
@@ -170,14 +170,17 @@ watcher each open folder holds — which the 8-folder cap is the other half of.
 
 **Ordering.** `runAttach` registers the root *before* ensuring the daemon, so a
 daemon it starts already has the folder at boot and a running one picks it up from
-the watcher. It then polls `/api/health` until the root id appears, because
-otherwise the browser can open a deep link before the root it names exists.
+the watcher. When `ensureDaemon`'s health probe does not yet list the root id, it
+polls `/api/health` (`waitForRoot`) until the root id appears, because otherwise
+the browser can open a deep link before the root it names exists.
 
 ### Workspace (`src/server/workspace.ts`)
 
 The server serves **N folders at once**, not one. Each is a `RootState`: its wire
-identity (`WorkspaceRoot`), its absolute path, its own frozen ignore set, its own
-`.mdview.json`, and its own chokidar watcher.
+identity (`WorkspaceRoot`), its absolute path (plus cached `realRoot`), its own
+frozen ignore set, its own `.mdview.json`, its own chokidar watcher, and (once
+chokidar signals `'ready'`) an in-memory `treeCache` invalidated on structural
+watcher events.
 
 Every path on the wire is **workspace-scoped**: `<rootId>/<path within the root>`.
 That is the whole design decision. A relPath stays a single opaque string, so
@@ -212,11 +215,11 @@ applied in that root's own walk and watcher.
 
 | Route | Purpose |
 |-------|---------|
-| `GET /api/file?path=...&palette=...` | `path` is workspace-scoped (`<rootId>/<path>`). Read the file, parse frontmatter, render to HTML, extract outline, tag internal links, rewrite image src. `palette` selects which palette's code colours are rendered; it is checked against the allow-list, and an unknown value renders the default palette instead of failing. Markdown extensions only (400 otherwise), 404 for a missing file, 413 over 16 MB. Returns a `RenderedFile` (incl. `lastModified` mtime). |
-| `GET /api/tree` | Walk every open root; return `{ roots, tree, config }`. With one root its contents sit at the top level, exactly as before workspaces existed; with several, each root is a top-level folder node whose `relPath` is its bare id. `config` comes from the primary root. |
-| `GET /api/search?q=...&case=...&word=...&regex=...` | Grep across every folder root; hits come back root-qualified. Caps per-file (20) and global (200) — the global cap is a budget for the whole search, not per root. Lines over 10,000 characters are skipped in both modes, and a literal search stops after 1 s of matching; either sets `truncated`. At most two searches run at once across the server; later ones wait, and one whose client goes away leaves the queue. Single-file roots are skipped. Returns `{ query, results, truncated, timedOut }`; `timedOut` means a regex search hit its time budget and `results` is partial. |
-| `GET /api/watch` | One Server-Sent Events stream carrying every root's `WatchEvent`s, with root-scoped `relPath`s. Includes a synthetic `config` event when a root's `.mdview.json` changes, and a `workspace` event when the set of open roots changes. |
-| `GET /__asset/*` | Serve user content assets (images, etc.). The splat is workspace-scoped, so the URL shape is unchanged: `/__asset/<rootId>/<path>`. Resolved via `parseWorkspacePath` then `resolveSafePath`. A single-file root serves only what its document references. |
+| `GET /api/file?path=...&palette=...` | `path` is workspace-scoped (`<rootId>/<path>`). Resolves via `resolveSafePath`, checks a 16M-char `RenderedFileCache` (keyed by `${wsRel}\0${palette}` and verified against `(absPath, mtimeMs, size)`, also invalidated by watcher events), and on miss reads the file, parses frontmatter, renders to HTML, extracts outline, and rewrites internal links + image srcs in one pass. `palette` selects which palette's code colours are rendered; unknown values fall back to the default palette. Markdown extensions only (400 otherwise), 404 for a missing file, 413 over 16 MB. Returns a `RenderedFile` (incl. `lastModified` mtime). |
+| `GET /api/tree` | Loads every open root concurrently via `loadRootTree` (reusing `RootState.treeCache` when the root's live watcher is ready, with in-flight deduplication); returns `{ roots, tree, config }`. With one root its contents sit at the top level; with several, each root is a top-level folder node whose `relPath` is its bare id. `config` comes from the primary root. |
+| `GET /api/search?q=...&case=...&word=...&regex=...` | Grep across every folder root; hits come back root-qualified. Reuses cached root markdown file lists when live watchers are ready. Caps per-file (20) and global (200) — the global cap is a budget for the whole search, not per root. Lines over 10,000 characters are skipped in both modes, and a literal search stops after 1 s of matching; either sets `truncated`. At most two searches run at once across the server; later ones wait, and one whose client goes away leaves the queue. Single-file roots are skipped. Returns `{ query, results, truncated, timedOut }`; `timedOut` means a regex search hit its time budget and `results` is partial. |
+| `GET /api/watch` | One Server-Sent Events stream carrying every root's `WatchEvent`s, with root-scoped `relPath`s. Includes a synthetic `config` event when a root's `.mdview.json` changes, and a `workspace` event when the set of open roots changes. Active streams close cleanly on `app.close()`. |
+| `GET /__asset/*` | Serve user content assets (images, etc.). The splat is workspace-scoped, so the URL shape is unchanged: `/__asset/<rootId>/<path>`. Resolved via `parseWorkspacePath` then `resolveSafePath`. A single-file root serves only what its document references. Emits weak `ETag`s from `(size, mtimeMs)` and answers `304 Not Modified` on `If-None-Match` after all security checks (retaining `ASSET_SECURITY_HEADERS`). |
 | `GET /api/health` | Registered only when `createServer` is given an `identity` (i.e. in daemon mode). Reports `{ok, pid, startedAt, version, roots: [id]}` — ids only, never absolute paths. |
 | `GET /*` | Falls through to the static SPA bundle; SPA fallback for unknown routes (so client routing works on refresh). |
 
@@ -226,17 +229,17 @@ All request paths that touch the filesystem go through `resolveSafePath(rootAbsP
 
 The renderer lives in `src/render/`, **outside** `src/server/`, because it has no Node-only or HTTP-specific code. It can run from any context (server route, future editor extension, tests). Each request to `/api/file` runs through this pipeline in order:
 
-1. **`frontmatter.ts`** — `parseFrontmatter(raw)` peels off `---`-delimited YAML using `js-yaml` (YAML 1.2 core schema plus merge keys). Front matter is YAML only: an opening line like `---js` is body text, and a budget of 10,000 nodes and 1,000,000 characters rejects alias bombs and cycles. It walks lines by offset and never splits the whole document; the blank lines after the closing `---` are dropped by the same walk, not a regex, so millions of them cannot overflow the stack. Returns `{ data, body, bodyStartLine }`.
+1. **`frontmatter.ts`** — `parseFrontmatter(raw)` peels off `---`-delimited YAML using `js-yaml` (YAML 1.2 core schema plus merge keys). Front matter is YAML only: an opening line like `---js` is body text, raw spans over 2,000,000 characters bail out before YAML parsing, and a budget of 10,000 nodes and 1,000,000 characters rejects alias bombs and cycles. It walks lines by offset ($O(1)$ fence check on line 0) and never splits the whole document; the blank lines after the closing `---` are dropped by the same walk, not a regex, so millions of them cannot overflow the stack. Returns `{ data, body, bodyStartLine }`.
 2. **`markdown.ts`** — `renderMarkdown(body)` constructs a singleton `markdown-it` instance with `linkify`, local linear `headingAnchorsPlugin` and `taskListsPlugin`, and the local **`mathPlugin`**. Walks the token list to intercept `fence` tokens: `mermaid` becomes a `<div class="mermaid-block" data-source="...">` that the client renders to SVG, everything else is highlighted via Shiki. The same walk runs `stripMetaAndBase` (`html-tags.ts`) over every `html_block` token and every `html_inline` child, which removes `<meta>`, `<base>`, and `<link>` start tags from the document's raw HTML (see the security model).
 3. **`shiki.ts`** — `highlightCode(code, lang, palette)` lazy-loads languages on demand. Only the default palette's theme pair loads at start-up; another palette's pair loads on its first request, and concurrent requests share that load. Results sit in an 8 MB `ByteLru` (keys count toward the cap) keyed by palette, language and the SHA-256 of the code, so a live reload re-highlights only blocks that changed. It renders the requested palette's light and dark themes with `defaultColor: false`, so each token carries exactly `--shiki-light` and `--shiki-dark` and the light/dark toggle repaints purely in CSS. Changing *palette* refetches, because only the active one is rendered: rendering all eight put 16 variables on every token and took a real document from 30 KB to 204 KB.
 4. **`math.ts`** — markdown-it core rule that compacts `$$...$$` paragraphs in-place in one linear pass and scans `$...$` inline runs (with whitespace heuristics and code-span exclusion), emitting `<span class="math-inline">` / `<div class="math-block">` placeholders with URL-encoded `data-source`.
 5. **`outline.ts`** — `extractOutline(tokens)` walks heading tokens, builds a nested `OutlineNode[]` tree using a stack-based algorithm. Handles non-monotonic depth jumps (e.g. h1 → h3 with no h2).
-6. **`links.ts`** — `tagInternalLinks(html, currentRelPath)` adds `data-internal-link="<resolved-path>"` to relative `.md` `<a href>`s so the client can intercept them. `rewriteImageSrc(html, currentRelPath)` rewrites relative `<img src>` to `/__asset/<resolved>` so they resolve against the content root, not the SPA bundle. Both run over the final HTML through `rewriteTags` (`html-tags.ts`), a single forward pass that reads tags the way an HTML tokenizer does: quoted attribute values may hold `>`, comments and the attributes of other tags are stepped over, attribute names match case-insensitively, and single-quoted or unquoted values are handled like double-quoted ones. Markdown links and raw-HTML anchors and images are rewritten alike.
+6. **`links.ts`** — `rewriteLinksAndImages(html, currentRelPath)` (plus standalone `tagInternalLinks` and `rewriteImageSrc`) adds `data-internal-link="<resolved-path>"` to relative `.md` `<a href>`s and rewrites relative `<img src>` to `/__asset/<resolved>` in a single forward pass through `rewriteTags` (`html-tags.ts`). Quoted attribute values may hold `>`, comments and non-matching tags are stepped over without allocating tag-name substrings, attribute names match case-insensitively, and single-quoted or unquoted values are handled like double-quoted ones.
 
 ### Filesystem (`src/server/fs/`)
 
-- **`resolve.ts`** — `resolveSafePath(root, rel)` is the security boundary. Rejects NUL bytes, absolute paths (including Windows drive-prefixed paths on Windows), normalizes the result, and checks lexically that it stays within `root`. It then runs `realpath` on both the root and the target and checks containment again, so a symlink inside the root cannot lead out of it; a link that stays inside still resolves. It returns the real path, which callers read and judge extensions on. A missing file or dangling link rejects with the filesystem's `ENOENT` (callers answer 404); an escape rejects with `OutsideRootError` (callers answer 400). Also exports `hasDotSegment` and `MAX_MARKDOWN_BYTES`. Used by every fs read.
-- **`tree.ts`** — `walkFolder(root, { ignore, relBase })` recursively walks the directory up to `MAX_WALK_DEPTH` (64), skipping dotfiles, unreadable child directories (`EACCES`/`EPERM`), and any directory whose basename is in the supplied ignore set (defaults to `DEFAULT_IGNORED_DIRS`). Sorts dirs first then alpha. Marks markdown files with `isMarkdown: true`. `relBase` prefixes the emitted relPaths with the root id — it affects the wire path only, never which directory is read.
+- **`resolve.ts`** — `resolveSafePath(root, rel, { realRoot })` is the security boundary. Rejects NUL bytes, absolute paths (including Windows drive-prefixed paths on Windows), normalizes the result, and checks lexically that it stays within `root`. It then runs `realpath` on the target (reusing `RootState.realRoot` when provided) and checks containment again, so a symlink inside the root cannot lead out of it; a link that stays inside still resolves. It returns the real path, which callers read and judge extensions on. A missing file or dangling link rejects with the filesystem's `ENOENT` (callers answer 404); an escape rejects with `OutsideRootError` (callers answer 400). Also exports `hasDotSegment` and `MAX_MARKDOWN_BYTES`. Used by every fs read.
+- **`tree.ts`** — `walkFolder(root, { ignore, relBase })` recursively walks the directory up to `MAX_WALK_DEPTH` (64) with bounded subdirectory concurrency (16), skipping dotfiles, unreadable child directories (`EACCES`/`EPERM`), and any directory whose basename is in the supplied ignore set (defaults to `DEFAULT_IGNORED_DIRS`). Sorts dirs first then alpha. Marks markdown files with `isMarkdown: true`. `relBase` prefixes the emitted relPaths with the root id — it affects the wire path only, never which directory is read.
 - **`grep.ts`** — `grepFiles(roots, query, opts)` searches across roots. Reuses `walkFolder` + `flattenMdRelPaths` + the shared `compilePattern`. Walks each root unprefixed so paths stay resolvable against it, then prefixes on the way out. Caps per-file and global. Strips frontmatter before grepping. Every search, literal or regex, first takes one of two slots in `searchSlots` (a `Limiter` from `limiter.ts`, first come first served); later searches queue, and a queued search whose client goes away leaves the queue and returns empty. A search keeps up to 8 reads in flight ahead of the matcher while still reporting files in walk order, and skips files over 16 MB. Each read is charged by file size to `searchReadBudget`, one 32 MB byte budget shared by all searches, and holds it until the matcher is done with that body; files queue for it in walk order, so the file the matcher waits on is never stuck behind later ones. Front-matter-stripped bodies live in a `ContentCache` (32M characters, least-recently-used out first) keyed by path and checked against mtime and size; `createServer` also invalidates entries from watcher events. A cache hit costs no budget. The route aborts the search when the client closes the request. Both modes walk a body's lines by offset instead of splitting it, skip lines over 10,000 characters (`maxLineLen`), and count hits past the per-file cap without storing them. Literal matching runs on the main thread under a 1 s matching budget (`literalBudgetMs`) and hands the thread back every 10 ms of matching, even inside one file, checking for an abort each time; spending the budget ends the search with `truncated` set, not `timedOut`. Regex matching runs in `regex-worker.ts` (bundled to `bin/regex-worker.mjs`) through `regex-runner.ts`, which keeps one warm worker and terminates a worker at its search's time budget; the search slots bound how many workers run at once — see the security model.
 - **`ignore.ts`** — `DEFAULT_IGNORED_DIRS` (re-exported from `src/shared/ignore.ts` so the client tooltip can list the same names), `buildIgnoreSet(extra)` to union user-supplied basenames into the defaults, and `isPathIgnored(abs, root, set)` for the chokidar `ignored` callback. Plain basename equality — no globs, no regex.
 
@@ -307,18 +310,18 @@ const { signal, set } = createPersistedSignal('mdview-foo', defaultValue, { pars
 
 ### Wire pipeline (`src/client/lib/`)
 
-After `Content.tsx` injects the server-rendered HTML, it runs `runWires(root, ctx, defaultWires)` from `lib/wire-pipeline.ts`. The default wires are listed in `lib/wires.ts`; adding a new behavior is a single entry, in one place.
+After `Content.tsx` injects the server-rendered HTML, it runs `runWires(root, ctx, defaultWires)` from `lib/wire-pipeline.ts` with an `AbortSignal` tied to the render cycle. Synchronous interactive wires run first so links, copy buttons, permalinks, and sections work immediately while lazy Mermaid/KaTeX chunks load; the signal aborts pending async wires on file swap. The default wires are listed in `lib/wires.ts`; adding a new behavior is a single entry, in one place.
 
 | Wire | File | Effect |
 |------|------|--------|
-| `mermaid` | `mermaid-loader.ts` | Find `.mermaid-block` divs, dynamically `import('pele/lazy')` (loads only the diagram types in use), render each as SVG. Bundle never loaded if no diagrams exist. Colours come from CSS variables mapped from the palette tokens in `content.css`, so theme and palette switches need no re-render. Links are limited to `http`, `https` and `mailto`; images are off. |
-| `math` | `katex-loader.ts` | Find `.math-inline` / `.math-block` placeholders, dynamically `import('katex')` + lazy-inject KaTeX CSS, render each. |
 | `internal-links` | `link-router.ts` | Wires click handlers on `a[data-internal-link]` to navigate inside the SPA. |
 | `copy-buttons` | `copy-buttons.ts` | Appends a hover-revealed "Copy" button to each `<pre>`. |
 | `permalinks` | `permalinks.ts` | Appends a `#` anchor to each heading; click copies a deep-link URL. |
 | `external-links` | `external-links.ts` | Strips `javascript:`/`vbscript:`/`data:` `href` and `xlink:href` attributes, detects `http(s)` and protocol-relative `//` links across HTML `<a>`, SVG `<a>`, and `<area>`, enforces `target="_blank"` + `rel="noopener noreferrer"` (including on raw HTML `target` attributes, rewriting `_top`/`_parent` to `_blank`), and appends an inline SVG `↗` icon to HTML anchors. |
 | `image-lightbox` | `image-lightbox.ts` | Wires click handlers on `<img>` elements to open the lightbox. |
 | `collapsible-sections` | `collapsible-sections.ts` | Prepends a chevron `<button>` inside every top-level heading-with-id; clicking toggles `hidden` on its trailing siblings up to the next heading of equal-or-shallower level. State is module-scoped (`Set<string>` of collapsed ids), keyed on `currentPathSignal` so same-file live-reload preserves it and a file switch resets it. Exports `expandSectionContaining(id)` for anchor jumps and `expandAll` / `collapseAll` for the `e` / `⇧E` shortcuts. |
+| `mermaid` | `mermaid-loader.ts` | Find `.mermaid-block` divs, dynamically `import('pele/lazy')` (loads only the diagram types in use), render each as SVG. Bundle never loaded if no diagrams exist. Colours come from CSS variables mapped from the palette tokens in `content.css`, so theme and palette switches need no re-render. Links are limited to `http`, `https` and `mailto`; images are off. |
+| `math` | `katex-loader.ts` | Find `.math-inline` / `.math-block` placeholders, dynamically `import('katex')` + lazy-inject KaTeX CSS, render each. |
 
 Each helper is **idempotent** (uses a marker class, dataset flag, or `WeakMap` to skip already-processed nodes/roots) and takes the root element. Don't add behavior to JSX components if it requires walking the rendered HTML — keep that in lib helpers.
 
@@ -329,15 +332,15 @@ There are **two** "active heading" trackers, deliberately:
 - **`useScrollSpy` → `activeHeadingId`**: the *topmost heading you've passed*. Drives the outline highlight + breadcrumb. Threshold = `scroll-margin-top: 16px` (matched in CSS) + 6 px tolerance for sub-pixel rounding. `lockScrollSpy(id, ms)` pins this for ~600 ms during programmatic smooth-scrolls so the outline doesn't flicker mid-jump.
 - **`useScrollSpy` → `focusedHeadingId`**: the *most recent heading that has crossed the top-third reading band* (`FOCUS_BAND_FRACTION = 0.35` of the viewport height, measured from the top). Drives focus mode. Because the band sits below the viewport top, focus moves to a new section as soon as its title enters the reading zone, while `activeHeadingId` still waits for the heading to reach the top edge.
 
-Both are computed by the same `useScrollSpy` effect (`pickActiveId` and `pickFocusedId`) from one cached heading list. Both use **bounding-rect deltas** (not `offsetTop`, which is relative to the nearest positioned ancestor and was misaligned with `scrollContainer.scrollTop`), cache the heading list, refresh via `ResizeObserver` on the scroller, and use `MutationObserver` on the **scroller (subtree)** — observing `.markdown-content` directly missed initial mount because `<Content>` is gated on file-loaded. Each signal gets a no-op-write guard to avoid notifying downstream effects when the result didn't change.
+Both are computed by the same `useScrollSpy` effect (`pickActiveId` and `pickFocusedId`, using binary search over sorted heading positions) from one cached heading list. Both use **bounding-rect deltas** (not `offsetTop`, which is relative to the nearest positioned ancestor and was misaligned with `scrollContainer.scrollTop`), cache the heading list, refresh via `ResizeObserver` on the scroller, and use `MutationObserver` on the **scroller (subtree)** (coalesced once per animation frame) — observing `.markdown-content` directly missed initial mount because `<Content>` is gated on file-loaded. Each signal gets a no-op-write guard to avoid notifying downstream effects when the result didn't change.
 
 The MutationObserver also watches `attributes` with `attributeFilter: ['hidden']`. Collapsing a section toggles the `hidden` attribute on every trailing sibling of the folded heading — that collapses their layout boxes without producing any `childList` mutation, so without this extension the cached heading offsets would go stale after a fold and `pickActiveId` would highlight the wrong heading.
 
 ### Live reload (`useLiveReload.ts`)
 
-Subscribes to `/api/watch` via `useSSE`. On `change` for the current file, snapshots `mainRef.current.scrollTop`, re-fetches `/api/file`, restores scroll. On `add` / `unlink` / `config` / `workspace`, re-fetches `/api/tree` (which carries the project config too).
+Subscribes to `/api/watch` via `useSSE`. On `change` for the current file, snapshots `mainRef.current.scrollTop`, re-fetches `/api/file`, restores scroll. On `add` / `unlink` / `config` / `workspace`, re-fetches `/api/tree` (which carries the project config too). On SSE reconnect (`onReconnect` after the initial `open`), resyncs both `/api/tree` and the open file so edits made while disconnected are picked up.
 
-`useSSE` opens one `EventSource` for the hook's lifetime and calls the newest handler through a ref. The handler changes on every navigation, so subscribing on handler identity would close and reopen the stream each time, drop events in the gap and briefly report zero connected clients to the server's idle timer.
+`useSSE` opens one `EventSource` for the hook's lifetime and calls the newest handlers through refs. The handlers change on every navigation, so subscribing on handler identity would close and reopen the stream each time, drop events in the gap and briefly report zero connected clients to the server's idle timer.
 
 Tree refetches go through `coalesce` (`lib/coalesce.ts`): a 150 ms trailing debounce plus an in-flight guard. A branch switch emits hundreds of `add` / `unlink` events, and each tree response carries the whole listing. Events that arrive during a fetch schedule exactly one follow-up, so the tree is always refreshed after the last event.
 

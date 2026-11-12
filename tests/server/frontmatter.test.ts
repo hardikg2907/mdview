@@ -157,4 +157,15 @@ describe('parseFrontmatter line handling', () => {
     const crlf = parseFrontmatter(`---\r\na: 1\r\n---\r\n${'\r\n'.repeat(blank)}`);
     expect(crlf).toEqual({ data: { a: 1 }, body: '', bodyStartLine: 4 + blank });
   });
+
+  it('bails out before YAML parsing when two --- horizontal rules span > 2 MB of prose', () => {
+    const prose = 'Paragraph line without colons.\n'.repeat(80_000);
+    const raw = `---\n${prose}---\n# Tail\n`;
+    const start = performance.now();
+    const res = parseFrontmatter(raw);
+    expect(performance.now() - start).toBeLessThan(200);
+    expect(res.data).toBeNull();
+    expect(res.body).toBe(raw);
+    expect(res.bodyStartLine).toBe(0);
+  });
 });

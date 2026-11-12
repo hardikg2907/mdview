@@ -56,7 +56,7 @@ export function registerApiAsset(app: FastifyInstance, roots: readonly RootState
     let abs: string;
     let realRoot: string;
     try {
-      realRoot = await realpath(resolved.state.absPath);
+      realRoot = resolved.state.realRoot ?? (await realpath(resolved.state.absPath));
       abs = await resolveSafePath(resolved.state.absPath, resolved.rel, { realRoot });
     } catch (err) {
       if (err instanceof OutsideRootError) {
@@ -85,9 +85,15 @@ export function registerApiAsset(app: FastifyInstance, roots: readonly RootState
       // rendered documents. Source, config and keys under the root stay unreadable.
       return reply.code(404).send({ error: 'Asset type not allowed' });
     }
+    const etag = `W/"${st.size.toString(16)}-${Math.trunc(st.mtimeMs).toString(16)}"`;
     reply.header('content-type', mime);
-    reply.header('content-length', st.size);
+    reply.header('etag', etag);
     reply.header('cache-control', 'no-cache');
+    const inm = req.headers['if-none-match'];
+    if (typeof inm === 'string' && inm.split(',').some((t) => t.trim() === etag)) {
+      return reply.code(304).send('');
+    }
+    reply.header('content-length', st.size);
     return reply.send(createReadStream(abs));
   });
 }

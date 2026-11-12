@@ -1,6 +1,7 @@
 import { h, render } from 'preact';
 import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { clearFile, fileSignal, loadFile } from '../../src/client/hooks/useFile.js';
 import { useLiveReload } from '../../src/client/hooks/useLiveReload.js';
 
 class FakeEventSource {
@@ -49,6 +50,7 @@ describe('useLiveReload tree refresh', () => {
   afterEach(() => {
     render(null, host);
     host.remove();
+    clearFile();
     vi.unstubAllGlobals();
     vi.useRealTimers();
   });
@@ -76,5 +78,53 @@ describe('useLiveReload tree refresh', () => {
     await vi.advanceTimersByTimeAsync(1000);
 
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('aborts an older slow loadFile so a newer navigation wins', async () => {
+    let resolveSlow!: (v: unknown) => void;
+    const signals: AbortSignal[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string, init?: RequestInit) => {
+        if (init?.signal) signals.push(init.signal);
+        if (url.includes('slow.md')) {
+          return new Promise((r) => {
+            resolveSlow = r;
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            relPath: 'r/fast.md',
+            html: '<p>fast</p>',
+            outline: [],
+            frontmatter: null,
+            title: 'Fast',
+            lastModified: 2,
+          }),
+        });
+      }),
+    );
+
+    const pSlow = loadFile('r/slow.md');
+    const pFast = loadFile('r/fast.md');
+    expect(signals[0]?.aborted).toBe(true);
+
+    await pFast;
+    expect(fileSignal.value?.relPath).toBe('r/fast.md');
+
+    resolveSlow({
+      ok: true,
+      json: async () => ({
+        relPath: 'r/slow.md',
+        html: '<p>slow</p>',
+        outline: [],
+        frontmatter: null,
+        title: 'Slow',
+        lastModified: 1,
+      }),
+    });
+    await pSlow;
+    expect(fileSignal.value?.relPath).toBe('r/fast.md');
   });
 });

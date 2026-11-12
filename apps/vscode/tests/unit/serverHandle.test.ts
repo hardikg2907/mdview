@@ -267,6 +267,29 @@ describe('ServerHandle — idempotent dispose', () => {
     handle.dispose();
     expect(fake.kill).toHaveBeenCalledTimes(1);
   });
+
+  it('detaches stdout data listener once ready resolves', async () => {
+    const { handle, fake } = makeHandle();
+    const p = handle.start();
+    expect(fake.stdout.listenerCount('data')).toBe(1);
+    emitReady(fake, 5004);
+    await p;
+    expect(fake.stdout.listenerCount('data')).toBe(0);
+  });
+
+  it.skipIf(process.platform === 'win32')(
+    'escalates to SIGKILL after 2s when child ignores SIGTERM',
+    async () => {
+      const { handle, fake } = makeHandle();
+      const p = handle.start();
+      emitReady(fake, 5005);
+      await p;
+      handle.dispose();
+      expect(fake.kill).toHaveBeenCalledWith('SIGTERM');
+      vi.advanceTimersByTime(2_001);
+      expect(fake.kill).toHaveBeenCalledWith('SIGKILL');
+    },
+  );
 });
 
 describe('bundledCliEntry', () => {

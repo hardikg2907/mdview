@@ -23,14 +23,17 @@ export interface ServerHandleOpts {
 }
 
 const READY_TIMEOUT_MS = 10_000;
+const KILL_ESCALATION_MS = 2_000;
 const READY_BUFFER_CAP = 64 * 1024;
 
 export class ServerHandle {
   private child: cp.ChildProcess | undefined;
   private info: ServerInfo | undefined;
   private disposed = false;
+  private exited = false;
   private readyResolved = false;
   private readyTimer: ReturnType<typeof setTimeout> | undefined;
+  private killTimer: ReturnType<typeof setTimeout> | undefined;
 
   constructor(private readonly opts: ServerHandleOpts) {}
 
@@ -56,6 +59,7 @@ export class ServerHandle {
         if (this.readyResolved) return;
         this.readyResolved = true;
         this.readyTimer = undefined;
+        detachStdout();
         log('mdview did not signal ready within 10s; killing child');
         try { child.kill('SIGTERM'); } catch { /* ignore */ }
         reject(new Error('mdview ready signal timed out after 10s'));
@@ -68,15 +72,75 @@ export class ServerHandle {
         }
       };
 
+      const clearKillTimer = () => {
+        if (this.killTimer) {
+          clearTimeout(this.killTimer);
+          this.killTimer = undefined;
+        }
+      };
+
+      let buf = '';
+      const onStdoutData = (chunk: Buffer) => {
+        if (this.readyResolved) return;
+        buf += chunk.toString('utf8');
+        if (buf.length > READY_BUFFER_CAP) {
+          this.readyResolved = true;
+          clearReadyTimer();
+          detachStdout();
+          try { child.kill('SIGTERM'); } catch { /* ignore */ }
+          reject(new Error('mdview produced too much output before the ready signal'));
+          return;
+        }
+        const nl = buf.indexOf('\n');
+        if (nl < 0) return;
+        const line = buf.slice(0, nl).trim();
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(line);
+        } catch {
+          this.readyResolved = true;
+          clearReadyTimer();
+          detachStdout();
+          try { child.kill('SIGTERM'); } catch { /* ignore */ }
+          reject(new Error(`mdview ready line is not valid JSON: ${line}`));
+          return;
+        }
+        if (!isReadyMessage(parsed)) {
+          this.readyResolved = true;
+          clearReadyTimer();
+          detachStdout();
+          try { child.kill('SIGTERM'); } catch { /* ignore */ }
+          reject(new Error(`mdview emitted unexpected ready payload: ${line}`));
+          return;
+        }
+        this.info = { port: parsed.port, url: parsed.url, token };
+        this.readyResolved = true;
+        clearReadyTimer();
+        detachStdout();
+        resolve(this.info);
+      };
+
+      const detachStdout = () => {
+        buf = '';
+        child.stdout?.off('data', onStdoutData);
+        // Keep draining stdout after detaching our listener so a chatty child
+        // can never block on a full OS pipe buffer.
+        (child.stdout as { resume?: () => void } | null)?.resume?.();
+      };
+
       child.on('error', (err) => {
         if (this.readyResolved) return;
         this.readyResolved = true;
         clearReadyTimer();
+        detachStdout();
         log(`mdview spawn error: ${err.message}`);
         reject(err);
       });
 
       child.on('exit', (code, signal) => {
+        this.exited = true;
+        clearKillTimer();
+        detachStdout();
         if (!this.readyResolved) {
           this.readyResolved = true;
           clearReadyTimer();
@@ -97,42 +161,7 @@ export class ServerHandle {
         if (text) log(`[mdview cli] ${text}`);
       });
 
-      let buf = '';
-      child.stdout?.on('data', (chunk: Buffer) => {
-        if (this.readyResolved) return;
-        buf += chunk.toString('utf8');
-        if (buf.length > READY_BUFFER_CAP) {
-          this.readyResolved = true;
-          clearReadyTimer();
-          try { child.kill('SIGTERM'); } catch { /* ignore */ }
-          reject(new Error('mdview produced too much output before the ready signal'));
-          return;
-        }
-        const nl = buf.indexOf('\n');
-        if (nl < 0) return;
-        const line = buf.slice(0, nl).trim();
-        let parsed: unknown;
-        try {
-          parsed = JSON.parse(line);
-        } catch {
-          this.readyResolved = true;
-          clearReadyTimer();
-          try { child.kill('SIGTERM'); } catch { /* ignore */ }
-          reject(new Error(`mdview ready line is not valid JSON: ${line}`));
-          return;
-        }
-        if (!isReadyMessage(parsed)) {
-          this.readyResolved = true;
-          clearReadyTimer();
-          try { child.kill('SIGTERM'); } catch { /* ignore */ }
-          reject(new Error(`mdview emitted unexpected ready payload: ${line}`));
-          return;
-        }
-        this.info = { port: parsed.port, url: parsed.url, token };
-        this.readyResolved = true;
-        clearReadyTimer();
-        resolve(this.info);
-      });
+      child.stdout?.on('data', onStdoutData);
     });
   }
 
@@ -154,6 +183,15 @@ export class ServerHandle {
         c.kill();
       } else {
         c.kill('SIGTERM');
+        if (!this.exited && (c.exitCode === undefined || c.exitCode === null)) {
+          this.killTimer = setTimeout(() => {
+            this.killTimer = undefined;
+            if (!this.exited) {
+              try { c.kill('SIGKILL'); } catch { /* ignore */ }
+            }
+          }, KILL_ESCALATION_MS);
+          this.killTimer.unref?.();
+        }
       }
     } catch { /* ignore */ }
   }

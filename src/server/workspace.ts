@@ -1,6 +1,12 @@
 import path from 'node:path';
-import type { ProjectConfig, WorkspaceRoot } from '../shared/types.js';
+import type { ProjectConfig, TreeNode, WorkspaceRoot } from '../shared/types.js';
 import type { Watcher } from './watcher.js';
+
+/** Cached directory listing and markdown path index for a folder root. */
+export interface CachedRootTree {
+  prefixed: TreeNode[];
+  unprefixedMdPaths: string[];
+}
 
 /** What the caller asks for; the id and display name are derived from it. */
 export interface RootSpec {
@@ -22,9 +28,17 @@ export interface RootSpec {
 export interface RootState {
   root: WorkspaceRoot;
   absPath: string;
+  /** Cached realpath(absPath) when opened by createServer. */
+  realRoot?: string;
   ignoreSet: ReadonlySet<string>;
   config: ProjectConfig | null;
   watcher: Watcher;
+  /** True once a real chokidar watcher has finished its initial scan and will report changes. */
+  liveWatcher?: boolean;
+  /** Cached directory walk for /api/tree and /api/search; cleared on add/unlink/dir events. */
+  treeCache?: CachedRootTree;
+  /** Deduplicates concurrent walks of the same root. */
+  treeInflight?: Promise<CachedRootTree>;
   /**
    * Single-file roots only: the within-root paths the document's latest render
    * references through `/__asset/`, which are the only assets the root serves.

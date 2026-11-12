@@ -8,7 +8,24 @@ export const fileSignal = signal<RenderedFile | null>(null);
 export const fileError = signal<string | null>(null);
 export const fileLoading = signal(false);
 
+let activeRequestId = 0;
+let activeController: AbortController | null = null;
+
+export function clearFile(): void {
+  activeRequestId++;
+  activeController?.abort();
+  activeController = null;
+  fileSignal.value = null;
+  fileError.value = null;
+  fileLoading.value = false;
+}
+
 export async function loadFile(relPath: string | null): Promise<void> {
+  activeController?.abort();
+  const ctl = new AbortController();
+  activeController = ctl;
+  const reqId = ++activeRequestId;
+
   fileLoading.value = true;
   fileError.value = null;
   try {
@@ -18,17 +35,25 @@ export async function loadFile(relPath: string | null): Promise<void> {
     const q = new URLSearchParams({ palette: paletteSignal.value });
     if (relPath) q.set('path', relPath);
     const url = `/api/file?${q}`;
-    const res = await fetch(url, { headers: apiHeaders() });
+    const res = await fetch(url, { headers: apiHeaders(), signal: ctl.signal });
+    if (reqId !== activeRequestId) return;
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+      if (reqId !== activeRequestId) return;
       throw new Error(err.error ?? `HTTP ${res.status}`);
     }
-    fileSignal.value = (await res.json()) as RenderedFile;
+    const rendered = (await res.json()) as RenderedFile;
+    if (reqId !== activeRequestId) return;
+    fileSignal.value = rendered;
   } catch (err) {
+    if ((err as Error)?.name === 'AbortError' || reqId !== activeRequestId) return;
     fileError.value = (err as Error).message;
     fileSignal.value = null;
   } finally {
-    fileLoading.value = false;
+    if (reqId === activeRequestId) {
+      activeController = null;
+      fileLoading.value = false;
+    }
   }
 }
 

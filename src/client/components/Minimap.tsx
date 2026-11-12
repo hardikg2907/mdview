@@ -1,3 +1,4 @@
+import { useComputed } from '@preact/signals';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { OutlineNode } from '../../shared/types.js';
 import { mainScrollerSignal } from '../hooks/useScroller.js';
@@ -33,37 +34,70 @@ function computeBars(scroller: HTMLElement, outline: OutlineNode[]): Bar[] {
   return bars;
 }
 
+function MinimapBar({ bar }: { bar: Bar }) {
+  const isActive = useComputed(() => activeHeadingId.value === bar.id).value;
+  return (
+    <div
+      class={`minimap-bar minimap-level-${bar.level}${isActive ? ' is-active' : ''}`}
+      style={{ top: `${(bar.ratio * 100).toFixed(2)}%` }}
+      title={bar.id}
+    />
+  );
+}
+
 export function Minimap({ outline }: Props) {
   const scroller = mainScrollerSignal.value;
   const [bars, setBars] = useState<Bar[]>([]);
-  const [scrollFrac, setScrollFrac] = useState({ top: 0, height: 0 });
   const railRef = useRef<HTMLDivElement | null>(null);
+  const viewportRef = useRef<HTMLDivElement | null>(null);
 
-  // Recompute bars when outline or scroller changes (not on every scroll).
+  // Recompute bars when outline or scroller changes (coalesced via rAF).
   useEffect(() => {
     if (!scroller) return;
+    let raf = 0;
     const update = () => setBars(computeBars(scroller, outline));
-    update();
-    // ResizeObserver fires when content height changes (mermaid loads, etc.)
-    const ro = new ResizeObserver(update);
-    ro.observe(scroller);
-    return () => ro.disconnect();
-  }, [scroller, outline]);
-
-  // Track the visible viewport rectangle within the scroller.
-  useEffect(() => {
-    if (!scroller) return;
-    const onScroll = () => {
-      const total = scroller.scrollHeight || 1;
-      setScrollFrac({
-        top: scroller.scrollTop / total,
-        height: scroller.clientHeight / total,
+    const schedule = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        update();
       });
     };
-    onScroll();
+    update();
+    const ro = new ResizeObserver(schedule);
+    ro.observe(scroller);
+    return () => {
+      cancelAnimationFrame(raf);
+      ro.disconnect();
+    };
+  }, [scroller, outline]);
+
+  // Track the visible viewport rectangle directly on the DOM node inside rAF
+  // so scrolling never re-renders the bar list.
+  useEffect(() => {
+    if (!scroller) return;
+    let raf = 0;
+    const syncViewport = () => {
+      const vp = viewportRef.current;
+      if (!vp) return;
+      const total = scroller.scrollHeight || 1;
+      vp.style.top = `${((scroller.scrollTop / total) * 100).toFixed(2)}%`;
+      vp.style.height = `${((scroller.clientHeight / total) * 100).toFixed(2)}%`;
+    };
+    const onScroll = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        syncViewport();
+      });
+    };
+    syncViewport();
     scroller.addEventListener('scroll', onScroll, { passive: true });
-    return () => scroller.removeEventListener('scroll', onScroll);
-  }, [scroller]);
+    return () => {
+      cancelAnimationFrame(raf);
+      scroller.removeEventListener('scroll', onScroll);
+    };
+  }, [scroller, bars.length]);
 
   function jumpFromY(clientY: number) {
     const rail = railRef.current;
@@ -75,8 +109,6 @@ export function Minimap({ outline }: Props) {
 
   if (!scroller || bars.length === 0) return null;
 
-  const active = activeHeadingId.value;
-
   return (
     <div
       ref={railRef}
@@ -86,20 +118,9 @@ export function Minimap({ outline }: Props) {
       onClick={(ev) => jumpFromY(ev.clientY)}
     >
       {bars.map((b) => (
-        <div
-          key={b.id}
-          class={`minimap-bar minimap-level-${b.level}${active === b.id ? ' is-active' : ''}`}
-          style={{ top: `${(b.ratio * 100).toFixed(2)}%` }}
-          title={b.id}
-        />
+        <MinimapBar key={b.id} bar={b} />
       ))}
-      <div
-        class="minimap-viewport"
-        style={{
-          top: `${(scrollFrac.top * 100).toFixed(2)}%`,
-          height: `${(scrollFrac.height * 100).toFixed(2)}%`,
-        }}
-      />
+      <div ref={viewportRef} class="minimap-viewport" />
     </div>
   );
 }

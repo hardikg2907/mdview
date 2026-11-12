@@ -1,16 +1,23 @@
 import { timingSafeEqual } from 'node:crypto';
+import { realpath } from 'node:fs/promises';
 import path from 'node:path';
 import type { Readable } from 'node:stream';
 import chokidar, { type FSWatcher } from 'chokidar';
 import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify';
 import type { Palette, WatchEvent } from '../shared/types.js';
-import { CONFIG_FILENAME, loadEffectiveConfig, loadGlobalConfig, mergeConfigs } from './config.js';
+import {
+  CONFIG_FILENAME,
+  loadEffectiveConfig,
+  loadGlobalConfig,
+  mergeConfigs,
+  sanitizeForLog,
+} from './config.js';
 import { ContentCache } from './fs/grep.js';
 import { buildIgnoreSet } from './fs/ignore.js';
 import { closeRegexWorkers } from './fs/regex-runner.js';
 import { isAllowedHost } from './hosts.js';
 import { ASSET_SECURITY_HEADERS, registerApiAsset } from './routes/api-asset.js';
-import { registerApiFile } from './routes/api-file.js';
+import { RenderedFileCache, registerApiFile } from './routes/api-file.js';
 import { registerApiSearch } from './routes/api-search.js';
 import { registerApiTree } from './routes/api-tree.js';
 import { type HealthIdentity, registerHealth } from './routes/health.js';
@@ -216,45 +223,67 @@ export async function createServer(opts: ServerOptions): Promise<MdviewServer> {
   // always see the current set.
   const roots: RootState[] = [];
   const configWatchers = new Map<string, FSWatcher>();
+  const closedRoots = new WeakSet<RootState>();
+  let serverClosed = false;
   const hub = createEventHub();
 
   // mtime + size already guard against stale entries; the watcher closes the
   // gap of an edit inside the filesystem's mtime resolution, and frees memory.
   const searchCache = new ContentCache();
+  const fileCache = new RenderedFileCache();
   hub.on('event', (e) => {
     if (e.kind === 'workspace') {
       searchCache.clear();
+      fileCache.clear();
       return;
     }
     if (e.kind === 'config') return;
     const target = parseWorkspacePath(roots, e.relPath);
-    if (target) searchCache.invalidate(ContentCache.keyFor(target.state.absPath, target.rel));
+    if (target) {
+      const absCandidate = path.join(target.state.absPath, target.rel);
+      searchCache.invalidate(ContentCache.keyFor(target.state.absPath, target.rel));
+      fileCache.invalidate(e.relPath, absCandidate);
+    } else {
+      fileCache.invalidate(e.relPath);
+    }
   });
 
   async function openRoot(spec: RootSpec, id: string): Promise<RootState> {
     const root = describeRoot(spec, id);
     // A single-file root's absPath is its parent folder ($HOME, /tmp, ~/Downloads),
     // which belongs to more than that one file and may be shared or untrusted.
-    const config =
+    const [config, resolvedRealRoot] = await Promise.all([
       root.kind === 'file'
-        ? mergeConfigs(await loadGlobalConfig(), null)
-        : await loadEffectiveConfig(spec.absPath);
+        ? loadGlobalConfig().then((g) => mergeConfigs(g, null))
+        : loadEffectiveConfig(spec.absPath),
+      realpath(spec.absPath).catch(() => undefined),
+    ]);
     const ignoreSet = buildIgnoreSet(config?.ignore ?? []);
     const state: RootState = {
       root,
       absPath: spec.absPath,
+      ...(resolvedRealRoot ? { realRoot: resolvedRealRoot } : {}),
       ignoreSet,
       config,
       watcher: createWatcher(spec.absPath, {
         ignore: ignoreSet,
         prefix: id,
         ...(root.kind === 'file' ? { only: root.filePath } : {}),
+        onReady: () => {
+          if (!serverClosed && !closedRoots.has(state)) {
+            state.liveWatcher = true;
+          }
+        },
       }),
     };
     state.watcher.on('event', (e) => {
       // The document changed, so what it references may have too; the next
       // render or asset request recomputes it.
       if (root.kind === 'file') state.assetRefs = undefined;
+      if (e.kind === 'add' || e.kind === 'unlink') {
+        state.treeCache = undefined;
+        state.treeInflight = undefined;
+      }
       hub.emitSynthetic(e);
     });
 
@@ -270,13 +299,24 @@ export async function createServer(opts: ServerOptions): Promise<MdviewServer> {
         followSymlinks: false,
         awaitWriteFinish: { stabilityThreshold: 60, pollInterval: 30 },
       });
+      configWatcher.on('error', (err: unknown) => {
+        const e = err as NodeJS.ErrnoException;
+        console.error(`[mdview] config watcher error: ${sanitizeForLog(e?.message ?? err)}`);
+      });
       const reloadConfig = async (): Promise<void> => {
         // Note: only the scalar fields hot-reload. `ignore` is read once at
         // startup — changing it requires reopening the root, because the
         // FSWatcher was constructed against the original set.
-        state.config = await loadEffectiveConfig(spec.absPath);
-        const event: WatchEvent = { kind: 'config', relPath: `${id}/${CONFIG_FILENAME}` };
-        hub.emitSynthetic(event);
+        try {
+          const nextCfg = await loadEffectiveConfig(spec.absPath);
+          if (serverClosed || closedRoots.has(state)) return;
+          state.config = nextCfg;
+          const event: WatchEvent = { kind: 'config', relPath: `${id}/${CONFIG_FILENAME}` };
+          hub.emitSynthetic(event);
+        } catch (err) {
+          const e = err as NodeJS.ErrnoException;
+          console.error(`[mdview] config reload error: ${sanitizeForLog(e?.message ?? err)}`);
+        }
       };
       configWatcher.on('add', () => void reloadConfig());
       configWatcher.on('change', () => void reloadConfig());
@@ -288,12 +328,17 @@ export async function createServer(opts: ServerOptions): Promise<MdviewServer> {
   }
 
   async function closeRoot(state: RootState): Promise<void> {
+    closedRoots.add(state);
+    state.liveWatcher = false;
+    state.treeCache = undefined;
+    state.treeInflight = undefined;
     const cw = configWatchers.get(state.root.id);
     configWatchers.delete(state.root.id);
     await Promise.all([state.watcher.close(), cw?.close()]);
   }
 
-  async function setRoots(specs: RootSpec[]): Promise<void> {
+  async function applyRoots(specs: RootSpec[]): Promise<void> {
+    if (serverClosed) return;
     const taken = new Set<string>();
     const wanted = specs.map((spec) => {
       const id = resolveRootId(spec, taken);
@@ -316,10 +361,24 @@ export async function createServer(opts: ServerOptions): Promise<MdviewServer> {
       next.push(existing ?? (await openRoot(spec, id)));
     }
 
+    if (serverClosed) {
+      await Promise.all(next.filter((r) => !keep.has(r.root.id)).map(closeRoot));
+      return;
+    }
+
     roots.length = 0;
     roots.push(...next);
     await Promise.all(dropped.map(closeRoot));
     hub.emitSynthetic({ kind: 'workspace' });
+  }
+
+  // Serialize concurrent setRoots calls so rapid workspace.json updates cannot
+  // interleave across openRoot() awaits or leak duplicate watchers.
+  let rootsChain: Promise<void> = Promise.resolve();
+  function setRoots(specs: RootSpec[]): Promise<void> {
+    const op = rootsChain.then(() => applyRoots(specs));
+    rootsChain = op.catch(() => undefined);
+    return op;
   }
 
   {
@@ -331,7 +390,7 @@ export async function createServer(opts: ServerOptions): Promise<MdviewServer> {
     }
   }
 
-  registerApiFile(app, roots);
+  registerApiFile(app, roots, { cache: fileCache });
   registerApiTree(app, roots, opts.paletteOverride);
   registerApiAsset(app, roots);
   registerApiSearch(app, roots, { cache: searchCache });
@@ -386,10 +445,9 @@ export async function createServer(opts: ServerOptions): Promise<MdviewServer> {
   });
 
   app.addHook('onClose', async () => {
-    await Promise.all([
-      ...roots.map((r) => r.watcher.close()),
-      ...[...configWatchers.values()].map((w) => w.close()),
-    ]);
+    serverClosed = true;
+    await rootsChain;
+    await Promise.all(roots.map(closeRoot));
     await hub.close();
     await closeRegexWorkers();
   });

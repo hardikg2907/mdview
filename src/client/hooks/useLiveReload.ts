@@ -42,14 +42,20 @@ export function useLiveReload({ currentPath, scrollerRef }: Args): void {
   const refreshTree = useMemo(() => coalesce(fetchTree, TREE_REFETCH_DELAY_MS), []);
   useEffect(() => refreshTree.cancel, [refreshTree]);
 
+  const reloadCurrentPreservingScroll = () => {
+    const target = currentPath ?? fileSignal.value?.relPath ?? null;
+    if (!target) return;
+    const top = scrollerRef.current?.scrollTop ?? 0;
+    void loadFile(target).then(() => {
+      requestAnimationFrame(() => {
+        if (scrollerRef.current) scrollerRef.current.scrollTop = top;
+      });
+    });
+  };
+
   const onWatch = (e: WatchEvent) => {
     if (shouldReloadFile(e, fileSignal.value, currentPath)) {
-      const top = scrollerRef.current?.scrollTop ?? 0;
-      void loadFile(currentPath).then(() => {
-        requestAnimationFrame(() => {
-          if (scrollerRef.current) scrollerRef.current.scrollTop = top;
-        });
-      });
+      reloadCurrentPreservingScroll();
       return;
     }
     // A workspace event means a root was opened or closed, which only the tree
@@ -58,5 +64,11 @@ export function useLiveReload({ currentPath, scrollerRef }: Args): void {
       refreshTree.request();
     }
   };
-  useSSE(onWatch);
+
+  const onReconnect = () => {
+    refreshTree.request();
+    reloadCurrentPreservingScroll();
+  };
+
+  useSSE(onWatch, onReconnect);
 }

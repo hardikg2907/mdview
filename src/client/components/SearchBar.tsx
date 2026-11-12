@@ -73,15 +73,16 @@ export function SearchBar({ scroller, fileTrigger: _fileTrigger, onOpenFile }: P
           hits.value = found;
           activeIdx.value = 0;
           if (found.length > 0) {
-            highlightHits(found, 0);
-            domCount.value = el.querySelectorAll('mark.search-hit').length;
-            requestAnimationFrame(() => {
-              const active = el.querySelector<HTMLElement>('mark.search-hit.is-active');
-              if (active) {
-                expandSectionContainingElement(active);
-                active.scrollIntoView({ behavior: 'smooth', block: 'center' });
-              }
-            });
+            const marks = highlightHits(found, 0);
+            domCount.value = marks.length;
+            const firstActive = marks[0];
+            if (firstActive) {
+              requestAnimationFrame(() => {
+                if (!firstActive.isConnected) return;
+                expandSectionContainingElement(firstActive);
+                firstActive.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              });
+            }
           } else {
             domCount.value = 0;
           }

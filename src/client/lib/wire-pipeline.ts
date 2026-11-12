@@ -1,5 +1,6 @@
 export interface WireContext {
   onInternalNavigate: (relPath: string, hash: string) => void;
+  signal?: AbortSignal;
 }
 
 export interface Wire {
@@ -13,9 +14,11 @@ export async function runWires(
   wires: readonly Wire[],
 ): Promise<void> {
   for (const w of wires) {
+    if (ctx.signal?.aborted) return;
     try {
       await w.run(root, ctx);
     } catch (err) {
+      if (ctx.signal?.aborted) return;
       console.error(`[mdview] wire "${w.name}" failed:`, err);
     }
   }

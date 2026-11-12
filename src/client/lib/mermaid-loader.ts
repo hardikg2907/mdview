@@ -2,20 +2,30 @@ let promise: Promise<typeof import('pele/lazy')> | null = null;
 let counter = 0;
 
 function load() {
-  if (!promise) promise = import('pele/lazy');
+  if (!promise) {
+    promise = import('pele/lazy').catch((err) => {
+      promise = null;
+      throw err;
+    });
+  }
   return promise;
 }
 
-export async function renderMermaidIn(root: HTMLElement): Promise<void> {
+export async function renderMermaidIn(root: HTMLElement, signal?: AbortSignal): Promise<void> {
   const blocks = root.querySelectorAll<HTMLDivElement>('.mermaid-block');
-  if (blocks.length === 0) return;
+  if (blocks.length === 0 || signal?.aborted) return;
 
   const pele = await load();
-  await Promise.all(Array.from(blocks).map((b) => renderBlock(pele, b)));
+  if (signal?.aborted) return;
+  await Promise.all(Array.from(blocks).map((b) => renderBlock(pele, b, signal)));
 }
 
-async function renderBlock(pele: typeof import('pele/lazy'), block: HTMLDivElement): Promise<void> {
-  if (block.dataset.rendered) return;
+async function renderBlock(
+  pele: typeof import('pele/lazy'),
+  block: HTMLDivElement,
+  signal?: AbortSignal,
+): Promise<void> {
+  if (block.dataset.rendered || signal?.aborted) return;
   const style = getComputedStyle(block);
   const fontFamily = style.getPropertyValue('--pele-font').trim() || style.fontFamily;
   const fontFamilyMono = style.getPropertyValue('--pele-font-mono').trim() || undefined;
@@ -33,9 +43,11 @@ async function renderBlock(pele: typeof import('pele/lazy'), block: HTMLDivEleme
       fontFamilyMono,
       maxWidth: contentWidth > 0 ? contentWidth : undefined,
     });
+    if (signal?.aborted) return;
     block.innerHTML = svg;
     block.dataset.rendered = 'true';
   } catch (err) {
+    if (signal?.aborted) return;
     writeError(block, err instanceof Error ? err.message : String(err));
   }
 }

@@ -22,20 +22,24 @@ export interface RankedFile extends FileEntry {
   matchRanges: Array<[number, number]>;
 }
 
-/**
- * Rank a file against a query.
- * - Exact substring match in basename: highest tier
- * - Exact substring match in full path: middle tier
- * - Fuzzy subsequence match: lowest tier
- * - Returns null if no match
- */
-export function rankFile(file: FileEntry, query: string): RankedFile | null {
-  if (!query) {
-    return { ...file, score: 0, matchRanges: [] };
+interface LowerPair {
+  path: string;
+  name: string;
+}
+
+const lowerCache = new WeakMap<FileEntry, LowerPair>();
+
+function getLower(file: FileEntry): LowerPair {
+  let cached = lowerCache.get(file);
+  if (!cached) {
+    cached = { path: file.relPath.toLowerCase(), name: file.name.toLowerCase() };
+    lowerCache.set(file, cached);
   }
-  const q = query.toLowerCase();
-  const path = file.relPath.toLowerCase();
-  const name = file.name.toLowerCase();
+  return cached;
+}
+
+function rankFileLower(file: FileEntry, q: string): RankedFile | null {
+  const { path, name } = getLower(file);
 
   // Exact substring match in basename (best)
   const nameIdx = name.indexOf(q);
@@ -62,27 +66,44 @@ export function rankFile(file: FileEntry, query: string): RankedFile | null {
   const ranges: Array<[number, number]> = [];
   let qi = 0;
   let runStart = -1;
+  let lastMatchEnd = -1;
   for (let i = 0; i < path.length && qi < q.length; i++) {
     if (path[i] === q[qi]) {
       if (runStart === -1) runStart = i;
+      lastMatchEnd = i + 1;
       qi++;
     } else if (runStart !== -1) {
-      ranges.push([runStart, runStart + 1]);
+      ranges.push([runStart, i]);
       runStart = -1;
     }
   }
-  if (runStart !== -1) ranges.push([runStart, qi - (q.length - 1) + runStart]);
-  if (qi === q.length) {
-    return { ...file, score: 100 - file.relPath.length, matchRanges: ranges };
-  }
+  if (qi !== q.length) return null;
+  if (runStart !== -1) ranges.push([runStart, lastMatchEnd]);
+  return { ...file, score: 100 - file.relPath.length, matchRanges: ranges };
+}
 
-  return null;
+/**
+ * Rank a file against a query.
+ * - Exact substring match in basename: highest tier
+ * - Exact substring match in full path: middle tier
+ * - Fuzzy subsequence match: lowest tier
+ * - Returns null if no match
+ */
+export function rankFile(file: FileEntry, query: string): RankedFile | null {
+  if (!query) {
+    return { ...file, score: 0, matchRanges: [] };
+  }
+  return rankFileLower(file, query.toLowerCase());
 }
 
 export function rankAll(files: FileEntry[], query: string, max = 50): RankedFile[] {
+  if (!query) {
+    return files.slice(0, max).map((f) => ({ ...f, score: 0, matchRanges: [] }));
+  }
+  const q = query.toLowerCase();
   const ranked: RankedFile[] = [];
   for (const f of files) {
-    const r = rankFile(f, query);
+    const r = rankFileLower(f, q);
     if (r) ranked.push(r);
   }
   ranked.sort((a, b) => b.score - a.score);

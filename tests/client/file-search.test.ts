@@ -96,11 +96,12 @@ describe('rankFile — fuzzy tier', () => {
 
   it('records ranges for the matched characters', () => {
     const r = rankFile(f('abcde'), 'ace')!;
-    expect(r.matchRanges.length).toBeGreaterThan(0);
-    // Each range must point at a character that is part of the query.
-    for (const [start] of r.matchRanges) {
-      expect('ace').toContain('abcde'[start]);
-    }
+    expect(r.matchRanges).toEqual([[0, 1], [2, 3], [4, 5]]);
+  });
+
+  it('spans full contiguous runs in fuzzy matchRanges', () => {
+    const r = rankFile(f('ab_cd'), 'abcd')!;
+    expect(r.matchRanges).toEqual([[0, 2], [3, 5]]);
   });
 });
 

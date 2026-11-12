@@ -17,6 +17,9 @@ export interface FrontmatterResult {
 // node budget, so the characters they would serialize to are counted too.
 const MAX_NODES = 10_000;
 const MAX_STRING_CHARS = 1_000_000;
+// A horizontal rule on line 1 followed by megabytes of prose and a second `---`
+// near EOF would otherwise slice and feed the entire prose body into js-yaml.
+const MAX_RAW_YAML_CHARS = 2 * MAX_STRING_CHARS;
 
 // YAML 1.2 dropped merge keys, but front matter written for YAML 1.1 tools
 // (`<<: *defaults`) relies on them. The budgets above still bound what a merge
@@ -71,9 +74,10 @@ function locateBlock(
       closingStart = next;
       break;
     }
+    if (next - yamlStart > MAX_RAW_YAML_CHARS) return null;
     next = nextLineStart(raw, next);
   }
-  if (closingIdx < 0) return null;
+  if (closingIdx < 0 || closingStart - yamlStart > MAX_RAW_YAML_CHARS) return null;
 
   // Blank lines (LF or CRLF) after the closing fence are dropped, and the body
   // is a verbatim slice of `raw` from the first line that is not blank. A regex
@@ -108,7 +112,11 @@ function nextLineStart(raw: string, start: number): number {
 }
 
 function isFenceLine(raw: string, start: number): boolean {
-  return lineEnd(raw, start) - start === 3 && raw.startsWith('---', start);
+  if (!raw.startsWith('---', start)) return false;
+  const end = start + 3;
+  if (end === raw.length) return true;
+  const c = raw.charCodeAt(end);
+  return c === 10 || (c === 13 && raw.charCodeAt(end + 1) === 10);
 }
 
 function isBlank(yaml: string): boolean {

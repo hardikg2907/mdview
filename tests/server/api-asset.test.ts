@@ -216,4 +216,27 @@ describe('GET /__asset/* response headers', () => {
     expect(csp).toContain("object-src 'none'");
     expect(csp).not.toContain('sandbox');
   });
+
+  it('answers 304 Not Modified on matching If-None-Match while keeping sandbox headers', async () => {
+    const first = await app.inject({ url: '/__asset/w/evil.svg', headers: H });
+    expect(first.statusCode).toBe(200);
+    const etag = first.headers['etag'];
+    expect(typeof etag).toBe('string');
+    expect(String(etag).startsWith('W/"')).toBe(true);
+
+    const notMod = await app.inject({
+      url: '/__asset/w/evil.svg',
+      headers: { ...H, 'if-none-match': String(etag) },
+    });
+    expect(notMod.statusCode).toBe(304);
+    expect(notMod.body).toBe('');
+    expect(notMod.headers['etag']).toBe(etag);
+    expectAssetHeaders(notMod, '304 svg');
+
+    const mismatch = await app.inject({
+      url: '/__asset/w/evil.svg',
+      headers: { ...H, 'if-none-match': 'W/"stale"' },
+    });
+    expect(mismatch.statusCode).toBe(200);
+  });
 });

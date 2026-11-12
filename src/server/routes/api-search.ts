@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { ContentCache, type GrepRoot, grepFiles } from '../fs/grep.js';
 import type { RootState } from '../workspace.js';
+import { loadRootTree } from './api-tree.js';
 
 const MAX_QUERY_LEN = 200;
 
@@ -41,9 +42,21 @@ export function registerApiSearch(
     }
     // Single-file roots contribute nothing: folder search over a root that is
     // one file duplicates the in-document search the client already runs.
-    const searchable: GrepRoot[] = roots
-      .filter((r) => r.root.kind === 'dir')
-      .map((r) => ({ absPath: r.absPath, id: r.root.id, ignore: r.ignoreSet }));
+    const dirRoots = roots.filter((r) => r.root.kind === 'dir');
+    const searchable: GrepRoot[] = await Promise.all(
+      dirRoots.map(async (r) => {
+        const mdRelPaths = r.liveWatcher
+          ? (await loadRootTree(r).catch(() => undefined))?.unprefixedMdPaths
+          : undefined;
+        return {
+          absPath: r.absPath,
+          id: r.root.id,
+          ignore: r.ignoreSet,
+          ...(r.realRoot ? { realRoot: r.realRoot } : {}),
+          ...(mdRelPaths ? { mdRelPaths } : {}),
+        };
+      }),
+    );
 
     // The client aborts a search as soon as the query changes. The response
     // closing before it was written is how that shows up here, and the work

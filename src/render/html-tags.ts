@@ -112,11 +112,38 @@ function readAttrs(html: string, from: number, attrs: HtmlAttr[] | null): number
  * are stepped over, so a `<a` inside them is not mistaken for a tag. From a tag
  * or comment that never closes to the end, the input passes through untouched.
  */
+function asciiLower(c: number): number {
+  return c >= 65 && c <= 90 ? c + 32 : c;
+}
+
+function matchWantedName(
+  html: string,
+  start: number,
+  end: number,
+  nameList: readonly string[],
+): string | null {
+  const len = end - start;
+  for (let i = 0; i < nameList.length; i++) {
+    const candidate = nameList[i]!;
+    if (candidate.length !== len) continue;
+    let ok = true;
+    for (let k = 0; k < len; k++) {
+      if (asciiLower(html.charCodeAt(start + k)) !== candidate.charCodeAt(k)) {
+        ok = false;
+        break;
+      }
+    }
+    if (ok) return candidate;
+  }
+  return null;
+}
+
 export function rewriteTags(
   html: string,
   names: ReadonlySet<string>,
   rewrite: (tag: HtmlTag) => string | null,
 ): string {
+  const nameList = Array.from(names);
   const out: string[] = [];
   let copied = 0;
   let i = 0;
@@ -128,13 +155,12 @@ export function rewriteTags(
 
     if (isAsciiAlpha(c1)) {
       const ne = nameEnd(html, lt + 1);
-      const name = html.slice(lt + 1, ne).toLowerCase();
-      const wanted = names.has(name);
-      const attrs: HtmlAttr[] | null = wanted ? [] : null;
+      const matched = matchWantedName(html, lt + 1, ne, nameList);
+      const attrs: HtmlAttr[] | null = matched !== null ? [] : null;
       const end = readAttrs(html, ne, attrs);
       if (end < 0) break;
-      if (wanted) {
-        const replaced = rewrite({ name, start: lt, end, attrs: attrs as HtmlAttr[] });
+      if (matched !== null) {
+        const replaced = rewrite({ name: matched, start: lt, end, attrs: attrs as HtmlAttr[] });
         if (replaced !== null) {
           out.push(html.slice(copied, lt), replaced);
           copied = end;

@@ -19,11 +19,15 @@ export const treeSignal = signal<TreeResponse | null>(null);
 export const configSignal = signal<ProjectConfig | null>(null);
 
 async function fetchTree(): Promise<void> {
-  const res = await fetch('/api/tree', { headers: apiHeaders() });
-  if (!res.ok) return;
-  const data = (await res.json()) as TreeResponse;
-  treeSignal.value = data;
-  configSignal.value = data.config ?? null;
+  try {
+    const res = await fetch('/api/tree', { headers: apiHeaders() });
+    if (!res.ok) return;
+    const data = (await res.json()) as TreeResponse;
+    treeSignal.value = data;
+    configSignal.value = data.config ?? null;
+  } catch {
+    // Transient disconnect (e.g. daemon restart); SSE reconnect will resync.
+  }
 }
 
 export function useTree() {

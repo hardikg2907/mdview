@@ -1,3 +1,4 @@
+import { useComputed } from '@preact/signals';
 import { useMemo, useState } from 'preact/hooks';
 import type { HeadingLevel, OutlineNode } from '../../shared/types.js';
 import {
@@ -108,7 +109,7 @@ interface ItemProps {
 function OutlineItem({ node, onJump, depth }: ItemProps) {
   const [collapsed, setCollapsed] = useState(false);
   const hasChildren = node.children.length > 0;
-  const isActive = activeHeadingId.value === node.id;
+  const isActive = useComputed(() => activeHeadingId.value === node.id).value;
   const cappedDepth = Math.min(depth, 5);
 
   return (

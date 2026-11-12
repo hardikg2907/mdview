@@ -34,6 +34,7 @@ function sleep(ms: number): Promise<void> {
 export async function probeHealth(port: number): Promise<Health | null> {
   try {
     const res = await fetch(`http://127.0.0.1:${port}/api/health`, {
+      headers: { connection: 'close' },
       signal: AbortSignal.timeout(HEALTH_TIMEOUT_MS),
     });
     if (!res.ok) return null;
@@ -100,6 +101,11 @@ export interface EnsureDaemonOptions {
   startTimeoutMs?: number;
 }
 
+export interface EnsuredDaemon extends DaemonState {
+  /** Roots reported by the probe that confirmed the daemon is live. */
+  roots: string[];
+}
+
 type LiveDaemon = NonNullable<Awaited<ReturnType<typeof findLiveDaemon>>>;
 
 /**
@@ -112,6 +118,10 @@ function runsOtherVersion(live: LiveDaemon, version: string): boolean {
 
 function sameDaemon(a: LiveDaemon, b: LiveDaemon): boolean {
   return a.state.pid === b.state.pid && a.state.startedAt === b.state.startedAt;
+}
+
+function toEnsured(live: LiveDaemon): EnsuredDaemon {
+  return { ...live.state, roots: live.health.roots };
 }
 
 /**
@@ -130,13 +140,13 @@ function sameDaemon(a: LiveDaemon, b: LiveDaemon): boolean {
 export async function ensureDaemon(
   cliEntry: string,
   options: EnsureDaemonOptions = {},
-): Promise<DaemonState> {
+): Promise<EnsuredDaemon> {
   const version = options.version ?? readVersion();
   const timeoutMs = options.startTimeoutMs ?? START_TIMEOUT_MS;
   const spawnFn = options.spawnFn ?? spawnDaemon;
 
   const existing = await findLiveDaemon();
-  if (existing && !runsOtherVersion(existing, version)) return existing.state;
+  if (existing && !runsOtherVersion(existing, version)) return toEnsured(existing);
 
   if (!tryTakeSpawnLock()) {
     // Someone else is mid-spawn or mid-restart. Wait for the daemon they leave
@@ -148,10 +158,10 @@ export async function ensureDaemon(
       if (!existing || !sameDaemon(live, existing)) return live;
       return runsOtherVersion(live, version) ? null : live;
     }, timeoutMs);
-    if (found) return found.state;
+    if (found) return toEnsured(found);
     // The holder died mid-restart. The old daemon still serves, which beats failing.
     const fallback = await findLiveDaemon();
-    if (fallback) return fallback.state;
+    if (fallback) return toEnsured(fallback);
     throw new Error('Timed out waiting for the mdview background server to start.');
   }
 
@@ -159,7 +169,7 @@ export async function ensureDaemon(
     // Another CLI may have finished its own spawn or restart between our first
     // look and taking the lock.
     const current = await findLiveDaemon();
-    if (current && !runsOtherVersion(current, version)) return current.state;
+    if (current && !runsOtherVersion(current, version)) return toEnsured(current);
 
     if (current) await stopDaemon();
     // A state file left behind by a killed daemon would otherwise be mistaken
@@ -173,7 +183,7 @@ export async function ensureDaemon(
       );
     }
     if (current) options.onRestart?.(current.health.version ?? 'unknown', version);
-    return found.state;
+    return toEnsured(found);
   } finally {
     releaseSpawnLock();
   }
