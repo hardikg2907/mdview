@@ -54,6 +54,8 @@ npm audit --omit=dev  # 0 vulnerabilities in shipped deps (release blocker, see 
 
 `npm test` first runs `npm run build` once, through `tests/global-setup.ts`, before any test file starts. Several test files spawn `bin/mdview.mjs`, and one shared build keeps a file from spawning the bin while another rewrites its chunks. The tests that start the CLI take a good part of the run, so expect `npm test` to take tens of seconds, not a few.
 
+`vitest.config.ts` splits the suite into three projects. `server` and `client` run in parallel, one worker per core but one. `server-heavy` runs after both finish, two files at a time. It holds the files that start the CLI, open real sockets or watchers, load Shiki, or check CPU work against the wall clock (search budgets, linear-time checks). On a machine with efficiency cores and other load, a full set of workers puts those files on cores several times slower than their deadlines assume: a 15 MB literal search takes about 0.3 s on a performance core and 1.8 s on an efficiency core. A new test file that does any of these things belongs in the `HEAVY` list. A test that counts every hit of a large search passes its own `literalBudgetMs`, so the count does not depend on core speed; the budget has its own tests.
+
 `npm run lint:fix` will auto-apply the safe fixes Biome knows about (import order, dead code, optional chains, etc.). Lint config lives in `biome.json`; a11y rules are disabled because the custom keyboard-driven widgets (file tree, command palette, outline) intentionally diverge from generic ARIA patterns.
 
 ### Git hooks (husky)
