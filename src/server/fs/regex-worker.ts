@@ -33,9 +33,13 @@ export type MatchResponse =
 
 let compiled: { key: string; re: RegExp } | null = null;
 
+// matchFile's loop ends only because exec() advances lastIndex, which it does
+// with `g` alone: without `g` it returns the first match forever, and `y`
+// makes it stop at the first gap. So the worker sets the flags itself.
 function regexFor(source: string, flags: string): RegExp {
-  const key = `${flags}/${source}`;
-  if (compiled?.key !== key) compiled = { key, re: new RegExp(source, flags) };
+  const safeFlags = `g${flags.replace(/[gy]/g, '')}`;
+  const key = `${safeFlags}/${source}`;
+  if (compiled?.key !== key) compiled = { key, re: new RegExp(source, safeFlags) };
   return compiled.re;
 }
 
