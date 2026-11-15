@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Live reload kept jumping to the top of the document.** Saving the open file now keeps the scroll position; only opening a different document resets it to the top (or to its `#hash` anchor).
+
 ## [0.11.1] — 2026-11-12
 
 ### Security

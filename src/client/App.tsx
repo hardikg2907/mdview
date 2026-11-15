@@ -13,6 +13,7 @@ import { Resizer } from './components/Resizer.js';
 import { SearchBar } from './components/SearchBar.js';
 import { ShortcutsPanel } from './components/ShortcutsPanel.js';
 import { useAltWheelScroll } from './hooks/useAltWheelScroll.js';
+import { useDocumentScroll } from './hooks/useDocumentScroll.js';
 import { clearFile, fileError, fileLoading, fileSignal, loadFile } from './hooks/useFile.js';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts.js';
 import { useLiveReload } from './hooks/useLiveReload.js';
@@ -107,20 +108,7 @@ export function App() {
     document.title = name ? `${name} | mdview` : 'mdview';
   }, [fileSignal.value, currentPath]);
 
-  // After file loads, restore hash anchor (if any)
-  useEffect(() => {
-    if (!fileSignal.value || !mainRef.current) return;
-    const hash = window.location.hash.slice(1);
-    if (hash) {
-      requestAnimationFrame(() => {
-        expandSectionContaining(hash);
-        const el = document.getElementById(hash);
-        el?.scrollIntoView({ behavior: 'auto', block: 'start' });
-      });
-    } else {
-      mainRef.current.scrollTop = 0;
-    }
-  }, [fileSignal.value]);
+  useDocumentScroll(mainRef);
 
   useScrollSpy(mainRef.current);
   useEffect(() => { setMainScroller(mainRef.current); }, [mainRef.current]);

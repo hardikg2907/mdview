@@ -256,7 +256,7 @@ A thin `chokidar` wrapper. Accepts an `ignore` set wired through to chokidar's `
 ### Entry
 
 - **`src/client/main.tsx`** — mounts `<App />` to `#app`, imports JetBrains Mono CSS (400 + 600), then CSS files in order: reset → theme (CSS vars + palettes) → layout (3-pane grid) → content (markdown typography) → components (everything else).
-- **`src/client/App.tsx`** — top-level orchestration. Now slim; most logic delegated to hooks (`usePathRouting`, `useLiveReload`, `useScrollSpy`, `useTheme`, `usePalette`).
+- **`src/client/App.tsx`** — top-level orchestration. Now slim; most logic delegated to hooks (`usePathRouting`, `useLiveReload`, `useScrollSpy`, `useDocumentScroll`, `useTheme`, `usePalette`).
 
 ### State model — signals over useState
 
