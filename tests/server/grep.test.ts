@@ -139,7 +139,9 @@ describe('grepFiles — literal search limits', () => {
   });
 
   it('counts every hit on lines under the cap but keeps only the per-file cap', async () => {
-    const out = await grepFiles([{ absPath: manyDir, id: 'w' }], 'a');
+    // The default 1 s budget is a rate, not a count: an efficiency core matches
+    // about 7x slower than a performance core. The budget has its own tests.
+    const out = await grepFiles([{ absPath: manyDir, id: 'w' }], 'a', { literalBudgetMs: 60_000 });
     const [file] = out.results;
     expect(file?.total).toBe(9_999 * 300);
     expect(file?.hits).toHaveLength(20);
@@ -262,7 +264,9 @@ describe('grepFiles — every search shares two slots and one read budget', () =
     };
     const tick = setInterval(lag, 5);
     try {
-      const out = await grepFiles([{ absPath: bigDir, id: 'w' }], 'a');
+      // Match the whole file whatever core this lands on: 15 million hits take
+      // about 0.3 s on a performance core and 1.8 s on an efficiency core.
+      const out = await grepFiles([{ absPath: bigDir, id: 'w' }], 'a', { literalBudgetMs: 60_000 });
       expect(out.results[0]?.total).toBe(9_999 * 1_500);
     } finally {
       clearInterval(tick);
