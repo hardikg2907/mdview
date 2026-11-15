@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+- **The folder-search regex worker no longer depends on its caller for the `g` flag.** It now always matches with `g` and never `y`, so a request without `g` can no longer spin in its match loop until the 3 s budget ends it. Searches return the same results as before.
+
 ## [0.11.1] — 2026-11-12
 
 ### Security
