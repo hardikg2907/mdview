@@ -1,16 +1,57 @@
+<div align="center">
+
+<img src="https://raw.githubusercontent.com/hardikg2907/mdview/main/docs/assets/logo.svg" alt="" width="72" height="72">
+
 # mdview
 
-[![Version](https://img.shields.io/github/v/tag/hardikg2907/mdview?label=version)](https://github.com/hardikg2907/mdview/releases)
+**Read long markdown docs in your browser, with live reload.**<br>
+One command. Local and offline. macOS, Linux and Windows.
+
+[![npm](https://img.shields.io/npm/v/@hardikg/mdview?color=c2410c&label=npm)](https://www.npmjs.com/package/@hardikg/mdview)
+[![Downloads](https://img.shields.io/npm/dm/@hardikg/mdview?color=c2410c)](https://www.npmjs.com/package/@hardikg/mdview)
+[![Socket](https://badge.socket.dev/npm/package/@hardikg/mdview)](https://socket.dev/npm/package/@hardikg/mdview)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D22.12-brightgreen)](https://nodejs.org)
 
-A local markdown viewer for reading long, hierarchical docs without losing focus. Run a command, browser opens with a beautifully rendered, navigable view of your file or folder. Edits in your editor show up live. One background server hosts every folder you open; `mdview stop` ends it.
+[Install](#install) · [Features](#features) · [Docs](docs/ARCHITECTURE.md) · [Changelog](CHANGELOG.md)
 
-```
+</div>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/hardikg2907/mdview/main/docs/assets/hero-dark.png">
+  <img alt="mdview showing a folder of docs: file tree on the left, a rendered document in the middle, and its outline on the right" src="https://raw.githubusercontent.com/hardikg2907/mdview/main/docs/assets/hero-light.png" width="100%">
+</picture>
+
+## Quick start
+
+```bash
+npm install -g @hardikg/mdview
+
 mdview ./docs              # browse a folder
 mdview README.md           # view a single file
 mdview                     # current directory
 ```
+
+Your browser opens on a rendered, navigable view of the file or folder. One background server hosts every folder you open; `mdview stop` ends it.
+
+## Highlights
+
+- **Made for long documents.** A file tree, an outline with scroll-spy, breadcrumbs, collapsible sections, focus mode and a minimap keep you oriented.
+- **Live reload.** Save in your editor and the page updates without losing your place.
+- **Rich rendering.** GitHub-flavored markdown, Shiki syntax highlighting, Mermaid diagrams, KaTeX math and front matter.
+- **Search.** In-document and folder-wide search with case, whole-word and regex options, plus a `⌘P` fuzzy file switcher.
+- **Editorial typography.** Eight palettes, each with a light and a dark variant.
+- **Keyboard first.** `j`/`k` between headings, `gg`/`⇧G`, `⌘B` for the tree, `?` for the full list.
+- **Local and private.** It binds to `127.0.0.1`, sends no telemetry and works offline.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/hardikg2907/mdview/main/docs/assets/live-reload-dark.gif">
+    <img alt="Saving a markdown file: the new section appears in the browser right away, and the view stays where it was" src="https://raw.githubusercontent.com/hardikg2907/mdview/main/docs/assets/live-reload-light.gif" width="760">
+  </picture>
+  <br>
+  <sub>Save in your editor, and the open page updates where you are reading.</sub>
+</p>
 
 ## Why
 
@@ -22,6 +63,18 @@ Reading long markdown docs is hard:
 
 `mdview` is built for that. It's a single-machine, single-user, read-only viewer with editorial typography, persistent navigation, and live reload.
 
+### How it compares
+
+|  | mdview | [grip](https://github.com/joeyespo/grip) | VS Code preview | Obsidian |
+|---|---|---|---|---|
+| Runs as | A CLI that opens a browser tab | A CLI that opens a browser tab | A pane in the editor | A desktop app |
+| Renders offline | Yes | No, it sends the file to the GitHub API | Yes | Yes |
+| Browse a folder of docs | File tree and outline | One file at a time, follows links | Explorer and Outline views | Vault with file explorer |
+| Mermaid and math built in | Yes | Not documented | Yes | Yes |
+| Open source | Yes, MIT | Yes | Yes, MIT | No |
+
+Pick mdview when you want to read docs, not edit them, and you do not want to open an editor or an app for it.
+
 ## Install
 
 ```bash
@@ -30,7 +83,8 @@ npm install -g @hardikg/mdview
 
 Requires Node >= 22.12. The `mdview` binary lands on your `PATH`.
 
-## Install from source
+<details>
+<summary><strong>Install from source, or share a build without publishing</strong></summary>
 
 ```bash
 git clone https://github.com/hardikg2907/mdview.git
@@ -58,6 +112,8 @@ Send them the `.tgz` (Slack/Drive/AirDrop). They install with:
 ```bash
 npm install -g ./hardikg-mdview-<version>.tgz
 ```
+
+</details>
 
 ## Usage
 
@@ -100,6 +156,9 @@ $ mdview ls
 server:  http://mdview.localhost:7331/  (pid 40113)
 logs:    ~/.config/mdview/daemon.log
 ```
+
+<details>
+<summary><strong>How the background server works, and more flags</strong></summary>
 
 Folders stay open until you remove them with `mdview rm <name>`, across restarts
 and reboots. Up to 8 at a time — each one holds a live file watcher, so the
@@ -148,7 +207,12 @@ invocation that worked before still behaves exactly as it did; only the bare
 stopped with `mdview stop`. Set `MDVIEW_DEBUG=1` for full stack traces on
 unexpected errors.
 
+</details>
+
 ## Keyboard shortcuts
+
+<details>
+<summary><strong>All shortcuts</strong></summary>
 
 | Shortcut | Action |
 |----------|--------|
@@ -170,6 +234,8 @@ unexpected errors.
 | `Enter` / `Shift+Enter` | Next / previous match in search |
 | `Esc` | Close search / lightbox / panel |
 | `?` | Open shortcuts panel |
+
+</details>
 
 Click the keyboard icon in the header anytime to see the full list.
 
@@ -200,7 +266,7 @@ Click the keyboard icon in the header anytime to see the full list.
 - Math via KaTeX (`$inline$` and `$$block$$`), lazy-loaded only when a doc contains math.
 - Custom-styled task list checkboxes (filled accent when checked, hollow when unchecked).
 - Front matter detected and shown as a small collapsible metadata block.
-- Inline HTML pass-through (your content, your trust), except `<meta>` and `<base>`, which could send the tab to another site.
+- Inline HTML pass-through (your content, your trust), except `<meta>`, `<base>` and `<link>`, which could send the tab to another site or make network requests.
 - Images render via a safe `/__asset/*` route with relative-path resolution against the file's folder. Click any image to open in a lightbox.
 - External links get an `↗` icon and open in a new tab with `noopener noreferrer`.
 
@@ -235,6 +301,9 @@ Two layered files, both optional, same schema:
 }
 ```
 
+<details>
+<summary><strong>Validation, the ignore list and the <code>config</code> command</strong></summary>
+
 The global file also takes `"updateCheck": true` (see [Updates](#updates)). A per-project file ignores it.
 
 All fields optional. Validated on load: an unknown key is dropped without a word, and an invalid value is dropped with a warning in the server's output (`daemon.log` for the background server). `lineWidth` takes a short CSS length such as `70ch` or `900px` — at most 32 characters, made only of letters, digits, `_`, `%`, `.` and `-`. Edit the per-project file while the server is running and the SPA picks up palette/font/lineWidth changes live; `ignore` is read once at startup (the file watcher's skip list is frozen — restart mdview after editing).
@@ -250,6 +319,8 @@ mdview config ignore add deps _site # add one or more basenames
 mdview config ignore rm  deps       # remove one or more basenames
 mdview config update-check on       # daily check for a newer release (off by default)
 ```
+
+</details>
 
 ## Updates
 

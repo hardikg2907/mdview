@@ -38,7 +38,7 @@ Comprehensive catalog of what `mdview` does today.
 | Mermaid diagrams (lazy-loaded) | server emits `<div class="mermaid-block">`; `lib/mermaid-loader.ts` does dynamic `import('pele/lazy')` only when present; colours come from CSS variables, so palette and light/dark switches need no re-render |
 | **Math / LaTeX (KaTeX, lazy-loaded)** | custom `markdown-it` core rule in `render/math.ts` emits `<span class="math-inline">` and `<div class="math-block">`; `lib/katex-loader.ts` dynamic-imports KaTeX + injects its CSS only when math is present |
 | Front matter (YAML only, bounded) parsing & display | `render/frontmatter.ts` + `<details>` block in `Content.tsx` |
-| Inline HTML pass-through | markdown-it `html: true`; `<meta>` and `<base>` are removed at render time (`render/html-tags.ts`) |
+| Inline HTML pass-through | markdown-it `html: true`; `<meta>`, `<base>` and `<link>` are removed at render time (`render/html-tags.ts`) |
 | Images with relative-path resolution | `rewriteImageSrc` rewrites to `/__asset/<resolved>`; `api-asset.ts` serves with mime detection |
 | Image lightbox on click | `lib/image-lightbox.ts` + `Lightbox.tsx` |
 | External links → `↗` icon + `target="_blank"` + `rel="noopener noreferrer"` | `lib/external-links.ts` |
@@ -180,7 +180,7 @@ Errors are mapped to a one-line `mdview: …` message with a non-zero exit;
 - The page CSP allows scripts from `'self'` only (no inline script) and sets `frame-src` and `object-src` to `'none'`.
 - A single-file root (`mdview ~/README.md`) is scoped to its one document. It is watched through its folder one level deep, filtered to that file, and never recursively.
 - Watchers (each root's tree and `.mdview.json`, and `workspace.json`) do not follow symlinks.
-- `<meta>` and `<base>` are removed from a document's raw HTML at render time, because a `<meta http-equiv="refresh">` would send the tab to another site.
+- `<meta>`, `<base>` and `<link>` are removed from a document's raw HTML at render time, because a `<meta http-equiv="refresh">` would send the tab to another site and a `<link rel="preconnect">` would start a network lookup.
 - Front matter is YAML only, with a node budget and a character budget.
 - Folder regex search runs in a worker thread that is stopped after 3 s. All folder searches share two slots and one 32 MB read budget, and literal search is bounded too.
 - Every response carries `x-content-type-options: nosniff`.
