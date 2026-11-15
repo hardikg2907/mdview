@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.2] — 2026-11-15
+
 ### Fixed
 - **Live reload kept jumping to the top of the document.** Saving the open file now keeps the scroll position; only opening a different document resets it to the top (or to its `#hash` anchor).
 
@@ -342,7 +344,8 @@ Initial v1 release plus phase-2 features. Highlights:
 - Per-project `.mdview.json` config (palette, font, line-width, default-collapsed sidebars).
 - Friendly CLI error messages and graceful shutdown.
 
-[Unreleased]: https://github.com/hardikg2907/mdview/compare/v0.11.1...HEAD
+[Unreleased]: https://github.com/hardikg2907/mdview/compare/v0.11.2...HEAD
+[0.11.2]: https://github.com/hardikg2907/mdview/compare/v0.11.1...v0.11.2
 [0.11.1]: https://github.com/hardikg2907/mdview/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/hardikg2907/mdview/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/hardikg2907/mdview/compare/v0.9.1...v0.10.0
