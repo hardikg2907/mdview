@@ -20,7 +20,7 @@ describe('resolveSafePath', () => {
     mkdirSync(path.join(base, 'outside'));
     writeFileSync(path.join(root, 'docs', 'intro.md'), '# hi');
     writeFileSync(path.join(base, 'outside', 'secret'), 'TOP-SECRET');
-    realRoot = realpathSync(root);
+    realRoot = realpathSync.native(root);
     if (!isWin) {
       symlinkSync('../outside/secret', path.join(root, 'leak.md'));
       symlinkSync(path.join(base, 'outside'), path.join(root, 'outdir'));
