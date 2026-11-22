@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **mdview now requires Node 22.22 or later** (was 22.12). The file watcher moved to chokidar 6, which needs it. On macOS and Windows a folder is now watched through one native recursive handle.
+- **The VS Code extension now requires VS Code 1.110 or later** (was 1.101), the first release that runs on Node 22.22.
+
 ### Fixed
 - **Live reload did nothing for a single-file root on Windows** (`mdview README.md`). The watcher now sees saves to that file on Windows too.
 

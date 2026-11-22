@@ -11,7 +11,7 @@ One command. Local and offline. macOS, Linux and Windows.
 [![Downloads](https://img.shields.io/npm/dm/@hardikg/mdview?color=c2410c)](https://www.npmjs.com/package/@hardikg/mdview)
 [![Socket](https://badge.socket.dev/npm/package/@hardikg/mdview)](https://socket.dev/npm/package/@hardikg/mdview)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Node](https://img.shields.io/badge/node-%3E%3D22.12-brightgreen)](https://nodejs.org)
+[![Node](https://img.shields.io/badge/node-%3E%3D22.22-brightgreen)](https://nodejs.org)
 
 [Install](#install) · [Features](#features) · [Docs](docs/ARCHITECTURE.md) · [Changelog](CHANGELOG.md)
 
@@ -81,7 +81,7 @@ Pick mdview when you want to read docs, not edit them, and you do not want to op
 npm install -g @hardikg/mdview
 ```
 
-Requires Node >= 22.12. The `mdview` binary lands on your `PATH`.
+Requires Node >= 22.22. The `mdview` binary lands on your `PATH`.
 
 <details>
 <summary><strong>Install from source, or share a build without publishing</strong></summary>
@@ -332,7 +332,7 @@ $ mdview update
 mdview 0.11.0 → 0.12.0 is available.
 Install it with:
 
-  /Users/you/.nvm/versions/node/v22.20.0/bin/npm install -g @hardikg/mdview@0.12.0
+  /Users/you/.nvm/versions/node/v22.22.1/bin/npm install -g @hardikg/mdview@0.12.0
 
 The background server restarts itself on the next `mdview` run.
 ```
@@ -355,7 +355,7 @@ Only the global config can turn it on. A `.mdview.json` in a cloned repo cannot.
 
 ## Stack
 
-Node 22.12+, TypeScript 7, Fastify 5, markdown-it 15, Shiki 4, js-yaml 5, chokidar 4, Preact 11 + @preact/signals, KaTeX 0.19, pele (lazy), JetBrains Mono via @fontsource, Vite 8, tsup 9, vitest 5.
+Node 22.22+, TypeScript 7, Fastify 5, markdown-it 15, Shiki 4, js-yaml 5, chokidar 6, Preact 11 + @preact/signals, KaTeX 0.19, pele (lazy), JetBrains Mono via @fontsource, Vite 8, tsup 9, vitest 5.
 
 ## Documentation
 
