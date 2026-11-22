@@ -79,7 +79,7 @@
     "viewer"
   ],
   "dependencies": {
-    "@hardikg/mdview": "^0.11.0"
+    "@hardikg/mdview": "^0.11.2"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
@@ -87,7 +87,7 @@
     "@vscode/vsce": "^3.0.0",
     "esbuild": "^0.28.2",
     "typescript": "^7.0.0",
-    "vitest": "^5.0.0"
+    "vitest": "^5.1.1"
   },
   "scripts": {
     "build": "node esbuild.config.mjs",
