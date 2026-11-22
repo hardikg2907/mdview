@@ -58,7 +58,7 @@ afterEach(() => {
 });
 
 describe('state files', () => {
-  it('writes the state dir 0700 and files 0600', () => {
+  it.skipIf(process.platform === 'win32')('writes the state dir 0700 and files 0600', () => {
     writeDaemonState({ pid: 111, port: 7331, startedAt: 5 });
     // Mask off the file-type bits; only permissions matter here.
     expect(statSync(stateDir()).mode & 0o777).toBe(0o700);
