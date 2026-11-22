@@ -69,6 +69,12 @@ Hooks live in `.husky/` and install automatically the first time you run `npm in
 
 `npm audit` requires network — if you're offline (flight, tunneled VPN) it'll fail and block the commit. In that genuine case use `git commit --no-verify` to bypass, then re-run the full gate set the next time you're online and before cutting a release. **Do not habitually `--no-verify`** — the hooks exist because every one of these failure modes has bitten this repo before.
 
+### CI (GitHub Actions)
+
+`.github/workflows/ci.yml` runs on every pull request and every push to `main`. The `check` job runs the five gates above on Linux, macOS and Windows with Node 22. The `vscode` job runs `typecheck` and `test:unit` in `apps/vscode`. Husky is off in CI (`HUSKY=0`).
+
+Dependabot (`.github/dependabot.yml`) opens weekly pull requests for the root package, `apps/vscode` and the GitHub Actions. Minor and patch bumps come grouped in one pull request. It skips major `@types/node` bumps (they must match `engines.node`) and minor or major `@types/vscode` bumps (they must match `engines.vscode`).
+
 ## Project layout (where things go)
 
 ```
