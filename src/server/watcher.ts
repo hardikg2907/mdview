@@ -67,10 +67,18 @@ export function createWatcher(rootAbsPath: string, opts: CreateWatcherOptions = 
   // directly: a direct watch follows the file's inode, and editors that save by
   // writing a temp file and renaming it over the original replace that inode.
   // The folder sees the rename, and the filter keeps every other entry out.
+  // chokidar hands `ignored` '/'-separated paths on Windows too, so normalize
+  // before comparing, or every path, the root included, is filtered out.
   const scope =
     only === undefined
       ? { ignored: (p: string) => isPathIgnored(p, rootAbsPath, ignore) }
-      : { ignored: (p: string) => p !== rootAbsPath && p !== only, depth: 0 };
+      : {
+          ignored: (p: string) => {
+            const n = path.normalize(p);
+            return n !== rootAbsPath && n !== only;
+          },
+          depth: 0,
+        };
 
   const watcher: FSWatcher = chokidar.watch(rootAbsPath, {
     ignoreInitial: true,

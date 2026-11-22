@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Live reload did nothing for a single-file root on Windows** (`mdview README.md`). The watcher now sees saves to that file on Windows too.
+
 ## [0.11.2] — 2026-11-15
 
 ### Fixed
